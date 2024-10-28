@@ -1,0 +1,92 @@
+/* ChatPage.css */
+
+/* Estilo para imagens nas mensagens */
+.message-image {
+    max-width: 200px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  
+  .message-image:hover {
+    transform: scale(1.05);
+  }
+  
+  /* Link de download */
+  .download-link a {
+    color: inherit;
+    text-decoration: none;
+  }
+  
+  .download-link a:hover {
+    text-decoration: underline;
+  }
+  
+  /* Estilo para mensagens de arquivo */
+  .file-message a {
+    color: inherit;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+  }
+  
+  .file-message a:hover {
+    text-decoration: underline;
+  }
+  
+  /* Estilo para o player de áudio */
+  .audio-message {
+    display: flex;
+    align-items: center;
+  }
+  
+  .audio-play-button {
+    font-size: 24px;
+    color: #1890ff;
+    margin-right: 8px;
+  }
+
+ 
+  
+  .audio-player {
+    width: 100%;
+    outline: none;
+    /* Estilize o player de áudio conforme desejado */
+    background-color: transparent;
+  }
+  
+  .audio-player::-webkit-media-controls-panel {
+    background-color: transparent;
+  }
+  
+  .audio-player::-webkit-media-controls-play-button,
+  .audio-player::-webkit-media-controls-pause-button,
+  .audio-player::-webkit-media-controls-volume-slider {
+    /* Personalize os controles se possível */
+  }
+  
+  /* Estilo para o card da mensagem */
+  .message-card {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  
+  /* Estilo para o picker de emojis */
+  .emoji-picker {
+    position: absolute;
+    bottom: 80px;
+    left: 16px;
+    z-index: 1000;
+  }
+  
+  /* Ajustes para dispositivos móveis */
+  @media (max-width: 768px) {
+    .message-card {
+      max-width: 90%;
+    }
+  
+    .emoji-picker {
+      left: 8px;
+      right: 8px;
+    }
+  }
+  

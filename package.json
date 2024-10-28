@@ -1,0 +1,80 @@
+{
+  "name": "ligchat-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@dnd-kit/core": "^6.1.0",
+    "@dnd-kit/modifiers": "^7.0.0",
+    "@dnd-kit/sortable": "^8.0.0",
+    "@emoji-mart/data": "^1.2.1",
+    "@emoji-mart/react": "^1.1.1",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "@types/emoji-mart": "^3.0.14",
+    "@types/jest": "^27.5.2",
+    "@types/node": "^16.18.112",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "@wavesurfer/react": "^1.0.7",
+    "antd": "^5.21.2",
+    "chart.js": "^4.4.4",
+    "date-fns": "^4.1.0",
+    "dayjs": "^1.11.13",
+    "emoji-mart": "^5.6.0",
+    "emoji-picker-react": "^4.12.0",
+    "moment": "^2.30.1",
+    "os-browserify": "^0.3.0",
+    "path-browserify": "^1.0.1",
+    "react": "^18.3.1",
+    "react-chartjs-2": "^5.2.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-dom": "^18.3.1",
+    "react-draggable": "^4.4.6",
+    "react-flow-renderer": "^10.3.17",
+    "react-h5-audio-player": "^3.9.3",
+    "react-hook-form": "^7.53.0",
+    "react-input-mask": "^2.0.4",
+    "react-router-dom": "^6.26.2",
+    "react-scripts": "5.0.1",
+    "react-text-mask": "^5.5.0",
+    "reactflow": "^11.11.4",
+    "socket.io-client": "^4.8.0",
+    "wavesurfer.js": "^7.8.6",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@types/react-input-mask": "^3.0.5",
+    "@types/react-mic": "^12.4.6",
+    "@types/react-text-mask": "^5.4.14",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^4.9.5"
+  }
+}

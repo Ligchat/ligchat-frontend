@@ -1,0 +1,110 @@
+.audio-message-container {
+    display: flex;
+    align-items: center;
+    background-color: #e9f7fe;
+    border-radius: 15px;
+    margin: 5px 0;
+    max-width: 100%;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+  
+  .audio-player-custom {
+    flex: 1;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    min-width: 300px; /* Aumenta a largura mínima do player */
+  }
+  
+  .audio-player-custom .rhap_container {
+    background-color: transparent !important;
+    border-radius: 15px;
+    width: 100%;
+  }
+
+  .audio-player-custom .rhap_progress-bar {
+    height: 6px; /* Deixa a barra de progresso um pouco maior */
+    background-color: #d3d3d3 !important; /* Define o fundo da barra como cinza claro */
+    border-radius: 3px; /* Arredonda a barra de progresso */
+    position: relative;
+  }
+  
+  
+  .audio-player-custom .rhap_progress-filled {
+    background-color: #007aff !important;
+    border-radius: 3px;
+  }
+  
+  .audio-player-custom .rhap_play-pause-button {
+    color: #007aff !important;
+    font-size: 24px; /* Aumenta o tamanho do ícone de play/pause */
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .audio-player-custom .rhap_progress-indicator {
+    width: 10px; /* Ajuste para melhor alinhamento */
+    height: 10px;
+    background-color: #007aff !important;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%; /* Centraliza verticalmente */
+    transform: translate(-50%, -50%); /* Centraliza horizontal e verticalmente */
+    margin-left: 3px; /* Ajuste fino para melhor alinhamento */
+  }
+  
+
+  /* AudioMessage.css */
+
+/* Estilo normal dos itens da lista */
+.contact-list-item {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease-in-out;
+  }
+  
+  /* Efeito hover com borda animada */
+  .contact-list-item:hover {
+    transform: scale(1.02);
+  }
+  
+  .select-status-1 .ant-select-selector {
+    border: 2px solid green !important;
+  }
+  
+  .select-status-2 .ant-select-selector {
+    border: 2px solid red !important;
+  }
+  
+  .select-status-3 .ant-select-selector {
+    border: 2px solid blue !important;
+  }
+  
+  
+  .contact-list-item:hover::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 2px solid #f1f1f1; /* Cor da borda animada */
+    border-radius: 4px;
+    animation: borderAnimation 1s linear infinite; /* Animação contínua */
+  }
+  
+  /* Definindo a animação da borda */
+  @keyframes borderAnimation {
+    0% {
+      box-shadow: 0 0 5px rgba(24, 144, 255, 0.5);
+    }
+    50% {
+      box-shadow: 0 0 15px rgba(24, 144, 255, 0.7);
+    }
+    100% {
+      box-shadow: 0 0 5px rgba(24, 144, 255, 0.5);
+    }
+  }
+  
