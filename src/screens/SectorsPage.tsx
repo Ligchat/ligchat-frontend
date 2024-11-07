@@ -11,7 +11,7 @@ import {
 } from '../services/SectorService';
 import SessionService from '../services/SessionService';
 import LoadingOverlay from '../components/LoadingOverlay';
-import axios from '../axiosConfig';
+import axios from 'axios';
 
 const { TextArea } = Input;
 

@@ -1,5 +1,5 @@
 
-import axios from '../axiosConfig';
+import axios from 'axios';
 import SessionService from './SessionService';
 
 export interface Tag {

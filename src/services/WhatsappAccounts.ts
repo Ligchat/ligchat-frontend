@@ -1,4 +1,4 @@
-import axios from '../axiosConfigWhatsapp';
+import axios from 'axios';
 
 
 export interface WhatsAppAccount {

@@ -1,6 +1,6 @@
 // services/MessageSchedulingService.ts
 
-import axios from '../axiosConfig';
+import axios from 'axios';
 import SessionService from './SessionService';
 
 
