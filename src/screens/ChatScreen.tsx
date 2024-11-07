@@ -117,7 +117,7 @@ const ChatPage: React.FC = () => {
 
 
   useEffect(() => {
-    socket.current = new WebSocket(`wss://7723-177-84-243-109.ngrok-free.app?sectorId=${sessionId}`);
+    socket.current = new WebSocket(`wss://whatsapp.ligchat.com?sectorId=${sessionId}`);
 
     socket.current.onopen = () => {
       console.log('WebSocket connection established');
