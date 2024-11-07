@@ -4,7 +4,7 @@ module.exports = function(app) {
     app.use(
         '/contact',  // Isso deve corresponder à rota que está funcionando no backend
         createProxyMiddleware({
-            target: 'http://localhost:5167',  // Porta correta do backend
+            target: 'https://whatsapp.ligchat.com',  // Porta correta do backend
             changeOrigin: true,
         })
     );
@@ -12,7 +12,7 @@ module.exports = function(app) {
     app.use(
         '/whatsapp',  // Isso deve corresponder à rota que está funcionando no backend
         createProxyMiddleware({
-            target: 'http://localhost:5167',  // Porta correta do backend
+            target: 'https://whatsapp.ligchat.com',  // Porta correta do backend
             changeOrigin: true,
         })
     );
@@ -20,7 +20,7 @@ module.exports = function(app) {
     app.use(
         '/api', 
         createProxyMiddleware({
-            target: 'http://localhost:5251',
+            target: 'https://api.ligchat.com',  // Porta correta do backend
             changeOrigin: true,
         })
     );

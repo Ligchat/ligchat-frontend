@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from '../axiosConfig';
 
 export interface BusinessHourInterface {
   id?: number; 

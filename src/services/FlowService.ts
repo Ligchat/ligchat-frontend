@@ -1,6 +1,6 @@
 import { message } from 'antd';
 import SessionService from './SessionService';
-import axios from 'axios';
+import axios from '../axiosConfig';
 
 // Interface para a entidade Flow
 export interface Flow {

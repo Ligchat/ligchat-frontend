@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from '../axiosConfigWhatsapp';
 
 export interface WhatsAppContact {
     id: number;

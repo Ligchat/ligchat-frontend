@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios from 'axios';
 import { SendVerificationCodeRequestDTO } from '../interfaces/AuthInterface';
 import { VerifyCodeRequestDTO } from '../interfaces/AuthInterface';
 import SessionService from './SessionService';

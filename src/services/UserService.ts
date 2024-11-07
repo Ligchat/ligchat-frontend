@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from '../axiosConfig';
 // Interface para representar um usuário
 export interface User {
   id: number;

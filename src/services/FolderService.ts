@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from '../axiosConfig';
 
 // Interface para a entidade Folder
 export interface Folder {
