@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Avatar, Dropdown, Button, Drawer, Select, message, Spin } from 'antd';
+import {
+    Layout,
+    Menu,
+    Avatar,
+    Dropdown,
+    Button,
+    Drawer,
+    Select,
+    message,
+    Spin
+} from 'antd';
 import {
     DashboardOutlined,
     MessageOutlined,
@@ -9,9 +19,6 @@ import {
     SettingOutlined,
     LogoutOutlined,
     MenuOutlined,
-    ApartmentOutlined,
-    NodeIndexOutlined,
-    DatabaseOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import Logo from '../assets/images/Logo.png';
@@ -25,11 +32,11 @@ import SectorsPage from '../screens/SectorsPage';
 import WebhookPage from '../screens/WebhookPage';
 import ProfilePage from '../screens/ProfilePage';
 import FlowPage from '../screens/FlowPage';
-import EditFlowPage from '../screens/EditFlowPage';
-import VariablesPage from '../screens/VariablesPage'; // Importando o componente de Variáveis
+import VariablesPage from '../screens/VariablesPage';
 import SessionService from '../services/SessionService';
 import { getUser } from '../services/UserService';
 import { getSectors, Sector } from '../services/SectorService';
+import EditFlowPage from '../screens/EditFlowPage';
 
 const { Header, Sider, Content } = Layout;
 const { Option } = Select;
@@ -45,8 +52,8 @@ const CombinedMenu: React.FC = () => {
     const [avatar, setAvatar] = useState<string | null>(null);
     const [selectedSector, setSelectedSector] = useState<string | null>(null);
     const [isEditingFlow, setIsEditingFlow] = useState(false);
-    
     const [selectedMenuKey, setSelectedMenuKey] = useState<string>('1');
+    const [isAdmin, setIsAdmin] = useState<boolean>(false);
     const navigate = useNavigate();
     const location = useLocation();
     const { id } = useParams<{ id: string }>();
@@ -63,11 +70,7 @@ const CombinedMenu: React.FC = () => {
 
     useEffect(() => {
         const tokenFromSession = SessionService.getSession('authToken');
-
-        if (!tokenFromSession || SessionService.isTokenExpired(tokenFromSession)) {
-            SessionService.clearAllSessions();
-            navigate('/', { state: { disconnected: true } });
-        } else {
+        if (tokenFromSession) {
             fetchSectors(tokenFromSession);
         }
     }, [navigate]);
@@ -140,7 +143,7 @@ const CombinedMenu: React.FC = () => {
                     break;
             }
         }
-    }, [location.pathname]);
+    }, [location.pathname, isEditingFlow, id]);
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -156,8 +159,10 @@ const CombinedMenu: React.FC = () => {
                 const response: any = await getUser(userId);
                 const userData = response.data;
                 setName(userData.name);
-                setAvatar(userData.avatarUrl || 'https://i.pravatar.cc/150?img=3');
+                setAvatar(userData.avatarUrl || null);
+                setIsAdmin(userData.isAdmin);
             } catch (error) {
+                console.error('Erro ao buscar dados do usuário:', error);
             }
         };
 
@@ -176,6 +181,7 @@ const CombinedMenu: React.FC = () => {
 
     const handleLogout = () => {
         SessionService.clearSession();
+        message.success('Sessão encerrada com sucesso.');
         navigate('/');
     };
 
@@ -195,39 +201,39 @@ const CombinedMenu: React.FC = () => {
                 setSelectedComponent(<MessageSchedule />);
                 navigate('/message/schedule');
                 break;
-            case '4':
+            case '4-1':
                 setSelectedComponent(<FlowPage />);
                 navigate('/flow');
                 break;
-            case '5':
+            case '4-2':
                 setSelectedComponent(<VariablesPage />);
                 navigate('/flow/variable');
                 break;
-            case '6':
+            case '5':
                 setSelectedComponent(<CRMPage />);
                 navigate('/crm');
                 break;
-            case '7':
+            case '6':
                 setSelectedComponent(<LabelPage />);
                 navigate('/labels');
                 break;
-            case '8':
+            case '7':
                 setSelectedComponent(<ProfilePage />);
                 navigate('/profile');
                 break;
-            case '9':
+            case '8-1':
                 setSelectedComponent(<AccessPage />);
                 navigate('/access');
                 break;
-            case '10':
+            case '8-2':
                 setSelectedComponent(<SectorsPage />);
                 navigate('/sector');
                 break;
-            case '11':
+            case '8-3':
                 setSelectedComponent(<WebhookPage />);
                 navigate('/webhook');
                 break;
-            case '12':
+            case '9':
                 handleLogout();
                 break;
             default:
@@ -236,21 +242,19 @@ const CombinedMenu: React.FC = () => {
         }
     };
 
-    
-
     const getPathFromKey = (key: string) => {
         switch (key) {
             case '1': return '/dashboard';
             case '2': return '/chat';
             case '3': return '/message/schedule';
-            case '4': return '/flow';
-            case '5': return '/flow/variable';
-            case '6': return '/crm';
-            case '7': return '/labels';
-            case '8': return '/profile';
-            case '9': return '/access';
-            case '10': return '/sector';
-            case '11': return '/webhook';
+            case '4-1': return '/flow';
+            case '4-2': return '/flow/variable';
+            case '5': return '/crm';
+            case '6': return '/labels';
+            case '7': return '/profile';
+            case '8-1': return '/access';
+            case '8-2': return '/sector';
+            case '8-3': return '/webhook';
             default: return '/dashboard';
         }
     };
@@ -258,42 +262,40 @@ const CombinedMenu: React.FC = () => {
     const menuItems = [
         { key: '1', icon: <DashboardOutlined />, label: 'DashBoard' },
         { key: '2', icon: <MessageOutlined />, label: 'Chat ao vivo' },
-        { key: '3', icon: <CalendarOutlined />, label: 'Agendamento de Mensagens' },
+        { key: '3', icon: <MessageOutlined />, label: 'Agendamento de Mensagens' },
         {
             key: '4',
-            icon: <NodeIndexOutlined />, // Ícone para Flow
+            icon: <CalendarOutlined />,
             label: 'Flow',
             children: [
-                { key: '4', icon: <NodeIndexOutlined />, label: 'Flow', onClick: () => navigate('/flow') },
-                { key: '5', icon: <DatabaseOutlined />, label: 'Variáveis', onClick: () => navigate('/flow/variable') },
+                { key: '4-1', label: 'Flow' },
+                { key: '4-2', label: 'Variáveis' },
             ],
         },
-        { key: '6', icon: <TagsOutlined />, label: 'CRM' },
-        { key: '7', icon: <TagsOutlined />, label: 'Etiqueta' },
-        { key: '8', icon: <UserOutlined />, label: 'Perfil' },
-        {
-            key: '9',
-            icon: <SettingOutlined />,
-            label: 'Configurações',
-            children: [
-                { key: '9', icon: <UserOutlined />, label: 'Acessos', onClick: () => navigate('/access') },
-                { key: '10', icon: <ApartmentOutlined />, label: 'Gerenciar Setores', onClick: () => navigate('/sector') },
-                { key: '11', icon: <SettingOutlined />, label: 'Webhook', onClick: () => navigate('/webhook') },
-            ],
-        },
-        { key: '12', icon: <LogoutOutlined />, label: 'Sair', onClick: handleLogout },
+        { key: '5', icon: <TagsOutlined />, label: 'CRM' },
+        { key: '6', icon: <TagsOutlined />, label: 'Etiqueta' },
+        { key: '7', icon: <UserOutlined />, label: 'Perfil' },
+        ...(isAdmin ? [
+            {
+                key: '8',
+                icon: <SettingOutlined />,
+                label: 'Configurações',
+                children: [
+                    { key: '8-1', label: 'Acessos' },
+                    { key: '8-2', label: 'Gerenciar Setores' },
+                    { key: '8-3', label: 'Webhook' },
+                ],
+            }
+        ] : []),
+        { key: '9', icon: <LogoutOutlined />, label: 'Sair' },
     ];
 
+    const dropdownMenuItems = [
+        { key: '10', label: 'Perfil', icon: <UserOutlined /> },
+        { key: '11', label: 'Editar Fluxo' },
+    ];
 
-
-    const dropdownMenu = (
-        <Menu>
-<Menu.Item key="12" icon={<UserOutlined />}>
-    <span onClick={() => handleMenuClick("8")}>Perfil</span>
-</Menu.Item>
-
-        </Menu>
-    );
+    const dropdownMenu = { items: dropdownMenuItems };
 
     const showDrawer = () => {
         setDrawerVisible(true);
@@ -315,8 +317,7 @@ const CombinedMenu: React.FC = () => {
                     backgroundColor: '#fff',
                 }}
             >
-<div style={{ display: 'flex', alignItems: 'center', marginLeft: isMobile ? 0 : 18}}>
-                {isMobile && (
+                <div style={{ display: 'flex', alignItems: 'center' }}>
                     <Button
                         type="text"
                         onClick={showDrawer}
@@ -324,36 +325,37 @@ const CombinedMenu: React.FC = () => {
                         style={{ fontSize: '20px', marginRight: '16px' }}
                         className="menu-button"
                     />
-                )}
                     <img src={Logo} alt="LigChat Logo" style={{ maxWidth: '40px', maxHeight: '40px' }} />
                 </div>
-
-
-                <Dropdown overlay={dropdownMenu} trigger={['hover']}>
-    <div className="flex items-center cursor-pointer">
-        {isLoading ? (
-            <div className="w-10 h-10 rounded-full bg-gray-300 animate-pulse"></div>
-        ) : (
-            <Avatar size={40} src={avatar || 'https://i.pravatar.cc/150?img=3'} />
-        )}
-        <span className="ml-2 text-black">
-            {isLoading ? (
-                <div className="w-24 h-4 bg-gray-300 animate-pulse rounded"></div>
-            ) : (
-                name
-            )}
-        </span>
-    </div>
-</Dropdown>
+                <Dropdown menu={dropdownMenu}>
+                    <div className="flex items-center cursor-pointer">
+                        {isLoading ? (
+                            <div className="w-10 h-10 rounded-full bg-gray-300 animate-pulse"></div>
+                        ) : (
+                            <Avatar
+                                size={40}
+                                icon={!avatar ? <UserOutlined /> : undefined}
+                                src={avatar ? avatar : undefined}
+                            />
+                        )}
+                        <span className="ml-2 text-black">
+                            {isLoading ? (
+                                <div className="w-24 h-4 bg-gray-300 animate-pulse rounded"></div>
+                            ) : (
+                                name
+                            )}
+                        </span>
+                    </div>
+                </Dropdown>
             </Header>
 
             <Layout>
                 {!isMobile && (
                     <Sider
                         width={300}
+                        collapsible
                         collapsed={collapsed}
                         onCollapse={(collapsed) => setCollapsed(collapsed)}
-                        collapsible={!isMobile}
                         breakpoint="lg"
                         collapsedWidth="0"
                         className="site-layout-background menu-sider"
@@ -389,7 +391,6 @@ const CombinedMenu: React.FC = () => {
                                 />
                                 <div style={{ marginTop: '20px' }}>
                                     <Select
-                                    notFoundContent="Nenhum setor encontrado"
                                         value={selectedSector || null}
                                         style={{ width: '100%' }}
                                         placeholder="Selecione o setor"
@@ -429,13 +430,12 @@ const CombinedMenu: React.FC = () => {
                         />
                         <div style={{ margin: '16px' }}>
                             <Select
-                            notFoundContent="Nenhum setor encontrado"
                                 value={selectedSector}
                                 style={{ width: '100%' }}
                                 placeholder="Selecione o setor"
                                 onChange={handleSectorChange}
                             >
-                                <Option value="clear">Selecione a sessão</Option>
+                                <Option value={null}>Selecione o setor</Option>
                                 {sectors.map((sector) => (
                                     <Option key={sector.id} value={sector.id}>
                                         {sector.name}

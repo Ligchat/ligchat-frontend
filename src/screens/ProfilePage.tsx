@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Input, Upload, Avatar, message, Skeleton } from 'antd';
+import { UploadOutlined, UserOutlined } from '@ant-design/icons';
 import SessionService from '../services/SessionService';
 import { updateUser, getUser } from '../services/UserService';
-import { UploadOutlined } from '@ant-design/icons';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { useNavigate } from 'react-router-dom';
 
@@ -37,7 +37,7 @@ const ProfilePage: React.FC = () => {
         setName(userData.name);
         setEmail(userData.email);
         setPhoneNumber(userData.phoneWhatsapp);
-        setAvatar(userData.avatarUrl || 'https://i.pravatar.cc/150?img=3');
+        setAvatar(userData.avatarUrl || null); // Ajuste aqui
       } catch (error) {
         console.error('Erro ao buscar dados do usuário', error);
       } finally {
@@ -88,6 +88,7 @@ const ProfilePage: React.FC = () => {
       setSuccessMessage(true);
       setTimeout(() => setSuccessMessage(false), 3000);
     } catch (error) {
+      console.error('Erro ao atualizar o usuário', error);
     } finally {
       setIsLoading(false);
     }
@@ -140,7 +141,11 @@ const ProfilePage: React.FC = () => {
         {isAvatarLoading ? (
           <Skeleton.Avatar active size={100} shape="circle" />
         ) : (
-          <Avatar size={100} src={avatar || 'https://i.pravatar.cc/150?img=3'} />
+          <Avatar 
+            size={100} 
+            src={avatar || undefined} 
+            icon={!avatar ? <UserOutlined /> : undefined} 
+          />
         )}
         <div className="text-center mt-2">
           <Upload showUploadList={false} beforeUpload={handleUpload}>

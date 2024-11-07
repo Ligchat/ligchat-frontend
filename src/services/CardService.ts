@@ -1,38 +1,42 @@
+// src/services/CardService.ts
 import axios from "axios";
 
 export interface Contact {
-    id: number;
-    name: string;
-    phone: string;
-    email: string;
-  }
-  
-  export interface Card {
-    id: number;
-    contactId: number;
-    tagId?: number;
-    columnId: number;
-    lastContact: Date | null;
-    sectorId: number;
-    contact: Contact; // Inclui as informações do contato associado
-  }
-  
-  export interface CreateCardRequestDTO {
-    contactId: number;
-    tagId?: number;
-    columnId: number;
-    lastContact: Date | null;
-    sectorId: number;
-  }
-  
-  export interface UpdateCardRequestDTO {
-    contactId: number;
-    tagId?: number;
-    columnId: number;
-    lastContact: Date | null;
-    sectorId: number;
-  }
-  
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+}
+
+export interface Card {
+  id: number;
+  contactId: number;
+  tagId?: number;
+  columnId: number;
+  lastContact: Date | null;
+  sectorId: number;
+  position: number;
+  contato: Contact;
+}
+
+export interface CreateCardRequestDTO {
+  contactId: number;
+  tagId?: number;
+  columnId: number;
+  lastContact: Date | null;
+  sectorId: number;
+  position: number;
+}
+
+export interface UpdateCardRequestDTO {
+  contactId: number;
+  tagId?: number;
+  columnId: number;
+  lastContact: Date | null;
+  sectorId: number;
+  position: number;
+}
+
 export const createCard = async (cardData: CreateCardRequestDTO) => {
   try {
     const response = await axios.post('/api/cards', cardData);
@@ -90,18 +94,16 @@ export const deleteCard = async (id: number) => {
   }
 };
 
-export const moveCard = async (id: number, newColumnId: number) => {
-    try {
-      const response = await axios.put(`/api/Cards/${id}/move`, null, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        params: {
-          newColumnId,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to move card with id ${id} to column with id ${newColumnId}: ${error}`);
-    }
-  };
+// Atualização da função moveCard para aceitar newPosition
+export const moveCard = async (id: number, newColumnId: number, newPosition: number) => {
+  try {
+    const response = await axios.put(`/api/cards/${id}/move`, { newColumnId, newPosition }, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(`Failed to move card with id ${id} to column with id ${newColumnId}: ${error}`);
+  }
+};

@@ -15,9 +15,10 @@ interface Person {
   email: string;
   enabled: boolean;
   isDeleting: boolean;
-  phoneWhatsapp:string;
+  phoneWhatsapp: string;
   isAdmin?: boolean;
-  status: boolean; // Adiciona a propriedade status
+  status: boolean;
+  sectors: string[];
 }
 
 const AccessPage: React.FC = () => {
@@ -29,16 +30,22 @@ const AccessPage: React.FC = () => {
     id: '',
     name: '',
     email: '',
-    phoneWhatsapp:'',
+    phoneWhatsapp: '',
     enabled: true,
     isDeleting: false,
     isAdmin: false,
-    status: true, // Incluir status por padrão como ativo
+    status: true,
+    sectors: [],
   });
+  const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
+
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAvatarLoading, setIsAvatarLoading] = useState<boolean>(true);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const navigate = useNavigate();
+  const token = SessionService.getSession('authToken');
+  const decodedToken = token ? SessionService.decodeToken(token) : null;
+  const userId = Number(decodedToken.userId);
+  const [invitedBy, setInvitedBy] = useState<number>(userId); // Estado para armazenar o ID do convidador
 
   useEffect(() => {
     const fetchSectors = async () => {
@@ -54,19 +61,19 @@ const AccessPage: React.FC = () => {
     const fetchUsers = async () => {
       try {
         setIsLoading(true);
-        const users: any = await getAllUsers();
-        const updatedPeople = users.data.map((user: any) => {
-          return {
-            id: user.id.toString(),
-            name: user.name,
-            email: user.email,
-            enabled: user.enabled,
-            phoneWhatsapp: user.phoneWhatsapp,
-            isDeleting: false,
-            isAdmin: user.isAdmin || false,
-            status: user.status !== undefined ? user.status : true, // Certifique-se de que status é booleano
-          };
-        });
+        
+        const users: any = await getAllUsers(userId); // Passa o invitedBy aqui
+        const updatedPeople = users.data.map((user: any) => ({
+          id: user.id.toString(),
+          name: user.name,
+          email: user.email,
+          enabled: user.enabled,
+          phoneWhatsapp: user.phoneWhatsapp,
+          isDeleting: false,
+          isAdmin: user.isAdmin || false,
+          status: user.status !== undefined ? user.status : true,
+          sectors: user.sectors || [],
+        }));
         setPeople(updatedPeople);
       } catch (error) {
         console.error('Failed to fetch users', error);
@@ -81,23 +88,25 @@ const AccessPage: React.FC = () => {
   }, []);
 
   const refreshUsers = async () => {
+
     try {
       setIsLoading(true);
-      const users: any = await getAllUsers();
-      const updatedPeople = users.data.map((user: any) => {
-        return {
-          id: user.id.toString(),
-          name: user.name,
-          email: user.email,
-          enabled: user.enabled,
-          isDeleting: false,
-          isAdmin: user.isAdmin || false,
-          status: user.status !== undefined ? user.status : true, // Certifique-se de que status é booleano
-        };
-      });
+      const users: any = await getAllUsers(invitedBy);
+      const updatedPeople = users.data.map((user: any) => ({
+        id: user.id.toString(),
+        name: user.name,
+        email: user.email,
+        enabled: user.enabled,
+        phoneWhatsapp: user.phoneWhatsapp,
+        isDeleting: false,
+        isAdmin: user.isAdmin || false,
+        status: user.status !== undefined ? user.status : true,
+        sectors: user.sectors || [],
+      }));
       setPeople(updatedPeople);
     } catch (error) {
       console.error('Failed to refresh users', error);
+      setPeople([]);
     } finally {
       setIsLoading(false);
     }
@@ -106,6 +115,7 @@ const AccessPage: React.FC = () => {
   const handleEditPerson = (person: Person) => {
     setEditingPerson({ ...person });
     setIsAdmin(person.isAdmin || false);
+    setSelectedSectors(person.sectors || []);
   };
 
   const handleSavePerson = async () => {
@@ -117,12 +127,15 @@ const AccessPage: React.FC = () => {
           email: editingPerson.email,
           phoneWhatsapp: editingPerson.phoneWhatsapp,
           isAdmin: isAdmin,
-          status: editingPerson.status, // Incluir o status aqui
+          status: editingPerson.status,
+          sectors: selectedSectors,
+          invitedBy: invitedBy
         };
 
         await updateUser(Number(editingPerson.id), updatedUser);
         setEditingPerson(null);
-        await refreshUsers(); // Atualiza a lista de usuários após a edição
+        setSelectedSectors([]);
+        await refreshUsers();
       } catch (error) {
         console.error('Failed to update user', error);
       } finally {
@@ -135,7 +148,7 @@ const AccessPage: React.FC = () => {
     try {
       setIsLoading(true);
       await deleteUser(personId);
-      await refreshUsers(); // Atualiza a lista de usuários após a exclusão
+      await refreshUsers();
     } catch (error) {
       console.error('Failed to delete user', error);
     } finally {
@@ -152,6 +165,7 @@ const AccessPage: React.FC = () => {
 
   const handleCancelEdit = () => {
     setEditingPerson(null);
+    setSelectedSectors([]);
   };
 
   const handleAddPerson = async () => {
@@ -162,7 +176,9 @@ const AccessPage: React.FC = () => {
         email: newPerson.email,
         phoneWhatsapp: '',
         isAdmin: isAdmin,
-        status: newPerson.status, // Adiciona status ao novo usuário
+        status: newPerson.status,
+        sectors: selectedSectors,
+        invitedBy: invitedBy, // Passa o ID do convidador se disponível
       };
 
       await createUser(newUser);
@@ -171,14 +187,16 @@ const AccessPage: React.FC = () => {
         id: '',
         name: '',
         email: '',
-        phoneWhatsapp:'',
+        phoneWhatsapp: '',
         enabled: true,
         isDeleting: false,
         isAdmin: false,
-        status: true, // Reseta status para o valor padrão
+        status: true,
+        sectors: [],
       });
+      setSelectedSectors([]);
       setIsAdmin(false);
-      await refreshUsers(); // Atualiza a lista de usuários após a adição
+      await refreshUsers();
     } catch (error) {
       console.error('Failed to create user', error);
     } finally {
@@ -243,9 +261,23 @@ const AccessPage: React.FC = () => {
                     disabled={isLoading}
                   />
                   <Select
-                  notFoundContent="Nenhum acesso encontrado"
+                    mode="multiple"
+                    placeholder="Selecione os setores"
+                    className="mb-4 w-full"
+                    onChange={setSelectedSectors}
+                    disabled={isLoading}
+                    value={selectedSectors}
+                  >
+                    {sectors.map((sector) => (
+                      <Option key={sector.id} value={sector.id}>
+                        {sector.name}
+                      </Option>
+                    ))}
+                  </Select>
+                  <Select
+                    notFoundContent="Nenhum acesso encontrado"
                     value={isAdmin ? "Administrador" : "Colaborador"}
-                    className="mb-4 w-full" // Setar width 100%
+                    className="mb-4 w-full"
                     onChange={(value) => setIsAdmin(value === 'Administrador')}
                     disabled={isLoading}
                   >
@@ -253,8 +285,8 @@ const AccessPage: React.FC = () => {
                     <Option value="Administrador">Administrador</Option>
                   </Select>
                   <Switch
-                    checked={editingPerson.status} // Controla o estado ativo/inativo
-                    onChange={(checked) => setEditingPerson({ ...editingPerson, status: checked })} // Atualiza status ao mudar
+                    checked={editingPerson.status}
+                    onChange={(checked) => setEditingPerson({ ...editingPerson, status: checked })}
                     disabled={isLoading}
                     checkedChildren="Ativo"
                     unCheckedChildren="Inativo"
@@ -273,8 +305,11 @@ const AccessPage: React.FC = () => {
                       <p className="text-gray-500">
                         <strong>Nível de Acesso:</strong> {person.isAdmin ? "Administrador" : "Colaborador"}
                       </p>
+                      <p className="text-gray-500">
+                        <strong>Setores:</strong> {person.sectors.join(', ')}
+                      </p>
                       <Switch
-                        checked={person.status} // Exibe se o usuário está ativo ou inativo
+                        checked={person.status}
                         disabled
                         checkedChildren="Ativo"
                         unCheckedChildren="Inativo"
@@ -321,9 +356,23 @@ const AccessPage: React.FC = () => {
           disabled={isLoading}
         />
         <Select
-        notFoundContent="Nenhum acesso encontrado"
+          mode="multiple"
+          placeholder="Selecione os setores"
+          className="mb-4 w-full"
+          onChange={setSelectedSectors}
+          disabled={isLoading}
+          value={selectedSectors}
+        >
+          {sectors.map((sector) => (
+            <Option key={sector.id} value={sector.id}>
+              {sector.name}
+            </Option>
+          ))}
+        </Select>
+        <Select
+          notFoundContent="Nenhum acesso encontrado"
           defaultValue="Colaborador"
-          className="mb-4 w-full" // Setar width 100%
+          className="mb-4 w-full"
           onChange={(value) => setIsAdmin(value === 'Administrador')}
           disabled={isLoading}
         >
@@ -331,8 +380,8 @@ const AccessPage: React.FC = () => {
           <Option value="Administrador">Administrador</Option>
         </Select>
         <Switch
-          checked={newPerson.status} // Controla o estado ativo/inativo ao adicionar um novo usuário
-          onChange={(checked) => setNewPerson({ ...newPerson, status: checked })} // Atualiza o status ao mudar
+          checked={newPerson.status}
+          onChange={(checked) => setNewPerson({ ...newPerson, status: checked })}
           checkedChildren="Ativo"
           unCheckedChildren="Inativo"
           className="mb-4"

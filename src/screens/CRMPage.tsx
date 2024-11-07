@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Input, Select, Modal, message, Spin } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import { DndProvider, useDrag, useDrop } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
-import { createColumn, getColumns } from '../services/ColumnService';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { createColumn, getColumns, deleteColumn, moveColumn } from '../services/ColumnService';
 import { createContact, updateContact } from '../services/ContactService';
-import { createCard, getCards, deleteCard, moveCard, updateCard } from '../services/CardService';
 import SessionService from '../services/SessionService';
-import LoadingOverlay from '../components/LoadingOverlay';
+import { createCard, deleteCard, moveCard } from '../services/CardService';
+import './CRMPage.css'
 
 const { Option } = Select;
 
@@ -23,6 +22,7 @@ interface CardType {
   contato: Contato;
   lastContact: string;
   labels: string[];
+  position: number;
 }
 
 interface Column {
@@ -30,18 +30,19 @@ interface Column {
   name: string;
   cards: CardType[];
   sectorId: number;
+  position: number; // Adicionando a posição
 }
 
 const CRMPage: React.FC = () => {
-  const [columns, setColumns] = useState<Column[]>([]);
+  const [columns, setColumns] = useState<Column[]>([{ id: -1, name: '', cards: [], sectorId: -1, position: 0 }]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
   const [isSidePanelVisible, setIsSidePanelVisible] = useState(false);
   const [currentColumnId, setCurrentColumnId] = useState<number | null>(null);
-  const [isMoving, setIsMoving] = useState<boolean>(false);
   const [selectedSector, setSelectedSector] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
 
   useEffect(() => {
     const sectorId = SessionService.getSession('selectedSector');
@@ -50,8 +51,8 @@ const CRMPage: React.FC = () => {
   }, []);
 
   const loadColumns = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       const columnsData = await getColumns();
       setColumns(columnsData);
     } catch (error) {
@@ -60,11 +61,15 @@ const CRMPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+  
 
   const handleAddColumn = async () => {
     try {
       const sectorId = SessionService.getSession('selectedSector');
-      await createColumn({ name: newColumnName, sectorId: sectorId });
+      const nextPosition = columns.length > 0 ? Math.max(...columns.map(col => col.position)) + 1 : 1;
+  
+      await createColumn({ name: newColumnName, sectorId: sectorId, position: nextPosition });
+  
       setNewColumnName('');
       setIsModalVisible(false);
       loadColumns();
@@ -74,10 +79,24 @@ const CRMPage: React.FC = () => {
     }
   };
 
+  const handleDeleteColumn = async (columnId: number) => {
+    try {
+      await deleteColumn(columnId);
+      message.success('Coluna excluída com sucesso!');
+      loadColumns();
+    } catch (error) {
+      console.error('Erro ao excluir coluna:', error);
+      message.error('Erro ao excluir a coluna. Tente novamente.');
+    }
+  };
+
   const handleSaveCard = async () => {
     if (selectedCard && currentColumnId !== null) {
       try {
         if (selectedCard.id === 0) {
+          const currentColumn = columns.find(col => col.id === currentColumnId);
+          const maxPosition = currentColumn && currentColumn.cards.length > 0 ? Math.max(...currentColumn.cards.map(card => card.position)) : 0;
+
           const newContact = await createContact({
             name: selectedCard.contato.name,
             phone: selectedCard.contato.phone,
@@ -90,6 +109,7 @@ const CRMPage: React.FC = () => {
             columnId: currentColumnId,
             lastContact: new Date(),
             sectorId: selectedSector || 1,
+            position: maxPosition ? maxPosition + 1 : 1,
           });
 
           message.success('Card criado com sucesso!');
@@ -136,6 +156,7 @@ const CRMPage: React.FC = () => {
       },
       lastContact: '',
       labels: [],
+      position: 0,
     });
     setIsSidePanelVisible(true);
   };
@@ -151,141 +172,193 @@ const CRMPage: React.FC = () => {
     setSelectedCard(null);
   };
 
-  const ContactCard: React.FC<{ card: CardType; columnId: number }> = ({ card, columnId }) => {
-    const [{ isDragging }, drag] = useDrag({
-      type: 'card',
-      item: { cardId: card.id, fromColumnId: columnId },
-      collect: (monitor) => ({
-        isDragging: !!monitor.isDragging(),
-      }),
-    });
+  const onDragEnd = async (result: any) => {
+    const { source, destination, type } = result;
 
-    return (
-      <Card
-        ref={drag}
-        className="mb-4"
-        style={{
-          cursor: 'move',
-          backgroundColor: '#fff',
-          padding: '12px',
-          borderRadius: '8px',
-          opacity: isDragging ? 0.5 : 1,
+    if (!destination) return;
+
+    if (type === 'column') {
+      const reorderedColumns = Array.from(columns);
+      const [removed] = reorderedColumns.splice(source.index, 1);
+      reorderedColumns.splice(destination.index, 0, removed);
+
+      const updatedColumns = reorderedColumns.map((col, index) => ({ ...col, position: index + 1 }));
+      setColumns(updatedColumns);
+
+      try {
+        console.log("Destino da coluna movida:", destination.index + 1);
+        await moveColumn(removed.id, destination.index + 1);
+      } catch (error) {
+        console.error('Erro ao mover coluna:', error);
+        message.error('Falha ao mover a coluna. Tente novamente.');
+        loadColumns();
+      }
+    } else {
+      const sourceColumnIndex = columns.findIndex(column => column.id === parseInt(source.droppableId));
+      const destColumnIndex = columns.findIndex(column => column.id === parseInt(destination.droppableId));
+
+      const sourceColumn = columns[sourceColumnIndex];
+      const destColumn = columns[destColumnIndex];
+
+      const sourceCards = Array.from(sourceColumn.cards);
+      const [movedCard] = sourceCards.splice(source.index, 1);
+
+      if (sourceColumnIndex === destColumnIndex) {
+        sourceCards.splice(destination.index, 0, movedCard);
+        const newColumn = {
+          ...sourceColumn,
+          cards: sourceCards.map((card, index) => ({ ...card, position: index + 1 })),
+        };
+        const newColumns = [...columns];
+        newColumns[sourceColumnIndex] = newColumn;
+        setColumns(newColumns);
+      } else {
+        const destCards = Array.from(destColumn.cards);
+        destCards.splice(destination.index, 0, movedCard);
+
+        const updatedSourceColumn = {
+          ...sourceColumn,
+          cards: sourceCards.map((card, index) => ({ ...card, position: index + 1 })),
+        };
+
+        const updatedDestColumn = {
+          ...destColumn,
+          cards: destCards.map((card, index) => ({ ...card, position: index + 1 })),
+        };
+
+        const newColumns = [...columns];
+        newColumns[sourceColumnIndex] = updatedSourceColumn;
+        newColumns[destColumnIndex] = updatedDestColumn;
+        setColumns(newColumns);
+      }
+
+      try {
+        await moveCard(movedCard.id, parseInt(destination.droppableId), destination.index + 1);
+      } catch (error) {
+        console.error('Erro ao mover card:', error);
+        message.error('Falha ao mover o card. Tente novamente.');
+        loadColumns();
+      }
+    }
+  };
+
+  const ContactCard: React.FC<{ card: CardType; columnId: number }> = ({ card, columnId }) => (
+    <Card
+      className={`mb-4 contact-card ${selectedCardId === card.id ? 'selected' : ''}`}
+      onClick={() => {
+        setSelectedCardId(card.id);
+        openEditCardPanel(card, columnId);
+      }}
+    >
+      <h3 className="font-bold">{card.contato.name}</h3>
+      <p className="text-gray-500">Último contato: {new Date(card.lastContact).toLocaleDateString()}</p>
+      <p className="text-gray-500">Telefone: {card.contato.phone}</p>
+      <Button
+        danger
+        icon={<DeleteOutlined />}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleDeleteCard(card.id);
         }}
-        onClick={() => openEditCardPanel(card, columnId)}
       >
-        <h3 className="font-bold">{card.contato.name}</h3>
-        <p className="text-gray-500">Nome: {card.contato.name}</p>
-        <p className="text-gray-500">Último contato: {new Date(card.lastContact).toLocaleDateString()}</p>
-        <p className="text-gray-500">Telefone: {card.contato.phone}</p>
-        <Button
-          danger
-          icon={<DeleteOutlined />}
-          onClick={(e) => { e.stopPropagation(); handleDeleteCard(card.id); }}
-        >
-          Excluir
-        </Button>
-      </Card>
-    );
-  };
-
-  const ColumnComponent: React.FC<{ column: Column }> = ({ column }) => {
-    const [, drop] = useDrop({
-      accept: 'card',
-      drop: async (item: { cardId: number; fromColumnId: number }) => {
-        if (item.fromColumnId !== column.id) {
-          const originalColumnId = item.fromColumnId;
-
-          try {
-            moveCardLocally(item.cardId, column.id);
-            setIsMoving(true);
-
-            await Promise.all([
-              moveCard(item.cardId, column.id),
-              new Promise((resolve) => setTimeout(resolve, 300))
-            ]);
-
-            loadColumns();
-          } catch (error) {
-            moveCardLocally(item.cardId, originalColumnId);
-          } finally {
-            setIsMoving(false);
-          }
-        }
-      },
-    });
-
-    const moveCardLocally = (cardId: number, toColumnId: number) => {
-      setColumns((prevColumns) => {
-        const newColumns = [...prevColumns];
-
-        const fromColumn = newColumns.find((col) =>
-          col.cards.some((card) => card.id === cardId)
-        );
-        const toColumn = newColumns.find((col) => col.id === toColumnId);
-
-        if (!fromColumn || !toColumn) return newColumns;
-
-        const cardIndex = fromColumn.cards.findIndex((card) => card.id === cardId);
-        const [movedCard] = fromColumn.cards.splice(cardIndex, 1);
-
-        toColumn.cards.push(movedCard);
-
-        return newColumns;
-      });
-    };
-
-    return (
-      <div ref={drop} className="bg-blue-900 text-white p-4 rounded-lg min-w-[250px] relative">
-        {isMoving && (
-          <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center z-10">
-            <Spin tip="Movendo..." />
-          </div>
-        )}
-        <h2 className="text-xl font-bold mb-4">{column.name}</h2>
-        {column.cards.map((card: CardType) => (
-          <ContactCard key={card.id} card={card} columnId={column.id} />
-        ))}
-        <Button
-          icon={<PlusOutlined />}
-          type="dashed"
-          className="w-full mt-4"
-          onClick={() => openAddCardPanel(column.id)}
-        >
-          Adicionar Card
-        </Button>
-      </div>
-    );
-  };
+        Excluir
+      </Button>
+    </Card>
+  );
 
   return (
-    <DndProvider backend={HTML5Backend}>
+    
+    <DragDropContext onDragEnd={onDragEnd}>
       <div className="p-8">
-        {isLoading && <LoadingOverlay />}
         <h1 className="text-3xl font-bold mb-6">CRM</h1>
         {selectedSector === null && (
           <div className="flex justify-center items-center h-64 text-lg text-gray-500">
             Nenhum setor selecionado
           </div>
         )}
-        <div className="flex overflow-x-auto space-x-4 pb-4">
-          {columns.map((column) => (
-            <div className="min-w-[300px]" key={column.id}>
-              <ColumnComponent column={column} />
-            </div>
+<div className="flex overflow-x-auto space-x-4 pb-4">
+{selectedSector != null && (
+  <Droppable droppableId="all-columns" direction="horizontal" type="column">
+    {(provided) => (
+      <div {...provided.droppableProps} ref={provided.innerRef} className="flex space-x-4">
+        {columns
+          .sort((a, b) => a.position - b.position) // Ordenar colunas pela posição
+          .map((column, index) => (
+            <Draggable draggableId={column.id.toString()} index={index} key={column.id}>
+              {(provided) => (
+                <div
+                  {...provided.draggableProps}
+                  ref={provided.innerRef}
+                  className="min-w-[300px]"
+                  {...provided.dragHandleProps}
+                >
+                  <Droppable droppableId={column.id.toString()}>
+                    {(provided) => (
+                      <div
+                        {...provided.droppableProps}
+                        ref={provided.innerRef}
+                        className="bg-blue-900 text-white p-4 rounded-lg min-w-[250px] relative"
+                      >
+                        <div className="flex justify-between items-center mb-4">
+                          <h2 className="text-xl font-bold">{column.name}</h2>
+                          <Button
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => handleDeleteColumn(column.id)}
+                          />
+                        </div>
+                        {column.cards
+                          .sort((a, b) => a.position - b.position)
+                          .map((card, index) => (
+                            <Draggable key={card.id} draggableId={card.id.toString()} index={index}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className={`contact-card-wrapper ${snapshot.isDragging ? 'dragging' : ''} ${selectedCardId === card.id ? 'selected' : ''}`}
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                    marginTop: snapshot.isDragging ? '5px' : '5px', // Ajuste o margin-top ao arrastar
+                                  }}
+                                >
+                                  <ContactCard card={card} columnId={column.id} />
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                        {provided.placeholder}
+                        <Button
+                          icon={<PlusOutlined />}
+                          type="dashed"
+                          className="w-full mt-4"
+                          onClick={() => openAddCardPanel(column.id)}
+                        >
+                          Adicionar Card
+                        </Button>
+                      </div>
+                    )}
+                  </Droppable>
+                </div>
+              )}
+            </Draggable>
           ))}
-           {selectedSector != null && (
-          <div className="min-w-[300px]">
-            <Button
-              type="dashed"
-              icon={<PlusOutlined />}
-              className="w-full"
-              onClick={() => setIsModalVisible(true)}
-            >
-              Adicionar Coluna
-            </Button>
-          </div>
-           )}
+        {provided.placeholder}
+        <div className="min-w-[300px]">
+          <Button
+            type="dashed"
+            icon={<PlusOutlined />}
+            className="w-full"
+            onClick={() => setIsModalVisible(true)}
+          >
+            Adicionar Coluna
+          </Button>
         </div>
+      </div>
+    )}
+  </Droppable>
+)}
+</div>
       </div>
 
       <Modal
@@ -306,9 +379,9 @@ const CRMPage: React.FC = () => {
           <h2 className="text-lg font-bold mb-4">{selectedCard.id ? 'Editar Card' : 'Adicionar Card'}</h2>
           <Input
             value={selectedCard.contato.name}
-            onChange={(e) => setSelectedCard({ 
-              ...selectedCard, 
-              contato: { ...selectedCard.contato, name: e.target.value } 
+            onChange={(e) => setSelectedCard({
+              ...selectedCard,
+              contato: { ...selectedCard.contato, name: e.target.value }
             })}
             placeholder="Nome do contato"
             className="mb-4"
@@ -322,15 +395,15 @@ const CRMPage: React.FC = () => {
           />
           <Input
             value={selectedCard.contato.phone}
-            onChange={(e) => setSelectedCard({ 
-              ...selectedCard, 
-              contato: { ...selectedCard.contato, phone: e.target.value } 
+            onChange={(e) => setSelectedCard({
+              ...selectedCard,
+              contato: { ...selectedCard.contato, phone: e.target.value }
             })}
             placeholder="Telefone"
             className="mb-4"
           />
           <Select
-          notFoundContent="Nenhuma etiqueta encontrada"
+            notFoundContent="Nenhuma etiqueta encontrada"
             mode="tags"
             value={selectedCard.labels}
             onChange={(value) => setSelectedCard({ ...selectedCard, labels: value })}
@@ -356,7 +429,7 @@ const CRMPage: React.FC = () => {
           </div>
         </div>
       )}
-    </DndProvider>
+    </DragDropContext>
   );
 };
 

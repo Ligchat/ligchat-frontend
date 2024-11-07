@@ -42,6 +42,9 @@ export const getMessagesByContactId = async (contactId: number): Promise<Message
 // GET all WhatsApp contacts
 export const getWhatsAppContacts = async (sectorId: number): Promise<WhatsAppContact[]> => {
     try {
+        if(sectorId == null){
+            sectorId = -1
+        }
         const response = await axios.get(`/contact/sector/${sectorId}`, {
             headers: {
                 'Accept': '*/*',

@@ -38,7 +38,10 @@ import LoadingOverlay from '../components/LoadingOverlay';
 import { getTags } from '../services/LabelService';
 import AudioPlayer from 'react-h5-audio-player';
 import 'react-h5-audio-player/lib/styles.css';
+import { VideoCameraOutlined } from '@ant-design/icons';
 import Dropdown from 'antd/es/dropdown/dropdown';
+import { getSector } from '../services/SectorService';
+import { OAuth2Service } from '../services/OAuth2Service';
 
 const { Header, Sider, Content } = Layout;
 const { TextArea, Search } = Input;
@@ -93,9 +96,28 @@ const ChatPage: React.FC = () => {
     tagIds: [], // Para gerenciar as tags
   });
 
+
+
+  
   useEffect(() => {
-    // Conectar ao WebSocket
-    socket.current = new WebSocket(`wss://cfa4-177-84-243-98.ngrok-free.app?sectorId=${sessionId}`);
+  const fetchContacts = async () => {
+    setIsLoading(true);
+    try {
+      const contactsData = await getWhatsAppContacts(sessionId);
+      setContacts(contactsData);
+      setFilteredContacts(contactsData);
+    } catch (error) {
+      console.error('Erro ao buscar contatos:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  fetchContacts();
+  },[]);
+
+
+  useEffect(() => {
+    socket.current = new WebSocket(`wss://7723-177-84-243-109.ngrok-free.app?sectorId=${sessionId}`);
 
     socket.current.onopen = () => {
       console.log('WebSocket connection established');
@@ -174,25 +196,6 @@ const ChatPage: React.FC = () => {
   };
   fetchTags()
   },[]);
-
-useEffect(() => {
-  // Fetch contacts when component mounts
-  const fetchContacts = async () => {
-    setIsLoading(true);
-    try {
-      const sectorId = SessionService.getSessionForSector();
-      const contactsData = await getWhatsAppContacts(sectorId);
-      setContacts(contactsData);
-      setFilteredContacts(contactsData);
-    } catch (error) {
-      console.error('Erro ao buscar contatos:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  fetchContacts();
-}, []);
 
 useEffect(() => {
   handleFilterContacts();
@@ -482,7 +485,6 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
         antdMessage.success('Contato atualizado com sucesso!');
       } catch (error) {
         console.error('Erro ao atualizar contato:', error);
-        antdMessage.error('Erro ao atualizar contato.');
       }
 
       setEditableField(null); // Fechar o campo de entrada após salvar
@@ -735,14 +737,14 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
           Conversa não iniciada
         </div>
       ) : (
-        messages.map((message) => (
-          <div key={message.id} style={{ marginBottom: '16px', textAlign: message.isSent ? 'right' : 'left', display: 'flex', justifyContent: message.isSent ? 'flex-end' : 'flex-start' }}>
+        messages.map((message:any) => (
+          <div key={message.id} style={{ marginBottom: '16px', alignItems:'center', textAlign: message.isSent ? 'right' : 'left', display: 'flex', justifyContent: message.isSent ? 'flex-end' : 'flex-start' }}>
             {!message.isSent && (
               <Avatar src={selectedContact?.profilePictureUrl} icon={<UserOutlined />} style={{ marginRight: '8px' }} />
             )}
             <div style={{
               backgroundColor: message.isSent ? '#1890ff' : '#fff',
-              border: '1px solid #d9d9d9',
+              border: message.mediaType.includes("audio") ? 'none' : '1px solid #d9d9d9',
               borderRadius: '8px',
               display: 'flex',
               justifyContent:'center',

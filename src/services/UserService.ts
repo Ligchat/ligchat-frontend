@@ -19,6 +19,8 @@ export interface UserCreate {
   phoneWhatsapp: string;
   isAdmin?: boolean; // Campo opcional para is_admin
   status?: boolean; // Adiciona status como campo opcional
+  sectors: string[]
+  invitedBy:number | null;
 }
 
 // Interface para a atualização de um usuário
@@ -86,15 +88,16 @@ export const getSectors = async (): Promise<Sector[]> => {
   }
 };
 
-// Serviço para buscar todos os usuários
-export const getAllUsers = async (): Promise<User[]> => {
+export const getAllUsers = async (userId?: number | null): Promise<User[]> => { 
   try {
-    const response = await axios.get('/api/users');
-    return response.data; // Supondo que a resposta esteja no formato esperado
+    const response = await axios.get('/api/users', {
+      params: { invitedBy: userId }, 
+    });
+    return response.data; 
   } catch (error) {
     throw new Error(`Failed to fetch users: ${error}`);
   }
-};
+}
 
 // Serviço para deletar um usuário
 export const deleteUser = async (id: string): Promise<void> => {

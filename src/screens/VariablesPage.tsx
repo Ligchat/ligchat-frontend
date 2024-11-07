@@ -15,10 +15,15 @@ const VariablesPage: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [selectedSector, setSelectedSector] = useState<number | null>(SessionService.getSessionForSector());
 
   useEffect(() => {
-    fetchVariables();
-  }, []);
+    if (selectedSector !== null) {
+      fetchVariables();
+    } else {
+      setIsLoading(false);
+    }
+  }, [selectedSector]);
 
   const fetchVariables = async () => {
     try {
@@ -48,7 +53,7 @@ const VariablesPage: React.FC = () => {
     const variable: VariableInterface = {
       name: variableName,
       value: variableValue,
-      sectorId: SessionService.getSessionForSector(),
+      sectorId: selectedSector!,
     };
 
     try {
@@ -107,39 +112,56 @@ const VariablesPage: React.FC = () => {
 
   return (
     <div style={{ padding: '24px' }}>
-      {isLoading && <LoadingOverlay />}
-      {!isLoading && (
-        <Card>
-          <Title level={3}>Cadastro de Variáveis</Title>
-          <Button type="primary" onClick={() => setIsModalVisible(true)} style={{ marginBottom: '16px' }}>
-            {isEditing ? 'Salvar' : 'Cadastrar'}
-          </Button>
-          <List
-            style={{ marginTop: '24px' }}
-            header={
-              <Row style={{ width: '100%' }}>
-                <Col span={8}><Title level={4}>Nome</Title></Col>
-                <Col span={8}><Title level={4}>Valor</Title></Col>
-                <Col span={8}><Title level={4}>Ações</Title></Col>
-              </Row>
-            }
-            bordered
-            dataSource={variables}
-            locale={{ emptyText: 'Nenhuma variável cadastrada' }}
-            renderItem={(item, index) => (
-              <List.Item>
-                <Row style={{ width: '100%' }}>
-                  <Col span={8}><strong>{item.name}</strong></Col>
-                  <Col span={8}>{item.value}</Col>
-                  <Col span={8}>
-                    <Button type="link" onClick={() => handleEditVariable(index)}>Editar</Button>
-                    <Button type="link" danger onClick={() => handleDeleteVariable(index)}>Excluir</Button>
-                  </Col>
-                </Row>
-              </List.Item>
-            )}
-          />
-        </Card>
+                    <Title level={3}>Cadastro de Variáveis</Title>
+      {isLoading ? (
+        selectedSector === null ? (
+          <div className="flex justify-center items-center h-64 text-lg text-gray-500">
+            Nenhum setor selecionado
+          </div>
+        ) : (
+          <LoadingOverlay />
+        )
+      ) : (
+        <>
+          {selectedSector !== null && (
+            <Card>
+              <Button type="primary" onClick={() => setIsModalVisible(true)} style={{ marginBottom: '16px' }}>
+                {isEditing ? 'Salvar' : 'Cadastrar'}
+              </Button>
+              <List
+                style={{ marginTop: '24px' }}
+                header={
+                  <Row style={{ width: '100%' }}>
+                    <Col span={8}><Title level={4}>Nome</Title></Col>
+                    <Col span={8}><Title level={4}>Valor</Title></Col>
+                    <Col span={8}><Title level={4}>Ações</Title></Col>
+                  </Row>
+                }
+                bordered
+                dataSource={variables}
+                locale={{ emptyText: 'Nenhuma variável cadastrada' }}
+                renderItem={(item, index) => (
+                  <List.Item>
+                    <Row style={{ width: '100%' }}>
+                      <Col span={8}><strong>{item.name}</strong></Col>
+                      <Col span={8}>{item.value}</Col>
+                      <Col span={8}>
+                        <Button type="link" onClick={() => handleEditVariable(index)}>Editar</Button>
+                        <Button type="link" danger onClick={() => handleDeleteVariable(index)}>Excluir</Button>
+                      </Col>
+                    </Row>
+                  </List.Item>
+                )}
+              />
+            </Card>
+          )}
+
+          {selectedSector === null && (
+            <div className="flex justify-center items-center h-64 text-lg text-gray-500">
+              Nenhum setor selecionado
+            </div>
+          )}
+        </>
       )}
 
       <Modal

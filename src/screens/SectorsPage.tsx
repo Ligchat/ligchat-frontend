@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Card, Button, Input, Row, Col, Drawer, Modal, message, Skeleton,
+  Card, Button, Input, Row, Col, Drawer, Modal, Skeleton,
 } from 'antd';
 import {
   DeleteOutlined, EditOutlined, PlusOutlined,
@@ -10,9 +10,8 @@ import {
   createSector, updateSector, deleteSector, getSectors,
 } from '../services/SectorService';
 import SessionService from '../services/SessionService';
-import OpeningHoursCard, { DayOfWeek } from './OpeningHoursCard';
-import { BusinessHourInterface, createBusinessHour, getBusinessHoursBySectorId } from '../services/BusinessHourService';
 import LoadingOverlay from '../components/LoadingOverlay';
+import axios from 'axios';
 
 const { TextArea } = Input;
 
@@ -23,34 +22,48 @@ interface Sector {
   phoneNumberId: string;
   accessToken: string;
   description: string;
-  openingHours?: BusinessHourInterface[];
-}
-
-interface OpeningHours {
-  [key: string]: BusinessHourInterface;
+  googleClientId?: string;
+  googleApiKey?: string;
 }
 
 const SectorsPage: React.FC = () => {
   const navigate = useNavigate();
   const [sectors, setSectors] = useState<Sector[]>([]);
-  const [editingSectorId, setEditingSectorId] = useState<number | null>(null);
   const [newSector, setNewSector] = useState<boolean>(false);
   const [sectorData, setSectorData] = useState<Sector>({
     name: '',
     phoneNumberId: '',
     accessToken: '',
     description: '',
+    googleClientId: '',
+    googleApiKey: '',
   });
   const [isDrawerVisible, setIsDrawerVisible] = useState<boolean>(false);
-  const [isHoursDrawerVisible, setIsHoursDrawerVisible] = useState<boolean>(false);
   const [currentSector, setCurrentSector] = useState<Sector | null>(null);
-  const [openingHours, setOpeningHours] = useState<OpeningHours>({});
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     fetchSectors();
   }, []);
+
+  // Função auxiliar para fazer a chamada à API do Google
+  const makeGoogleApiRequest = async (googleClientId: string, googleApiKey: string) => {
+    try {
+      // Exemplo de chamada genérica à API do Google
+      const response = await axios.get('https://www.googleapis.com/someapi/v1/resource', {
+        params: {
+          key: googleApiKey,
+          client_id: googleClientId,
+          // Outros parâmetros necessários pela API específica
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao chamar a API do Google:', error);
+      throw error;
+    }
+  };
 
   const fetchSectors = async () => {
     try {
@@ -67,59 +80,6 @@ const SectorsPage: React.FC = () => {
     }
   };
 
-  const fetchBusinessHours = async (sectorId: number) => {
-    try {
-      const businessHours = await getBusinessHoursBySectorId(sectorId);
-  
-      // Se businessHours for null ou não for um array, inicializa como um array vazio
-      const validBusinessHours = Array.isArray(businessHours) ? businessHours : [];
-  
-      if (validBusinessHours.length === 0) {
-        console.warn(`Nenhum horário encontrado para o setor ${sectorId}. Usando horários padrão.`);
-      }
-  
-      const hoursObject: OpeningHours = {};
-      const daysOfWeek: DayOfWeek[] = [
-        'domingo',
-        'segunda-feira',
-        'terça-feira',
-        'quarta-feira',
-        'quinta-feira',
-        'sexta-feira',
-        'sábado',
-      ];
-  
-      daysOfWeek.forEach((day) => {
-        const hour = validBusinessHours.find((bh: BusinessHourInterface) => bh.dayOfWeek === day);
-        if (hour) {
-          hoursObject[day] = hour; // Adiciona o horário existente
-        } else {
-          // Mock padrão para dias que não existem no banco
-          hoursObject[day] = {
-            dayOfWeek: day,
-            openingTime: '09:00 AM',
-            closingTime: '05:00 PM',
-            isOpen: false, // Todos os mocks vão estar desativados
-            sectorId: sectorId,
-          };
-        }
-      });
-  
-      setOpeningHours(hoursObject);
-    } catch (error: unknown) {
-      // Casting para ApiError
-      const apiError = error as any;
-  
-      if (apiError.response && apiError.response.status === 404) {
-        console.warn('Erro 404: Horários não encontrados para este setor.');
-        // Aqui você pode definir um estado específico ou realizar alguma ação
-      } else {
-        console.error('Falha ao buscar horários de funcionamento', apiError);
-      }
-    }
-  };
-  
-
   const showDrawer = (sector: Sector) => {
     setCurrentSector(sector);
     setSectorData({
@@ -128,15 +88,11 @@ const SectorsPage: React.FC = () => {
       phoneNumberId: sector.phoneNumberId,
       accessToken: sector.accessToken,
       description: sector.description,
+      googleClientId: sector.googleClientId || '',
+      googleApiKey: sector.googleApiKey || '',
     });
     setNewSector(false);
     setIsDrawerVisible(true);
-  };
-
-  const showHoursDrawer = (sector: Sector) => {
-    setCurrentSector(sector);
-    fetchBusinessHours(sector.id || 0);
-    setIsHoursDrawerVisible(true);
   };
 
   const closeDrawer = () => {
@@ -147,52 +103,10 @@ const SectorsPage: React.FC = () => {
       phoneNumberId: '',
       accessToken: '',
       description: '',
+      googleClientId: '',
+      googleApiKey: '',
     });
     setErrors({});
-  };
-
-  const closeHoursDrawer = () => {
-    setIsHoursDrawerVisible(false);
-    setOpeningHours({});
-  };
-
-  const handleTimeChange = (day: DayOfWeek, type: 'open' | 'close', time: string) => {
-    const updatedHours = {
-      ...openingHours,
-      [day]: {
-        ...openingHours[day],
-        ...(type === 'open' ? { openingTime: time } : { closingTime: time }),
-        dayOfWeek: day,
-        sectorId: currentSector?.id || 0,
-        isOpen: openingHours[day]?.isOpen || false,
-      },
-    };
-    setOpeningHours(updatedHours);
-    saveBusinessHour(updatedHours[day]);
-  };
-
-  const handleSwitchChange = (day: DayOfWeek, checked: boolean) => {
-    const updatedHours = {
-      ...openingHours,
-      [day]: {
-        ...openingHours[day],
-        isOpen: checked,
-        dayOfWeek: day,
-        sectorId: currentSector?.id || 0,
-        openingTime: openingHours[day]?.openingTime || '09:00 AM',
-        closingTime: openingHours[day]?.closingTime || '05:00 PM',
-      },
-    };
-    setOpeningHours(updatedHours);
-    saveBusinessHour(updatedHours[day]);
-  };
-
-  const saveBusinessHour = async (businessHour: BusinessHourInterface) => {
-    try {
-      await createBusinessHour(businessHour);
-    } catch (error) {
-      console.error('Erro ao salvar horário de funcionamento:', error);
-    }
   };
 
   const handleSave = async () => {
@@ -236,15 +150,20 @@ const SectorsPage: React.FC = () => {
           await updateSector(updatedSectorData.id, updatedSectorData);
         }
 
+        // Integração com o Google após salvar o setor
+        if (sectorData.googleClientId && sectorData.googleApiKey) {
+          try {
+            await makeGoogleApiRequest(sectorData.googleClientId, sectorData.googleApiKey);
+            // Você pode fazer algo com a resposta da API do Google aqui
+          } catch (error) {
+            console.error('Erro ao chamar a API do Google:', error);
+          }
+        } else {
+          console.warn('googleClientId e googleApiKey não fornecidos para integração com o Google.');
+        }
+
         await fetchSectors();
-        setEditingSectorId(null);
         setNewSector(false);
-        setSectorData({
-          name: '',
-          phoneNumberId: '',
-          accessToken: '',
-          description: '',
-        });
         closeDrawer();
       } else {
         console.error('Erro ao obter userBusinessId do token.');
@@ -285,6 +204,8 @@ const SectorsPage: React.FC = () => {
       phoneNumberId: '',
       accessToken: '',
       description: '',
+      googleClientId: '',
+      googleApiKey: '',
     });
     setErrors({});
   };
@@ -292,11 +213,20 @@ const SectorsPage: React.FC = () => {
   const handleEditSector = (sector: Sector) => {
     showDrawer(sector);
   };
+
+  const truncateText = (text: string, maxLength: number) => {
+    if (text.length > maxLength) {
+      return text.substring(0, maxLength) + '...';
+    } else {
+      return text;
+    }
+  };
+
   return (
     <div className="p-8">
       {isLoading && <LoadingOverlay />}
 
-      <h1 className="text-3xl font-bold mb-6">Gerenciar Setores</h1>
+      <h1 className="text-3xl font-bold mb-6" style={{ color: '#1890ff' }}>Gerenciar Setores</h1>
       <Row gutter={[16, 16]}>
         {sectors.map((sector) => (
           <Col xs={24} sm={12} md={8} key={sector.id}>
@@ -310,13 +240,18 @@ const SectorsPage: React.FC = () => {
               }
             >
               <Skeleton active loading={isLoading}>
-                <p><strong>Descrição:</strong> {sector.description}</p>
-                <p><strong>Identificação do Telefone:</strong> {sector.phoneNumberId}</p>
-                <p style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><strong>Token de Acesso:</strong> {sector.accessToken}</p>
+                <p><strong>Descrição:</strong> {truncateText(sector.description, 50)}</p>
+                <h4 style={{ color: '#1890ff', marginTop: '10px' }}>Configuração da Meta</h4>
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <p><strong>Identificação do Telefone:</strong> {sector.phoneNumberId}</p>
+                  <p><strong>Token de Acesso:</strong> {truncateText(sector.accessToken, 50)}</p>
+                </div>
+                <h4 style={{ color: '#1890ff', marginTop: '10px' }}>Configuração do Google</h4>
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <p><strong>Google Client ID:</strong> {sector.googleClientId ? sector.googleClientId : 'Não definido'}</p>
+                  <p><strong>Google API Key:</strong> {sector.googleApiKey ? sector.googleApiKey : 'Não definido'}</p>
+                </div>
               </Skeleton>
-              <Button className="bg-blue-500 text-white w-full" onClick={() => showHoursDrawer(sector)} disabled={isLoading}>
-                Horário de funcionamento
-              </Button>
             </Card>
           </Col>
         ))}
@@ -333,7 +268,8 @@ const SectorsPage: React.FC = () => {
         {newSector && (
           <Col xs={24} sm={12} md={8}>
             <Card>
-              <h3 className="text-lg font-semibold mb-2">Nome do Setor</h3>
+              <h3 className="text-lg font-semibold">Nome do Setor</h3>
+              <label style={{ marginBottom: '5px', marginTop: '50px' }}>Nome do setor</label>
               <Input
                 placeholder="Nome do setor"
                 value={sectorData.name}
@@ -347,6 +283,7 @@ const SectorsPage: React.FC = () => {
               />
               {errors.name && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.name}</p>}
 
+              <label style={{ marginBottom: '5px', marginTop: '10px' }}>Descrição</label>
               <TextArea
                 rows={2}
                 placeholder="Descrição"
@@ -363,7 +300,8 @@ const SectorsPage: React.FC = () => {
               />
               {errors.description && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.description}</p>}
 
-              <h3 className="text-lg font-semibold mb-2">Configuração da Meta</h3>
+              <h3 className="text-lg font-semibold mb-2" style={{ color: '#1890ff', marginTop: '10px' }}>Configuração da Meta</h3>
+              <label style={{ marginBottom: '5px', marginTop: '10px' }}>Identificação do telefone</label>
               <Input
                 placeholder="Identificação do telefone"
                 value={sectorData.phoneNumberId}
@@ -377,6 +315,7 @@ const SectorsPage: React.FC = () => {
               />
               {errors.phoneNumberId && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.phoneNumberId}</p>}
 
+              <label style={{ marginBottom: '5px', marginTop: '10px' }}>Token de acesso</label>
               <TextArea
                 rows={2}
                 placeholder="Token de acesso"
@@ -392,6 +331,35 @@ const SectorsPage: React.FC = () => {
                 disabled={isLoading}
               />
               {errors.accessToken && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.accessToken}</p>}
+
+              <h3 className="text-lg font-semibold mb-2" style={{ color: '#1890ff', marginTop: '10px' }}>Configuração do Google</h3>
+              <label style={{ marginBottom: '5px', marginTop: '10px' }}>Google Client ID</label>
+              <Input
+                placeholder="Google Client ID"
+                value={sectorData.googleClientId}
+                onChange={(e) => setSectorData({ ...sectorData, googleClientId: e.target.value })}
+                style={{
+                  marginBottom: '10px',
+                  borderColor: errors.googleClientId ? 'red' : undefined,
+                  maxWidth: '100%',
+                }}
+                disabled={isLoading}
+              />
+              {errors.googleClientId && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.googleClientId}</p>}
+
+              <label style={{ marginBottom: '5px', marginTop: '10px' }}>Google API Key</label>
+              <Input
+                placeholder="Google API Key"
+                value={sectorData.googleApiKey}
+                onChange={(e) => setSectorData({ ...sectorData, googleApiKey: e.target.value })}
+                style={{
+                  marginBottom: '10px',
+                  borderColor: errors.googleApiKey ? 'red' : undefined,
+                  maxWidth: '100%',
+                }}
+                disabled={isLoading}
+              />
+              {errors.googleApiKey && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.googleApiKey}</p>}
 
               <Button className="mt-4" type="primary" onClick={handleSave} disabled={isLoading}>
                 Salvar
@@ -411,12 +379,13 @@ const SectorsPage: React.FC = () => {
         visible={isDrawerVisible}
         width={400}
       >
-        <h3 className="text-lg font-semibold mb-2">Nome do Setor</h3>
+        <label style={{ marginBottom: '10px', marginTop: '10px' }}>Nome do setor</label>
         <Input
           placeholder="Nome do setor"
           value={sectorData.name}
           onChange={(e) => setSectorData({ ...sectorData, name: e.target.value })}
           style={{
+            marginTop: 10,
             marginBottom: '10px',
             borderColor: errors.name ? 'red' : undefined,
             maxWidth: '100%',
@@ -425,12 +394,14 @@ const SectorsPage: React.FC = () => {
         />
         {errors.name && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.name}</p>}
 
+        <label style={{ marginBottom: '5px', marginTop: '10px' }}>Descrição</label>
         <TextArea
           rows={2}
           placeholder="Descrição"
           value={sectorData.description}
           onChange={(e) => setSectorData({ ...sectorData, description: e.target.value })}
           style={{
+            marginTop: 10,
             marginBottom: '10px',
             resize: 'none',
             borderColor: errors.description ? 'red' : undefined,
@@ -441,12 +412,14 @@ const SectorsPage: React.FC = () => {
         />
         {errors.description && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.description}</p>}
 
-        <h3 className="text-lg font-semibold mb-2">Configuração da Meta</h3>
+        <h3 className="text-lg font-semibold mb-2" style={{ color: '#1890ff', marginTop: '10px' }}>Configuração da Meta</h3>
+        <label style={{ marginBottom: '5px', marginTop: '10px' }}>Identificação do telefone</label>
         <Input
           placeholder="Identificação do telefone"
           value={sectorData.phoneNumberId}
           onChange={(e) => setSectorData({ ...sectorData, phoneNumberId: e.target.value })}
           style={{
+            marginTop: 10,
             marginBottom: '10px',
             borderColor: errors.phoneNumberId ? 'red' : undefined,
             maxWidth: '100%',
@@ -455,12 +428,14 @@ const SectorsPage: React.FC = () => {
         />
         {errors.phoneNumberId && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.phoneNumberId}</p>}
 
+        <label style={{ marginBottom: '5px', marginTop: '10px' }}>Token de acesso</label>
         <TextArea
           rows={5}
           placeholder="Token de acesso"
           value={sectorData.accessToken}
           onChange={(e) => setSectorData({ ...sectorData, accessToken: e.target.value })}
           style={{
+            marginTop: 10,
             marginBottom: '10px',
             borderColor: errors.accessToken ? 'red' : undefined,
             maxWidth: '100%',
@@ -470,34 +445,43 @@ const SectorsPage: React.FC = () => {
         />
         {errors.accessToken && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.accessToken}</p>}
 
+        <h3 className="text-lg font-semibold mb-2" style={{ color: '#1890ff', marginTop: '10px' }}>Configuração do Google</h3>
+        <label style={{ marginBottom: '5px', marginTop: '10px' }}>Google Client ID</label>
+        <Input
+          placeholder="Google Client ID"
+          value={sectorData.googleClientId}
+          onChange={(e) => setSectorData({ ...sectorData, googleClientId: e.target.value })}
+          style={{
+            marginTop: 10,
+            marginBottom: '10px',
+            borderColor: errors.googleClientId ? 'red' : undefined,
+            maxWidth: '100%',
+          }}
+          disabled={isLoading}
+        />
+        {errors.googleClientId && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.googleClientId}</p>}
+
+        <label style={{ marginBottom: '5px', marginTop: '10px' }}>Google API Key</label>
+        <Input
+          placeholder="Google API Key"
+          value={sectorData.googleApiKey}
+          onChange={(e) => setSectorData({ ...sectorData, googleApiKey: e.target.value })}
+          style={{
+            marginTop: 10,
+            marginBottom: '10px',
+            borderColor: errors.googleApiKey ? 'red' : undefined,
+            maxWidth: '100%',
+          }}
+          disabled={isLoading}
+        />
+        {errors.googleApiKey && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.googleApiKey}</p>}
+
         <Button className="mt-4" type="primary" onClick={handleSave} disabled={isLoading}>
           Salvar
         </Button>
         <Button className="mt-4 ml-2" onClick={closeDrawer} disabled={isLoading}>
           Cancelar
         </Button>
-      </Drawer>
-
-      <Drawer
-        title={`Horário de Funcionamento - ${currentSector?.name}`}
-        placement="right"
-        onClose={closeHoursDrawer}
-        visible={isHoursDrawerVisible}
-        width={400}
-      >
-        {openingHours && (
-          <Row gutter={[16, 16]}>
-            {Object.keys(openingHours).map((day) => (
-              <OpeningHoursCard
-                key={day}
-                day={day as DayOfWeek}
-                times={openingHours[day]}
-                onTimeChange={handleTimeChange}
-                onSwitchChange={handleSwitchChange}
-              />
-            ))}
-          </Row>
-        )}
       </Drawer>
     </div>
   );

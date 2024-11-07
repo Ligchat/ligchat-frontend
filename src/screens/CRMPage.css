@@ -1,0 +1,28 @@
+/* Estilo padrão do card */
+.contact-card {
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    background-color: #fff; /* Cor de fundo padrão */
+    cursor: pointer;
+  }
+  
+  /* Estilo do card ao passar o mouse (hover) */
+  .contact-card-wrapper:hover .contact-card {
+    background-color: #f0f5ff; /* Exemplo de uma cor mais clara para indicar hover */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); /* Sombra para destacar durante hover */
+  }
+  
+  /* Estilo do card enquanto estiver sendo arrastado (dragging) */
+  .contact-card-wrapper.dragging .contact-card {
+    background-color: #f0f5ff; /* Exemplo de uma cor mais clara para indicar hover */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); /* Sombra para mostrar que está sendo arrastado */
+  }
+
+  .contact-card-wrapper {
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+  .dragging {
+    margin: 20;
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+  

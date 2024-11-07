@@ -7,25 +7,29 @@ export interface Column {
   sectorId: number;
 }
 
-export interface CreateColumnRequestDTO {
+interface CreateColumnRequestDTO {
   name: string;
   sectorId: number;
+  position: number; // Nova propriedade
 }
 
-export interface UpdateColumnRequestDTO {
-  name: string; 
-  sectorId: number;
+interface UpdateColumnRequestDTO {
+  name?: string;
+  position?: number; // Nova propriedade opcional
 }
+
 
 // Função para criar uma nova coluna
 export const createColumn = async (columnData: CreateColumnRequestDTO) => {
   try {
+    // Incluindo position no columnData
     const response = await axios.post('/api/colunas', columnData);
     return response.data;
   } catch (error) {
     throw new Error(`Falha ao criar coluna: ${error}`);
   }
 };
+
 
 // Função para atualizar uma coluna existente
 export const updateColumn = async (id: number, data: UpdateColumnRequestDTO) => {
@@ -81,16 +85,16 @@ export const deleteColumn = async (id: number) => {
 };
 
 
-export const moveColumn = async (id: number, newColumnId: number) => {
-    try {
-      const response = await axios.put(`/api/colunas/${id}/move`, { newColumnId }, {
+export const moveColumn = async (id: number, newPosition: number) => {
+  try {
+      const response = await axios.put(`/api/colunas/${id}/move`, { newPosition: newPosition }, {
         headers: {
-          'Content-Type': 'application/json',
+            'Content-Type': 'application/json',
         },
-      });
+    });
       return response.data;
-    } catch (error) {
-      throw new Error(`Falha ao mover a coluna com id ${id} para a nova coluna com id ${newColumnId}: ${error}`);
-    }
-  };
+  } catch (error) {
+      throw new Error(`Falha ao mover a coluna com id ${id} para a posição ${newPosition}: ${error}`);
+  }
+};
   

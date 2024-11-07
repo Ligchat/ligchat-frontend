@@ -98,7 +98,6 @@ const FlowPage: React.FC = () => {
         setFolders([]);
         setNoFoldersFound(true);
       } else {
-        message.error('Erro ao buscar pastas. Tente novamente.');
       }
     } finally {
       setLoadingData(false); // Atualiza o estado para indicar que o carregamento terminou
@@ -299,9 +298,15 @@ const FlowPage: React.FC = () => {
   return (
     <div className="p-4 md:p-8">
       <h1 className="text-2xl md:text-3xl font-bold mb-4">Fluxos</h1>
-      {loadingData ? ( // Exibir o Spin enquanto os dados estão carregando
-        <Spin tip="Carregando dados..." />
+      {loadingData ? ( 
+      selectedSector == null ? (
+        <div className="flex justify-center items-center h-64 text-lg text-gray-500">
+          Nenhum setor selecionado
+        </div>
       ) : (
+        <Spin tip="Carregando dados..." />
+      )
+    ) : (
         <>
           {selectedSector != null && (
             <>

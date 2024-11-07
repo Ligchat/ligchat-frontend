@@ -854,6 +854,15 @@ const EditFlowPage: React.FC<EditFlowPageProps> = ({ flowId }:any) => {
     event.dataTransfer.effectAllowed = 'move';
   };
 
+  const exampleNodes = [
+  {
+    id: '1',
+    type: 'customNode2',
+    data: { label: 'Início' },
+    position: { x: 50, y: 100 }
+  }
+];
+
   return (
     <div style={{ height: '80vh', display: 'flex' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>

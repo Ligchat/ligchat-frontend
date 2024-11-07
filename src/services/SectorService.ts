@@ -1,25 +1,41 @@
 import axios from "axios";
 
 export interface Sector {
-  id: number ;
+  id: number;
   name: string;
   description: string;
-  userBusinessId: number | undefined;
+  userBusinessId?: number;
+  phoneNumberId: string;
+  accessToken: string;
+  googleClientId?: string;
+  googleApiKey?: string;
 }
 
 export interface CreateSectorRequestDTO {
   name: string;
   description: string;
-  userBusinessId: number | undefined;
+  userBusinessId?: number;
+  phoneNumberId: string;
+  accessToken: string;
+  googleClientId?: string;
+  googleApiKey?: string;
 }
 
 export interface UpdateSectorRequestDTO {
-  name: string;
-  description: string;
-  userBusinessId: number;
+  name?: string;
+  description?: string;
+  userBusinessId?: number;
+  phoneNumberId?: string;
+  accessToken?: string;
+  googleClientId?: string;
+  googleApiKey?: string;
+  oauth2AccessToken?: string;
+  oauth2RefreshToken?: string;
+  oauth2TokenExpiration?: Date;
 }
 
-export const createSector = async (sectorData: any) => {
+
+export const createSector = async (sectorData: CreateSectorRequestDTO) => {
   try {
     const response = await axios.post('/api/sectors', sectorData);
     return response.data;
@@ -28,7 +44,7 @@ export const createSector = async (sectorData: any) => {
   }
 };
 
-export const updateSector = async (id: number, data: any) => {
+export const updateSector = async (id: number, data: UpdateSectorRequestDTO) => {
   try {
     const response = await axios.put(`/api/sectors/${id}`, data, {
       headers: {
@@ -54,7 +70,7 @@ export const getSector = async (id: number): Promise<Sector> => {
   }
 };
 
-export const getSectors = async (token:any): Promise<Sector[]> => {
+export const getSectors = async (token: any): Promise<Sector[]> => {
   try {
     const response = await axios.get('/api/sectors', {
       headers: {
