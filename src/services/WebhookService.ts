@@ -25,7 +25,7 @@ export interface UpdateWebhookRequestDTO {
 
 export const createWebhook = async (webhookData: CreateWebhookRequestDTO) => {
   try {
-    const response = await axios.post('/server/webhooks', webhookData);
+    const response = await axios.post('/server/api/webhooks', webhookData);
     return response.data;
   } catch (error) {
     throw new Error(`Failed to create webhook: ${error}`);
@@ -34,7 +34,7 @@ export const createWebhook = async (webhookData: CreateWebhookRequestDTO) => {
 
 export const updateWebhook = async (id: number, data: UpdateWebhookRequestDTO) => {
   try {
-    const response = await axios.put(`/server/webhooks/${id}`, data, {
+    const response = await axios.put(`/server/api/webhooks/${id}`, data, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -47,7 +47,7 @@ export const updateWebhook = async (id: number, data: UpdateWebhookRequestDTO) =
 
 export const getWebhook = async (id: number): Promise<Webhook> => {
   try {
-    const response = await axios.get(`/server/webhooks/${id}`, {
+    const response = await axios.get(`/server/api/webhooks/${id}`, {
       headers: {
         'Accept': '*/*',
       },
@@ -61,7 +61,7 @@ export const getWebhook = async (id: number): Promise<Webhook> => {
 export const getWebhooks = async (): Promise<Webhook[]> => {
   try {
     const sectorId = SessionService.getSessionForSector();
-    const response = await axios.get(`/server/webhooks?sectorId=${sectorId}`, {
+    const response = await axios.get(`/server/api/webhooks?sectorId=${sectorId}`, {
       headers: {
         'Accept': '*/*',
       },
@@ -74,7 +74,7 @@ export const getWebhooks = async (): Promise<Webhook[]> => {
 
 export const deleteWebhook = async (id: number) => {
   try {
-    const response = await axios.delete(`/server/webhooks/${id}`);
+    const response = await axios.delete(`/server/api/webhooks/${id}`);
     return response.data;
   } catch (error) {
     throw new Error(`Failed to delete webhook with id ${id}: ${error}`);

@@ -66,7 +66,7 @@ export interface UpdateMessageSchedulingDTO {
 export const getMessageSchedulings = async (): Promise<MessageScheduling[]> => {
   const sectorId = SessionService.getSession('selectedSector');
   try {
-    const response = await axios.get(`/server/message-schedulings?sectorId=${sectorId}`, {
+    const response = await axios.get(`/server/api/message-schedulings?sectorId=${sectorId}`, {
       headers: {
         'Accept': 'application/json',
       },
@@ -81,7 +81,7 @@ export const getMessageSchedulings = async (): Promise<MessageScheduling[]> => {
 // Função para obter um MessageScheduling pelo ID
 export const getMessageScheduling = async (id: number): Promise<MessageScheduling> => {
   try {
-    const response = await axios.get(`/server/message-schedulings/${id}`, {
+    const response = await axios.get(`/server/api/message-schedulings/${id}`, {
       headers: {
         'Accept': 'application/json',
       },
@@ -97,7 +97,7 @@ export const createMessageScheduling = async (
   messageData: CreateMessageSchedulingDTO
 ): Promise<MessageScheduling> => {
   try {
-    const response = await axios.post('/server/message-schedulings', messageData, {
+    const response = await axios.post('/server/api/message-schedulings', messageData, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -114,7 +114,7 @@ export const updateMessageScheduling = async (
   data: UpdateMessageSchedulingDTO
 ): Promise<MessageScheduling> => {
   try {
-    const response = await axios.put(`/server/message-schedulings/${id}`, data, {
+    const response = await axios.put(`/server/api/message-schedulings/${id}`, data, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -128,7 +128,7 @@ export const updateMessageScheduling = async (
 // Função para deletar um MessageScheduling
 export const deleteMessageScheduling = async (id: number): Promise<void> => {
   try {
-    await axios.delete(`/server/message-schedulings/${id}`);
+    await axios.delete(`/server/api/message-schedulings/${id}`);
   } catch (error: any) {
     throw new Error(`Failed to delete message scheduling with id ${id}: ${error.response?.data?.message || error.message}`);
   }

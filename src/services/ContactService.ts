@@ -31,7 +31,7 @@ export interface UpdateContactRequestDTO {
 
 export const createContact = async (contactData: CreateContactRequestDTO) => {
   try {
-    const response = await axios.post('/server/contatos', contactData);
+    const response = await axios.post('/server/api/contatos', contactData);
     return response.data;
   } catch (error) {
     throw new Error(`Failed to create contact: ${error}`);
@@ -40,7 +40,7 @@ export const createContact = async (contactData: CreateContactRequestDTO) => {
 
 export const updateContact = async (id: number, data: UpdateContactRequestDTO) => {
   try {
-    const response = await axios.put(`/server/contatos/${id}`, data, {
+    const response = await axios.put(`/server/api/contatos/${id}`, data, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -53,7 +53,7 @@ export const updateContact = async (id: number, data: UpdateContactRequestDTO) =
 
 export const getContact = async (id: number): Promise<Contact> => {
   try {
-    const response = await axios.get(`/server/contatos/${id}`, {
+    const response = await axios.get(`/server/api/contatos/${id}`, {
       headers: {
         'Accept': '*/*',
       },
@@ -66,7 +66,7 @@ export const getContact = async (id: number): Promise<Contact> => {
 
 export const getContacts = async (): Promise<Contact[]> => {
   try {
-    const response = await axios.get('/server/contatos', {
+    const response = await axios.get('/server/api/contatos', {
       headers: {
         'Accept': '*/*',
       },
@@ -79,7 +79,7 @@ export const getContacts = async (): Promise<Contact[]> => {
 
 export const deleteContact = async (id: number) => {
   try {
-    const response = await axios.delete(`/server/contatos/${id}`);
+    const response = await axios.delete(`/server/api/contatos/${id}`);
     return response.data;
   } catch (error) {
     throw new Error(`Failed to delete contact with id ${id}: ${error}`);

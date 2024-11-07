@@ -24,7 +24,7 @@ export interface UpdateFolderRequestDTO {
 // Função para criar uma nova pasta
 export const createFolder = async (folderData: CreateFolderRequestDTO, token: string): Promise<Folder> => {
   try {
-    const response = await axios.post('/server/folders', folderData, {
+    const response = await axios.post('/server/api/folders', folderData, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -39,7 +39,7 @@ export const createFolder = async (folderData: CreateFolderRequestDTO, token: st
 // Função para atualizar uma pasta existente
 export const updateFolder = async (id: number, data: UpdateFolderRequestDTO, token: string): Promise<Folder> => {
   try {
-    const response = await axios.put(`/server/folders/${id}`, data, {
+    const response = await axios.put(`/server/api/folders/${id}`, data, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -54,7 +54,7 @@ export const updateFolder = async (id: number, data: UpdateFolderRequestDTO, tok
 // Função para obter uma pasta específica por ID
 export const getFolder = async (id: number, token: string, userId: number): Promise<Folder> => {
   try {
-    const response = await axios.get(`/server/folders/${id}`, {
+    const response = await axios.get(`/server/api/folders/${id}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': '*/*',
@@ -70,7 +70,7 @@ export const getFolder = async (id: number, token: string, userId: number): Prom
 export const getFolders = async (token: string, sectorId: number): Promise<Folder[]> => {
     try {
       // Adiciona o sectorId diretamente na query string da URL
-      const response = await axios.get(`/server/folders?sectorId=${sectorId}`, {
+      const response = await axios.get(`/server/api/folders?sectorId=${sectorId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': '*/*',
@@ -85,7 +85,7 @@ export const getFolders = async (token: string, sectorId: number): Promise<Folde
 // Função para deletar uma pasta por ID
 export const deleteFolder = async (id: number, token: string): Promise<void> => {
   try {
-    await axios.delete(`/server/folders/${id}`, {
+    await axios.delete(`/server/api/folders/${id}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },

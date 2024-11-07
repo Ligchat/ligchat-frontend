@@ -3,7 +3,7 @@ import axios from 'axios';
 // Função para obter todos os fluxos
 export const getAllFlows = async (): Promise<any[]> => {
   try {
-    const response = await axios.get(`/server/FlowWhatsapp`, {
+    const response = await axios.get(`/server/api/FlowWhatsapp`, {
       headers: {
         'Accept': '*/*',
       },
@@ -18,7 +18,7 @@ export const getAllFlows = async (): Promise<any[]> => {
 // Função para obter um fluxo por ID
 export const getFlowById = async (id: string): Promise<any> => {
   try {
-    const response = await axios.get(`/server/FlowWhatsapp/${id}`, {
+    const response = await axios.get(`/server/api/FlowWhatsapp/${id}`, {
       headers: {
         'Accept': '*/*',
       },
@@ -33,7 +33,7 @@ export const getFlowById = async (id: string): Promise<any> => {
 // Função para criar um fluxo
 export const createFlow = async (flowData: any): Promise<any> => {
   try {
-    const response = await axios.post(`/server/FlowWhatsapp`, flowData, {
+    const response = await axios.post(`/server/api/FlowWhatsapp`, flowData, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -48,7 +48,7 @@ export const createFlow = async (flowData: any): Promise<any> => {
 // Função para atualizar um fluxo
 export const updateFlow = async (id: string, flowData: any): Promise<any> => {
   try {
-    const response = await axios.put(`/server/FlowWhatsapp/${id}`, flowData, {
+    const response = await axios.put(`/server/api/FlowWhatsapp/${id}`, flowData, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -63,7 +63,7 @@ export const updateFlow = async (id: string, flowData: any): Promise<any> => {
 // Função para deletar um fluxo
 export const deleteFlow = async (id: string): Promise<void> => {
   try {
-    await axios.delete(`/server/FlowWhatsapp/${id}`);
+    await axios.delete(`/server/api/FlowWhatsapp/${id}`);
   } catch (error) {
     console.error(`Erro ao deletar fluxo com ID ${id}:`, error);
   }

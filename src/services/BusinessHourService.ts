@@ -11,7 +11,7 @@ export interface BusinessHourInterface {
 
 export const createBusinessHour = async (businessHour: BusinessHourInterface) => {
   try {
-    const response = await axios.post('/server/businessHour', businessHour);
+    const response = await axios.post('/server/api/businessHour', businessHour);
     return response.data;
   } catch (error) {
     console.log(error)
@@ -20,7 +20,7 @@ export const createBusinessHour = async (businessHour: BusinessHourInterface) =>
 
 export const getBusinessHoursBySectorId = async (sectorId: number) => {
   try {
-    const response = await axios.get(`/server/businessHour/${sectorId}`);
+    const response = await axios.get(`/server/api/businessHour/${sectorId}`);
     return response.data;
   } catch (error) {
     console.log(error)

@@ -42,7 +42,7 @@ export interface Sector {
 // Serviço para criar um usuário
 export const createUser = async (userData: UserCreate): Promise<User> => {
   try {
-    const response = await axios.post('/server/users', userData);
+    const response = await axios.post('/server/api/users', userData);
     return response.data;
   } catch (error) {
     throw new Error(`Failed to create user: ${error}`);
@@ -52,7 +52,7 @@ export const createUser = async (userData: UserCreate): Promise<User> => {
 // Serviço para atualizar um usuário
 export const updateUser = async (id: number, data: UpdateUserRequestDTO): Promise<User> => {
   try {
-    const response = await axios.put(`/server/users/${id}`, data, {
+    const response = await axios.put(`/server/api/users/${id}`, data, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -66,7 +66,7 @@ export const updateUser = async (id: number, data: UpdateUserRequestDTO): Promis
 // Serviço para obter um usuário pelo ID
 export const getUser = async (id: number): Promise<User> => {
   try {
-    const response = await axios.get(`/server/users/${id}`, {
+    const response = await axios.get(`/server/api/users/${id}`, {
       headers: {
         'Accept': 'application/json',
       },
@@ -80,7 +80,7 @@ export const getUser = async (id: number): Promise<User> => {
 // Serviço para buscar todos os setores
 export const getSectors = async (): Promise<Sector[]> => {
   try {
-    const response = await axios.get('/server/setores');
+    const response = await axios.get('/server/api/setores');
     return response.data; // Supondo que a resposta esteja no formato esperado
   } catch (error) {
     throw new Error(`Failed to fetch sectors: ${error}`);
@@ -89,7 +89,7 @@ export const getSectors = async (): Promise<Sector[]> => {
 
 export const getAllUsers = async (userId?: number | null): Promise<User[]> => { 
   try {
-    const response = await axios.get('/server/users', {
+    const response = await axios.get('/server/api/users', {
       params: { invitedBy: userId }, 
     });
     return response.data; 
@@ -101,7 +101,7 @@ export const getAllUsers = async (userId?: number | null): Promise<User[]> => {
 // Serviço para deletar um usuário
 export const deleteUser = async (id: string): Promise<void> => {
   try {
-    await axios.delete(`/server/users/${id}`);
+    await axios.delete(`/server/api/users/${id}`);
   } catch (error) {
     throw new Error(`Failed to delete user: ${error}`);
   }

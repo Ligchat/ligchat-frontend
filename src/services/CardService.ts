@@ -38,7 +38,7 @@ export interface UpdateCardRequestDTO {
 
 export const createCard = async (cardData: CreateCardRequestDTO) => {
   try {
-    const response = await axios.post('/server/cards', cardData);
+    const response = await axios.post('/server/api/cards', cardData);
     return response.data;
   } catch (error) {
     throw new Error(`Failed to create card: ${error}`);
@@ -47,7 +47,7 @@ export const createCard = async (cardData: CreateCardRequestDTO) => {
 
 export const updateCard = async (id: number, data: UpdateCardRequestDTO) => {
   try {
-    const response = await axios.put(`/server/cards/${id}`, data, {
+    const response = await axios.put(`/server/api/cards/${id}`, data, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -60,7 +60,7 @@ export const updateCard = async (id: number, data: UpdateCardRequestDTO) => {
 
 export const getCard = async (id: number): Promise<Card> => {
   try {
-    const response = await axios.get(`/server/cards/${id}`, {
+    const response = await axios.get(`/server/api/cards/${id}`, {
       headers: {
         'Accept': '*/*',
       },
@@ -73,7 +73,7 @@ export const getCard = async (id: number): Promise<Card> => {
 
 export const getCards = async (): Promise<Card[]> => {
   try {
-    const response = await axios.get('/server/cards', {
+    const response = await axios.get('/server/api/cards', {
       headers: {
         'Accept': '*/*',
       },
@@ -86,7 +86,7 @@ export const getCards = async (): Promise<Card[]> => {
 
 export const deleteCard = async (id: number) => {
   try {
-    const response = await axios.delete(`/server/cards/${id}`);
+    const response = await axios.delete(`/server/api/cards/${id}`);
     return response.data;
   } catch (error) {
     throw new Error(`Failed to delete card with id ${id}: ${error}`);
@@ -96,7 +96,7 @@ export const deleteCard = async (id: number) => {
 // Atualização da função moveCard para aceitar newPosition
 export const moveCard = async (id: number, newColumnId: number, newPosition: number) => {
   try {
-    const response = await axios.put(`/server/cards/${id}/move`, { newColumnId, newPosition }, {
+    const response = await axios.put(`/server/api/cards/${id}/move`, { newColumnId, newPosition }, {
       headers: {
         'Content-Type': 'application/json',
       },
