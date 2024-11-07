@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios from '../axiosConfig';
 
 // Função para obter todos os fluxos
 export const getAllFlows = async (): Promise<any[]> => {

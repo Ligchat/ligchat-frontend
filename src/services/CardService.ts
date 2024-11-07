@@ -1,5 +1,4 @@
-// src/services/CardService.ts
-import axios from "axios";
+import axios from '../axiosConfig';
 
 export interface Contact {
   id: number;

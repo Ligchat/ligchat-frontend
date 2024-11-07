@@ -18,7 +18,6 @@
     "@types/react-dom": "^18.3.0",
     "@wavesurfer/react": "^1.0.7",
     "antd": "^5.21.2",
-    "axios": "^1.7.7",
     "chart.js": "^4.4.4",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",

@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios from '../axiosConfig';
 
 export interface BusinessHourInterface {
   id?: number; 
@@ -18,11 +18,10 @@ export const createBusinessHour = async (businessHour: BusinessHourInterface) =>
   }
 };
 
-// Função para obter horários de funcionamento de um setor específico
 export const getBusinessHoursBySectorId = async (sectorId: number) => {
   try {
     const response = await axios.get(`/api/businessHour/${sectorId}`);
-    return response.data; // Retorna a lista de horários de funcionamento
+    return response.data;
   } catch (error) {
     console.log(error)
   }
