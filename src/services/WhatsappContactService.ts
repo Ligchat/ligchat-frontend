@@ -27,7 +27,7 @@ export interface Messages {
 
 export const getMessagesByContactId = async (contactId: number): Promise<Messages[]> => {
     try {
-        const response = await axios.get(`/contact/${contactId}/messages`, {
+        const response = await axios.get(`/job/contact/${contactId}/messages`, {
             headers: {
                 'Accept': '*/*',
             },
@@ -45,7 +45,7 @@ export const getWhatsAppContacts = async (sectorId: number): Promise<WhatsAppCon
         if(sectorId == null){
             sectorId = -1
         }
-        const response = await axios.get(`/contact/sector/${sectorId}`, {
+        const response = await axios.get(`/job/contact/sector/${sectorId}`, {
             headers: {
                 'Accept': '*/*',
             },
@@ -60,7 +60,7 @@ export const getWhatsAppContacts = async (sectorId: number): Promise<WhatsAppCon
 // GET a WhatsApp contact by ID
 export const getWhatsAppContactById = async (id: number): Promise<WhatsAppContact | null> => {
     try {
-        const response = await axios.get(`/contact/${id}`, {
+        const response = await axios.get(`/job/contact/${id}`, {
             headers: {
                 'Accept': '*/*',
             },
@@ -75,7 +75,7 @@ export const getWhatsAppContactById = async (id: number): Promise<WhatsAppContac
 // POST a new WhatsApp contact
 export const createWhatsAppContact = async (contact: Omit<WhatsAppContact, 'id'>): Promise<void> => {
     try {
-        await axios.post('/contact', contact, {
+        await axios.post('/job/contact', contact, {
             headers: {
                 'Accept': '*/*',
                 'Content-Type': 'application/json',
@@ -89,7 +89,7 @@ export const createWhatsAppContact = async (contact: Omit<WhatsAppContact, 'id'>
 // PUT to update a WhatsApp contact by ID
 export const updateWhatsAppContact = async (contact: Omit<WhatsAppContact, 'id'>): Promise<void> => {
     try {
-        await axios.post(`/contact`, contact, {
+        await axios.post(`/job/contact`, contact, {
             headers: {
                 'Accept': '*/*',
                 'Content-Type': 'application/json',
@@ -103,7 +103,7 @@ export const updateWhatsAppContact = async (contact: Omit<WhatsAppContact, 'id'>
 // DELETE a WhatsApp contact by ID
 export const deleteWhatsAppContact = async (id: number): Promise<void> => {
     try {
-        await axios.delete(`/contact/${id}`, {
+        await axios.delete(`/job/contact/${id}`, {
             headers: {
                 'Accept': '*/*',
             },

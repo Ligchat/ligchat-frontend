@@ -38,7 +38,7 @@ export interface MessageType {
 // Função para enviar mensagem
 export const sendMessage = async (message: SendMessageDto): Promise<MessageResponse> => {
   try {
-    const response = await axios.post('/whatsapp/send-message', message, {
+    const response = await axios.post('/job/whatsapp/send-message', message, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -53,7 +53,7 @@ export const sendMessage = async (message: SendMessageDto): Promise<MessageRespo
 // Função para enviar arquivo
 export const sendFile = async (file: SendFileDto): Promise<MessageResponse> => {
   try {
-    const response = await axios.post('/whatsapp/send-file', file, {
+    const response = await axios.post('/job/whatsapp/send-file', file, {
       headers: {
         'Content-Type': 'application/json',
       },
