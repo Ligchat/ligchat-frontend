@@ -9,7 +9,7 @@ export interface WhatsAppAccount {
 
 export const getWhatsAppAccount = async (sectorId: string): Promise<WhatsAppAccount> => {
     try {
-        const response = await axios.get(`/api/whatsapp/account/${sectorId}`, {
+        const response = await axios.get(`/server/whatsapp/account/${sectorId}`, {
             headers: {
                 'Accept': '*/*',
             },

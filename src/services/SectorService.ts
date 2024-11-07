@@ -37,7 +37,7 @@ export interface UpdateSectorRequestDTO {
 
 export const createSector = async (sectorData: CreateSectorRequestDTO) => {
   try {
-    const response = await axios.post('/api/sectors', sectorData);
+    const response = await axios.post('/server/sectors', sectorData);
     return response.data;
   } catch (error) {
     throw new Error(`Failed to create sector: ${error}`);
@@ -46,7 +46,7 @@ export const createSector = async (sectorData: CreateSectorRequestDTO) => {
 
 export const updateSector = async (id: number, data: UpdateSectorRequestDTO) => {
   try {
-    const response = await axios.put(`/api/sectors/${id}`, data, {
+    const response = await axios.put(`/server/sectors/${id}`, data, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -59,7 +59,7 @@ export const updateSector = async (id: number, data: UpdateSectorRequestDTO) => 
 
 export const getSector = async (id: number): Promise<Sector> => {
   try {
-    const response = await axios.get(`/api/sectors/${id}`, {
+    const response = await axios.get(`/server/sectors/${id}`, {
       headers: {
         'Accept': '*/*',
       },
@@ -72,7 +72,7 @@ export const getSector = async (id: number): Promise<Sector> => {
 
 export const getSectors = async (token: any): Promise<Sector[]> => {
   try {
-    const response = await axios.get('/api/sectors', {
+    const response = await axios.get('/server/sectors', {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': '*/*',
@@ -86,7 +86,7 @@ export const getSectors = async (token: any): Promise<Sector[]> => {
 
 export const deleteSector = async (id: number) => {
   try {
-    const response = await axios.delete(`/api/sectors/${id}`);
+    const response = await axios.delete(`/server/sectors/${id}`);
     return response.data;
   } catch (error) {
     throw new Error(`Failed to delete sector with id ${id}: ${error}`);

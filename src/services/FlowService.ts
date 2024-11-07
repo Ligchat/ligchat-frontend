@@ -43,7 +43,7 @@ export const getFlows = async (
   token: string
 ): Promise<Flow[]> => {
   try {
-    const response = await axios.get('/api/flows', {
+    const response = await axios.get('/server/flows', {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: '*/*',
@@ -67,7 +67,7 @@ export const createFlow = async (
   try {
     const sectorId = SessionService.getSession('selectedSector')
     flowData.sectorId = sectorId;
-    const response = await axios.post('/api/flows', flowData);
+    const response = await axios.post('/server/flows', flowData);
     return response.data;
   } catch (error: any) {
     console.error('Erro ao criar fluxo:', error);
@@ -78,7 +78,7 @@ export const createFlow = async (
 // Função para obter um fluxo específico por ID
 export const getFlow = async (id: string, token: string): Promise<Flow> => {
   try {
-    const response = await axios.get(`/api/flows/${id}`, {
+    const response = await axios.get(`/server/flows/${id}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: '*/*',
@@ -98,7 +98,7 @@ export const updateFlow = async (
   token: string
 ): Promise<Flow> => {
   try {
-    const response = await axios.put(`/api/flows/${id}`, data, {
+    const response = await axios.put(`/server/flows/${id}`, data, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -114,7 +114,7 @@ export const updateFlow = async (
 // Função para deletar um fluxo por ID
 export const deleteFlow = async (id: string, token: string): Promise<void> => {
   try {
-    await axios.delete(`/api/flows/${id}`, {
+    await axios.delete(`/server/flows/${id}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },

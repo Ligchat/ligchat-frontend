@@ -22,7 +22,7 @@ export interface UpdateTagRequestDTO {
 
 export const createTag = async (tagData: CreateTagRequestDTO) => {
   try {
-    const response = await axios.post('/api/tags', tagData);
+    const response = await axios.post('/server/tags', tagData);
     return response.data;
   } catch (error) {
     throw new Error(`Failed to create tag: ${error}`);
@@ -31,7 +31,7 @@ export const createTag = async (tagData: CreateTagRequestDTO) => {
 
 export const updateTag = async (id: number, data: UpdateTagRequestDTO) => {
   try {
-    const response = await axios.put(`/api/tags/${id}`, data, {
+    const response = await axios.put(`/server/tags/${id}`, data, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -44,7 +44,7 @@ export const updateTag = async (id: number, data: UpdateTagRequestDTO) => {
 
 export const getTag = async (id: number): Promise<Tag> => {
   try {
-    const response = await axios.get(`/api/tags/${id}`, {
+    const response = await axios.get(`/server/tags/${id}`, {
       headers: {
         'Accept': '*/*',
       },
@@ -63,7 +63,7 @@ export const getTags = async (): Promise<Tag[]> => {
   }
 
   try {
-    const response = await axios.get(`/api/tags?sectorId=${sectorIdFromSession}`, { // Passando o sectorId na URL
+    const response = await axios.get(`/server/tags?sectorId=${sectorIdFromSession}`, { // Passando o sectorId na URL
       headers: {
         'Accept': '*/*',
       },
@@ -76,7 +76,7 @@ export const getTags = async (): Promise<Tag[]> => {
 
 export const deleteTag = async (id: number) => {
   try {
-    const response = await axios.delete(`/api/tags/${id}`);
+    const response = await axios.delete(`/server/tags/${id}`);
     return response.data;
   } catch (error) {
     throw new Error(`Failed to delete tag with id ${id}: ${error}`);

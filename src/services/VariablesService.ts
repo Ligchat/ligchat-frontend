@@ -9,7 +9,7 @@ export interface VariableInterface {
 
 export const getAllVariables = async () => {
   try {
-    const response = await axios.get('/api/variables');
+    const response = await axios.get('/server/variables');
     return response.data;
   } catch (error) {
     console.error('Error fetching all variables:', error);
@@ -18,7 +18,7 @@ export const getAllVariables = async () => {
 
 export const getVariablesBySector = async (sectorId: number) => {
   try {
-    const response = await axios.get(`/api/variables/sector/${sectorId}`);
+    const response = await axios.get(`/server/variables/sector/${sectorId}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching variables for sector ${sectorId}:`, error);
@@ -27,7 +27,7 @@ export const getVariablesBySector = async (sectorId: number) => {
 
 export const createVariable = async (variable: VariableInterface) => {
   try {
-    const response = await axios.post('/api/variables', variable);
+    const response = await axios.post('/server/variables', variable);
     return response.data;
   } catch (error) {
     console.error('Error creating variable:', error);
@@ -36,7 +36,7 @@ export const createVariable = async (variable: VariableInterface) => {
 
 export const editVariable = async (id: number, variable: VariableInterface) => {
   try {
-    const response = await axios.put(`/api/variables/${id}`, variable);
+    const response = await axios.put(`/server/variables/${id}`, variable);
     return response.data;
   } catch (error) {
     console.error(`Error editing variable with id ${id}:`, error);
@@ -45,7 +45,7 @@ export const editVariable = async (id: number, variable: VariableInterface) => {
 
 export const deleteVariable = async (id: number) => {
   try {
-    const response = await axios.delete(`/api/variables/${id}`);
+    const response = await axios.delete(`/server/variables/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error deleting variable with id ${id}:`, error);
