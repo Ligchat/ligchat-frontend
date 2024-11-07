@@ -1,4 +1,4 @@
-import axios from '../axiosConfig';
+import axios from 'axios';
 export interface Contact {
   id: number;
   name: string;

@@ -1,4 +1,4 @@
-import axios from '../axiosConfigWhatsapp';
+import axios from 'axios';
 // Interfaces para as requisições
 export interface SendMessageDto {
   content: string;

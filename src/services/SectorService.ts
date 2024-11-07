@@ -1,4 +1,4 @@
-import axios from '../axiosConfig';
+import axios from 'axios';
 
 export interface Sector {
   id: number;
