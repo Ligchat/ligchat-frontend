@@ -98,22 +98,22 @@ const ChatPage: React.FC = () => {
 
 
 
-  
+
   useEffect(() => {
-  const fetchContacts = async () => {
-    setIsLoading(true);
-    try {
-      const contactsData = await getWhatsAppContacts(sessionId);
-      setContacts(contactsData);
-      setFilteredContacts(contactsData);
-    } catch (error) {
-      console.error('Erro ao buscar contatos:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  fetchContacts();
-  },[]);
+    const fetchContacts = async () => {
+      setIsLoading(true);
+      try {
+        const contactsData = await getWhatsAppContacts(sessionId);
+        setContacts(contactsData);
+        setFilteredContacts(contactsData);
+      } catch (error) {
+        console.error('Erro ao buscar contatos:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchContacts();
+  }, []);
 
 
   useEffect(() => {
@@ -155,23 +155,23 @@ const ChatPage: React.FC = () => {
 
   const handleStatusChange = async (value: number) => {
     setStatus(value); // Atualiza o estado local
-  
+
     if (selectedContact) {
       const updatedContact = {
         ...selectedContact,
         status: value, // Atualiza o status no objeto do contato
       };
-  
+
       try {
         await updateWhatsAppContact(updatedContact);
-  
+
         // Atualiza a lista de contatos para refletir a alteração
         setContacts((prevContacts) =>
           prevContacts.map((contact) =>
             contact.id === updatedContact.id ? updatedContact : contact
           )
         );
-  
+
         // Atualiza o contato selecionado para refletir a alteração
         setSelectedContact(updatedContact);
       } catch (error) {
@@ -182,70 +182,70 @@ const ChatPage: React.FC = () => {
 
 
   useEffect(() => {
-  const fetchTags = async () => {
-    try {
+    const fetchTags = async () => {
+      try {
         setIsLoading(true);
         const response: any = await getTags();
         setTags(Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
+      } catch (error) {
         console.error('Erro ao buscar etiquetas:', error);
         setTags([]);
-    } finally {
+      } finally {
         setIsLoading(false);
+      }
+    };
+    fetchTags()
+  }, []);
+
+  useEffect(() => {
+    handleFilterContacts();
+  }, [searchTerm, selectedFilter, contacts]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleFilterChange = (filter: string) => {
+    setSelectedFilter(filter);
+  };
+
+  const handleFilterContacts = () => {
+    let updatedContacts = [...contacts];
+
+    // Filtra por termo de pesquisa
+    if (searchTerm) {
+      updatedContacts = updatedContacts.filter((contact) =>
+        contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contact.phoneNumber.includes(searchTerm)
+      );
+    }
+
+    // Filtra por tipo (lidas, não lidas, todas)
+    if (selectedFilter === 'unread') {
+      updatedContacts = updatedContacts.filter((contact) => !contact.isRead);
+    } else if (selectedFilter === 'read') {
+      updatedContacts = updatedContacts.filter((contact) => contact.isRead);
+    }
+
+    setFilteredContacts(updatedContacts);
+  };
+
+  const handleSelectConversation = async (contact: WhatsAppContact) => {
+    setSelectedContact(contact);
+    setShowChat(true);
+    setIsLoading(true); // Inicia o carregamento das mensagens
+
+    try {
+      const messagesData: any = await getMessagesByContactId(contact.id);
+      setMessages(messagesData);
+      setStatus(contact.status); // Atualiza o estado do status com o valor do contato
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    } catch (error) {
+      console.error('Erro ao buscar mensagens:', error);
+    } finally {
+      setIsLoading(false); // Finaliza o carregamento
     }
   };
-  fetchTags()
-  },[]);
-
-useEffect(() => {
-  handleFilterContacts();
-}, [searchTerm, selectedFilter, contacts]);
-
-const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  setSearchTerm(e.target.value);
-};
-
-const handleFilterChange = (filter: string) => {
-  setSelectedFilter(filter);
-};
-
-const handleFilterContacts = () => {
-  let updatedContacts = [...contacts];
-
-  // Filtra por termo de pesquisa
-  if (searchTerm) {
-    updatedContacts = updatedContacts.filter((contact) =>
-      contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.phoneNumber.includes(searchTerm)
-    );
-  }
-
-  // Filtra por tipo (lidas, não lidas, todas)
-  if (selectedFilter === 'unread') {
-    updatedContacts = updatedContacts.filter((contact) => !contact.isRead);
-  } else if (selectedFilter === 'read') {
-    updatedContacts = updatedContacts.filter((contact) => contact.isRead);
-  }
-
-  setFilteredContacts(updatedContacts);
-};
-
-const handleSelectConversation = async (contact: WhatsAppContact) => {
-  setSelectedContact(contact);
-  setShowChat(true);
-  setIsLoading(true); // Inicia o carregamento das mensagens
-
-  try {
-    const messagesData: any = await getMessagesByContactId(contact.id);
-    setMessages(messagesData);
-    setStatus(contact.status); // Atualiza o estado do status com o valor do contato
-    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-  } catch (error) {
-    console.error('Erro ao buscar mensagens:', error);
-  } finally {
-    setIsLoading(false); // Finaliza o carregamento
-  }
-};
 
   const handleSendMessage = async () => {
     if (messageInput.trim() !== '' && selectedContact) {
@@ -323,7 +323,7 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
       reader.onloadend = async () => {
         const base64File = reader.result as string;
         const mimeType = file.type;
-  
+
         const fileData: any = {
           base64File: base64File.split(',')[1],
           mediaType: mimeType,
@@ -333,25 +333,25 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
           contactId: selectedContact?.id,
           sectorId: SessionService.getSessionForSector(),
         };
-  
+
         setIsSending(true);
-  
+
         try {
-         const response:any =  await sendFile(fileData);
-  
+          const response: any = await sendFile(fileData);
+
           const messageToAdd: MessageType = {
             id: Date.now(),
-            content: isImage ? '' : file.name, 
+            content: isImage ? '' : file.name,
             isSent: response.media.isSent,
             mediaType: response.media.mediaType,
-            mediaUrl: response.media.mediaUrl, 
+            mediaUrl: response.media.mediaUrl,
             sectorId: response.media.sectorId,
             contactId: response.media.contactId,
           };
-  
+
           socket.current?.send(JSON.stringify(messageToAdd));
-  
-          setMessages((prevMessages) => [...prevMessages, messageToAdd]); 
+
+          setMessages((prevMessages) => [...prevMessages, messageToAdd]);
           antdMessage.success('Arquivo enviado com sucesso!');
         } catch (error) {
           console.error('Erro ao enviar arquivo:', error);
@@ -361,7 +361,7 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
       };
       reader.readAsDataURL(file);
     }
-  
+
     // Fechar os modais e limpar seleção de arquivos
     if (isImage) {
       setIsImageModalVisible(false);
@@ -408,8 +408,8 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
           title={file.name}
           description={file.type}
         />
-        <Button 
-          icon={<EyeOutlined />} 
+        <Button
+          icon={<EyeOutlined />}
           onClick={() => handlePreviewImage(file)} // Chama a função para visualizar a imagem
         >
           Visualizar
@@ -424,13 +424,13 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
       Modal.info({
         title: 'Visualizar Imagem',
         content: (
-          <img 
-            src={reader.result as string} 
-            alt={file.name} 
-            style={{ width: '100%', height: 'auto' }} 
+          <img
+            src={reader.result as string}
+            alt={file.name}
+            style={{ width: '100%', height: 'auto' }}
           />
         ),
-        onOk() {},
+        onOk() { },
       });
     };
     reader.readAsDataURL(file);
@@ -541,7 +541,7 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
         const mimeType = recordedAudio.type.split(';')[0];
         const extension = mimeType.split('/')[1];
         const fileName = `audio_recording.${extension}`;
-  
+
         const fileData = {
           base64File: base64File.split(',')[1], // Envia apenas o conteúdo do base64
           mediaType: mimeType,
@@ -551,13 +551,13 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
           contactId: selectedContact.id,
           sectorId: SessionService.getSessionForSector(),
         };
-  
+
         setIsSending(true);
-  
+
         try {
           // Chama a função para enviar o arquivo e armazena a resposta
-          const response:any = await sendFile(fileData);
-  
+          const response: any = await sendFile(fileData);
+
           // Cria a mensagem com o `mediaUrl` retornado pela API
           const messageToAdd: MessageType = {
             id: Date.now(),
@@ -568,7 +568,7 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
             sectorId: response.media.sectorId,
             contactId: response.media.contactId,
           };
-  
+
           setMessages((prevMessages) => [...prevMessages, messageToAdd]);
           antdMessage.success('Áudio enviado com sucesso!');
         } catch (error) {
@@ -583,7 +583,7 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
       reader.readAsDataURL(recordedAudio);
     }
   };
-  
+
   const getSelectStyle = () => {
     switch (status) {
       case 1:
@@ -628,38 +628,38 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
       {isLoading && <LoadingOverlay />} {/* Exibe o loading overlay */}
 
       <Sider width={350} style={{ padding: 20, backgroundColor: '#fff', borderRight: '5px solid #f0f0f0', borderBottom: '2px solid #f0f0f0', borderTop: '2px solid #f0f0f0', borderLeft: '2px solid #f0f0f0', borderRadius: '20px 0 0 20px' }}>
-      <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'center' }}>
-  <Search
-    placeholder="Pesquisar conversas"
-    value={searchTerm}
-    onChange={handleSearchChange}
-    style={{ width: '80%' }}
-    allowClear
-  />
-</div>
+        <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'center' }}>
+          <Search
+            placeholder="Pesquisar conversas"
+            value={searchTerm}
+            onChange={handleSearchChange}
+            style={{ width: '80%' }}
+            allowClear
+          />
+        </div>
 
-<div style={{ margin: '16px 0', display: 'flex', alignItems: 'center', gap: '16px' }}>
-  <div style={{ display: 'flex', gap: '8px' }}>
-    <Button
-      type={selectedFilter === 'unread' ? 'primary' : 'default'}
-      onClick={() => handleFilterChange('unread')}
-    >
-      Não lidas
-    </Button>
-    <Button
-      type={selectedFilter === 'read' ? 'primary' : 'default'}
-      onClick={() => handleFilterChange('read')}
-    >
-      Lidas
-    </Button>
-  </div>
+        <div style={{ margin: '16px 0', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Button
+              type={selectedFilter === 'unread' ? 'primary' : 'default'}
+              onClick={() => handleFilterChange('unread')}
+            >
+              Não lidas
+            </Button>
+            <Button
+              type={selectedFilter === 'read' ? 'primary' : 'default'}
+              onClick={() => handleFilterChange('read')}
+            >
+              Lidas
+            </Button>
+          </div>
 
-  <Dropdown overlay={filterMenu} trigger={['click']}>
-    <Button>
-      Etiqueta <DownOutlined />
-    </Button>
-  </Dropdown>
-</div>
+          <Dropdown overlay={filterMenu} trigger={['click']}>
+            <Button>
+              Etiqueta <DownOutlined />
+            </Button>
+          </Dropdown>
+        </div>
 
 
 
@@ -689,126 +689,124 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
           borderBottom: '2px solid #f0f0f0',
           borderRight: '2px solid #f0f0f0'
         }}>
-      <Header style={{
-        backgroundColor: '#fff',
-        padding: '16px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between', // Espaçamento entre os itens
-        borderTop: '2px solid #f0f0f0',
-        borderRight: '2px solid #f0f0f0',
-        borderBottom: '2px solid #f0f0f0',
-        borderLeft: '2px solid #f0f0f0',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Avatar icon={<UserOutlined />} />
-          <Title level={5} style={{ margin: '0 10px' }}>
-  {selectedContact ? selectedContact.name : 'Nome do Contato'}
-</Title>
-        </div>
-
-        <Select
-        notFoundContent="Nenhum atendimento encontrado"
-  value={status}
-  onChange={handleStatusChange}
-  className={
-    status === 1 ? 'select-status-1' :
-    status === 2 ? 'select-status-2' :
-    status === 3 ? 'select-status-3' : ''
-  }
-  style={{ width: 200, textAlign: 'center' }}
->
-  <Select.Option value={1}>Em Atendimento</Select.Option>
-  <Select.Option value={2}>Inativo</Select.Option>
-  <Select.Option value={3}>Concluído</Select.Option>
-</Select>
-
-
-        <Button style={{ marginLeft: '10px' }} onClick={handleShowDrawer} type="primary">Mais informações</Button>
-      </Header>
-
-      <Content style={{ padding: '24px', backgroundColor: '#fff', overflowY: 'auto', flex: 1, border: '1px solid #d9d9d9', borderRadius: '4px' }}>
-  <div style={{ flex: 1, overflowY: 'auto' }}>
-    {isLoading ? (
-      <Skeleton active paragraph={{ rows: 3 }} />
-    ) : (
-      messages.length === 0 ? (
-        <div style={{ textAlign: 'center', marginTop: '20px', color: '#888' }}>
-          Conversa não iniciada
-        </div>
-      ) : (
-        messages.map((message:any) => (
-          <div key={message.id} style={{ marginBottom: '16px', alignItems:'center', textAlign: message.isSent ? 'right' : 'left', display: 'flex', justifyContent: message.isSent ? 'flex-end' : 'flex-start' }}>
-            {!message.isSent && (
-              <Avatar src={selectedContact?.profilePictureUrl} icon={<UserOutlined />} style={{ marginRight: '8px' }} />
-            )}
-            <div style={{
-              backgroundColor: message.isSent ? '#1890ff' : '#fff',
-              border: message.mediaType.includes("audio") ? 'none' : '1px solid #d9d9d9',
-              borderRadius: '8px',
-              display: 'flex',
-              justifyContent:'center',
-              alignItems:'center',
-              maxWidth: '45%',
-              padding: '8px',
-              boxShadow: message.isSent ? '0 2px 10px rgba(0, 0, 0, 0.1)' : 'none',
-              wordWrap: 'break-word',
-              overflowWrap: 'break-word',
-              whiteSpace: 'normal',
-            }}>
-              {message.mediaType && message.mediaType.includes("image") && message.mediaUrl ? (
-                <img
-                  src={message.mediaUrl}
-                  alt="Image"
-                  style={{ maxWidth: '200px', maxHeight: '200px', cursor: 'pointer', borderRadius: '8px' }}
-                  onClick={() => handleImageClick(message.mediaUrl)}
-                />
-              ) : null}
-
-              {message.mediaType && message.mediaType.includes("audio") && message.mediaUrl ? (
-                <AudioMessage audioUrl={message.mediaUrl} />
-              ) : null}
-
-              {/* Renderização de documentos */}
-              {(message.mediaType && (message.mediaType.includes("document") || message.mediaType.includes("application"))) && message.mediaUrl ? (
-  <div style={{ display: 'flex', alignItems: 'center' }}>
-    <a
-      href={message.mediaUrl}
-      download
-      style={{ cursor: 'pointer', marginLeft: '8px', textDecoration: 'underline', color:'white' }}
-    >
-    <span>{message.mediaUrl.split('/').pop()}</span>
-    </a>
-  </div>
-) : null}
-
-
-              {/* Para mensagens de texto normais */}
-              {message.content && (
-  <span style={{ color: message.isSent ? 'white' : 'black' }}>
-    {message.content}
-  </span>
-)}
+          <Header style={{
+            backgroundColor: '#fff',
+            padding: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between', // Espaçamento entre os itens
+            borderTop: '2px solid #f0f0f0',
+            borderRight: '2px solid #f0f0f0',
+            borderBottom: '2px solid #f0f0f0',
+            borderLeft: '2px solid #f0f0f0',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <Avatar icon={<UserOutlined />} />
+              <Title level={5} style={{ margin: '0 10px' }}>
+                {selectedContact ? selectedContact.name : 'Nome do Contato'}
+              </Title>
             </div>
-          </div>
-        ))
-      )
-    )}
-    <Modal
-      visible={isImagePreviewVisible}
-      footer={[
-        <Button key="download" icon={<DownloadOutlined />} onClick={() => window.open(previewImageUrl, '_blank')}>
-          Download
-        </Button>
-      ]}
-      onCancel={handleCloseImagePreview}
-    >
-      <img src={previewImageUrl} alt="Image Preview" style={{ width: '100%' }} />
-    </Modal>
 
-    <div ref={chatEndRef} />
-  </div>
-</Content>
+            <Select
+              notFoundContent="Nenhum atendimento encontrado"
+              value={status}
+              onChange={handleStatusChange}
+              className={
+                status === 1 ? 'select-status-1' :
+                  status === 2 ? 'select-status-2' :
+                    status === 3 ? 'select-status-3' : ''
+              }
+              style={{ width: 200, textAlign: 'center' }}
+            >
+              <Select.Option value={1}>Em Atendimento</Select.Option>
+              <Select.Option value={2}>Inativo</Select.Option>
+              <Select.Option value={3}>Concluído</Select.Option>
+            </Select>
+
+
+            <Button style={{ marginLeft: '10px' }} onClick={handleShowDrawer} type="primary">Mais informações</Button>
+          </Header>
+
+          <Content style={{ padding: '24px', backgroundColor: '#fff', overflowY: 'auto', flex: 1, border: '1px solid #d9d9d9', borderRadius: '4px' }}>
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {isLoading ? (
+                <Skeleton active paragraph={{ rows: 3 }} />
+              ) : (
+                messages.length === 0 ? (
+                  <div style={{ textAlign: 'center', marginTop: '20px', color: '#888' }}>
+                    Conversa não iniciada
+                  </div>
+                ) : (
+                  messages.map((message: any) => (
+                    <div key={message.id} style={{ marginBottom: '16px', alignItems: 'center', textAlign: message.isSent ? 'right' : 'left', display: 'flex', justifyContent: message.isSent ? 'flex-end' : 'flex-start' }}>
+                      {!message.isSent && (
+                        <Avatar src={selectedContact?.profilePictureUrl} icon={<UserOutlined />} style={{ marginRight: '8px' }} />
+                      )}
+                      <div style={{
+                        backgroundColor: message?.isSent ? '#1890ff' : '#fff',
+                        border: message?.mediaType?.includes("audio") ? 'none' : '1px solid #d9d9d9',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        maxWidth: '45%',
+                        padding: '8px',
+                        boxShadow: message.isSent ? '0 2px 10px rgba(0, 0, 0, 0.1)' : 'none',
+                        wordWrap: 'break-word',
+                        overflowWrap: 'break-word',
+                        whiteSpace: 'normal',
+                      }}>
+                        {message?.mediaType && message?.mediaType?.includes("image") && message.mediaUrl ? (
+                          <img
+                            src={message.mediaUrl}
+                            alt="Image"
+                            style={{ maxWidth: '200px', maxHeight: '200px', cursor: 'pointer', borderRadius: '8px' }}
+                            onClick={() => handleImageClick(message.mediaUrl)}
+                          />
+                        ) : null}
+
+                        {message?.mediaType && message?.mediaType.includes("audio") && message.mediaUrl ? (
+                          <AudioMessage audioUrl={message.mediaUrl} />
+                        ) : null}
+
+                        {/* Renderização de documentos */}
+                        {(message?.mediaType && (message?.mediaType?.includes("document") || message?.mediaType?.includes("application"))) && message?.mediaUrl ? (
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <a
+                              href={message.mediaUrl}
+                              download
+                              style={{ cursor: 'pointer', marginLeft: '8px', textDecoration: 'underline', color: 'white' }}
+                            >
+                              <span>{message.mediaUrl.split('/').pop()}</span>
+                            </a>
+                          </div>
+                        ) : null}
+                        
+                        {message.content && (
+                          <span style={{ color: message.isSent ? 'white' : 'black' }}>
+                            {message.content}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )
+              )}
+              <Modal
+                visible={isImagePreviewVisible}
+                footer={[
+                  <Button key="download" icon={<DownloadOutlined />} onClick={() => window.open(previewImageUrl, '_blank')}>
+                    Download
+                  </Button>
+                ]}
+                onCancel={handleCloseImagePreview}
+              >
+                <img src={previewImageUrl} alt="Image Preview" style={{ width: '100%' }} />
+              </Modal>
+
+              <div ref={chatEndRef} />
+            </div>
+          </Content>
 
 
           <div style={{ padding: '16px', backgroundColor: '#fff', borderTop: '1px solid #f0f0f0' }}>
@@ -977,7 +975,7 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
               <Button icon={<PaperClipOutlined />}>Selecionar Anexos</Button>
             </Upload>
             <AntList
-            locale={{ emptyText: 'Nenhum arquivo encontrado' }}
+              locale={{ emptyText: 'Nenhum arquivo encontrado' }}
               style={{ marginTop: '16px' }}
               bordered
               dataSource={filesToUpload.map((file, index) => ({
@@ -1017,137 +1015,137 @@ const handleSelectConversation = async (contact: WhatsAppContact) => {
           </Modal>
 
           <Drawer
-  title="Editar Contato"
-  placement="right"
-  closable
-  onClose={handleCloseDrawer}
-  visible={isDrawerVisible}
-  width={400}
->
-  <Title level={4}>{selectedContact?.name}</Title>
-  <Divider />
+            title="Editar Contato"
+            placement="right"
+            closable
+            onClose={handleCloseDrawer}
+            visible={isDrawerVisible}
+            width={400}
+          >
+            <Title level={4}>{selectedContact?.name}</Title>
+            <Divider />
 
-  <Text>
-    <strong style={{ marginRight: 8 }}>Tags:</strong>
-    <Select
-  mode="multiple"
-notFoundContent="Nenhuma etiqueta encontrada"
-  style={{ width: '100%', marginBottom: '12px' }}
-  placeholder="Selecione as tags"
-  value={(typeof currentValues.tagIds === 'string' ? currentValues.tagIds.split(',') : []).map((id:any) => parseInt(id)).filter((id:any) => !isNaN(id))}
-  onChange={handleTagIdsChange}
->
-  {tags.map(tag => (
-    <Select.Option key={tag.id} value={tag.id}>
-      {tag.name}
-    </Select.Option>
-  ))}
-</Select>
+            <Text>
+              <strong style={{ marginRight: 8 }}>Tags:</strong>
+              <Select
+                mode="multiple"
+                notFoundContent="Nenhuma etiqueta encontrada"
+                style={{ width: '100%', marginBottom: '12px' }}
+                placeholder="Selecione as tags"
+                value={(typeof currentValues.tagIds === 'string' ? currentValues.tagIds.split(',') : []).map((id: any) => parseInt(id)).filter((id: any) => !isNaN(id))}
+                onChange={handleTagIdsChange}
+              >
+                {tags.map(tag => (
+                  <Select.Option key={tag.id} value={tag.id}>
+                    {tag.name}
+                  </Select.Option>
+                ))}
+              </Select>
 
-  </Text>
+            </Text>
 
-  <Card
-    bodyStyle={{ padding: "0" }}
-    style={{ marginTop: 20, marginBottom: '12px', position: 'relative', borderRadius: '8px', border: '1px solid #e0e0e0', padding: 0 }} 
-    bordered={false}
-  >
-    <div style={{ padding: '16px', position: 'relative', margin: 0 }}>
-      <strong style={{ color: '#1E88E5', fontSize: '16px', display: 'block', marginBottom: 20}}>Informações:</strong>
-      <Text>
-        <strong style={{ marginRight: 8,color:'#9CA3AF' }}>Mora em:</strong>
-        {editableField === 'address' ? (
-          <Input
-            value={currentValues.address}
-            onChange={(e) => handleInputChange('address', e.target.value)}
-            onBlur={handleSave}
-            style={{ width: '60%', marginLeft: 8 }}
-          />
-        ) : (
-          <>
-            {currentValues.address}
-            <EditOutlined onClick={() => handleFieldEdit('address')} style={{ marginLeft: 8, cursor: 'pointer' }} />
-          </>
-        )}
-      </Text>
-      <br />
+            <Card
+              bodyStyle={{ padding: "0" }}
+              style={{ marginTop: 20, marginBottom: '12px', position: 'relative', borderRadius: '8px', border: '1px solid #e0e0e0', padding: 0 }}
+              bordered={false}
+            >
+              <div style={{ padding: '16px', position: 'relative', margin: 0 }}>
+                <strong style={{ color: '#1E88E5', fontSize: '16px', display: 'block', marginBottom: 20 }}>Informações:</strong>
+                <Text>
+                  <strong style={{ marginRight: 8, color: '#9CA3AF' }}>Mora em:</strong>
+                  {editableField === 'address' ? (
+                    <Input
+                      value={currentValues.address}
+                      onChange={(e) => handleInputChange('address', e.target.value)}
+                      onBlur={handleSave}
+                      style={{ width: '60%', marginLeft: 8 }}
+                    />
+                  ) : (
+                    <>
+                      {currentValues.address}
+                      <EditOutlined onClick={() => handleFieldEdit('address')} style={{ marginLeft: 8, cursor: 'pointer' }} />
+                    </>
+                  )}
+                </Text>
+                <br />
 
-      <Text>
-        <strong style={{ marginRight: 8,color:'#9CA3AF' }}>Telefone:</strong>
-        {editableField === 'phoneNumber' ? (
-          <Input
-            value={currentValues.phoneNumber}
-            onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-            onBlur={handleSave}
-            style={{ width: '60%', marginLeft: 8 }}
-          />
-        ) : (
-          <>
-            {currentValues.phoneNumber}
-            <EditOutlined onClick={() => handleFieldEdit('phoneNumber')} style={{ marginLeft: 8, cursor: 'pointer' }} />
-          </>
-        )}
-      </Text>
-      <br />
+                <Text>
+                  <strong style={{ marginRight: 8, color: '#9CA3AF' }}>Telefone:</strong>
+                  {editableField === 'phoneNumber' ? (
+                    <Input
+                      value={currentValues.phoneNumber}
+                      onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                      onBlur={handleSave}
+                      style={{ width: '60%', marginLeft: 8 }}
+                    />
+                  ) : (
+                    <>
+                      {currentValues.phoneNumber}
+                      <EditOutlined onClick={() => handleFieldEdit('phoneNumber')} style={{ marginLeft: 8, cursor: 'pointer' }} />
+                    </>
+                  )}
+                </Text>
+                <br />
 
-      <Text>
-        <strong style={{ marginRight: 8,color:'#9CA3AF' }}>E-mail:</strong>
-        {editableField === 'email' ? (
-          <Input
-            value={currentValues.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            onBlur={handleSave}
-            style={{ width: '60%', marginLeft: 8 }}
-          />
-        ) : (
-          <>
-            {currentValues.email}
-            <EditOutlined onClick={() => handleFieldEdit('email')} style={{ marginLeft: 8, cursor: 'pointer' }} />
-          </>
-        )}
-      </Text>
-      <br />
-    </div>
-  </Card>
+                <Text>
+                  <strong style={{ marginRight: 8, color: '#9CA3AF' }}>E-mail:</strong>
+                  {editableField === 'email' ? (
+                    <Input
+                      value={currentValues.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      onBlur={handleSave}
+                      style={{ width: '60%', marginLeft: 8 }}
+                    />
+                  ) : (
+                    <>
+                      {currentValues.email}
+                      <EditOutlined onClick={() => handleFieldEdit('email')} style={{ marginLeft: 8, cursor: 'pointer' }} />
+                    </>
+                  )}
+                </Text>
+                <br />
+              </div>
+            </Card>
 
-  <Card
-    bodyStyle={{ padding: "0" }}
-    style={{ marginTop: 20, marginBottom: '12px', position: 'relative', borderRadius: '8px', border: '1px solid #e0e0e0', padding: 0 }}
-    bordered={false}
-  >
-    <div style={{ padding: '16px', position: 'relative', margin: 0 }}>
-      <strong style={{ color: '#1E88E5', fontSize: '16px', display: 'block' }}>Anotações:</strong>
-      <EditOutlined
-        style={{
-          position: 'absolute',
-          top: '16px',
-          right: '16px',
-          cursor: 'pointer',
-          borderRadius: '50%',
-          backgroundColor: '#f0f0f0',
-          padding: '4px',
-          color: '#1E88E5',
-        }}
-        onClick={() => handleFieldEdit('annotations')}
-      />
-      {editableField === 'annotations' ? (
-        <Input.TextArea
-          value={currentValues.annotations}
-          onChange={(e) => handleInputChange('annotations', e.target.value)}
-          onBlur={handleSave}
-          style={{ width: '100%', marginTop: 8, padding: 0 }}
-          rows={4}
-        />
-      ) : (
-        <div style={{ marginTop: 8, color: '#757575' }}>
-          {currentValues.annotations || "Faça as suas anotações aqui."}
-        </div>
-      )}
-    </div>
-  </Card>
+            <Card
+              bodyStyle={{ padding: "0" }}
+              style={{ marginTop: 20, marginBottom: '12px', position: 'relative', borderRadius: '8px', border: '1px solid #e0e0e0', padding: 0 }}
+              bordered={false}
+            >
+              <div style={{ padding: '16px', position: 'relative', margin: 0 }}>
+                <strong style={{ color: '#1E88E5', fontSize: '16px', display: 'block' }}>Anotações:</strong>
+                <EditOutlined
+                  style={{
+                    position: 'absolute',
+                    top: '16px',
+                    right: '16px',
+                    cursor: 'pointer',
+                    borderRadius: '50%',
+                    backgroundColor: '#f0f0f0',
+                    padding: '4px',
+                    color: '#1E88E5',
+                  }}
+                  onClick={() => handleFieldEdit('annotations')}
+                />
+                {editableField === 'annotations' ? (
+                  <Input.TextArea
+                    value={currentValues.annotations}
+                    onChange={(e) => handleInputChange('annotations', e.target.value)}
+                    onBlur={handleSave}
+                    style={{ width: '100%', marginTop: 8, padding: 0 }}
+                    rows={4}
+                  />
+                ) : (
+                  <div style={{ marginTop: 8, color: '#757575' }}>
+                    {currentValues.annotations || "Faça as suas anotações aqui."}
+                  </div>
+                )}
+              </div>
+            </Card>
 
-  <br />
-  <Divider />
-</Drawer>
+            <br />
+            <Divider />
+          </Drawer>
 
 
         </Layout>
