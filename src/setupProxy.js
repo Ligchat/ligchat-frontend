@@ -2,26 +2,20 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = function(app) {
     app.use(
-        '/contact',
+        '/job',  
         createProxyMiddleware({
-            target: 'https://whatsapp.ligchat.com',
+            target: 'http://localhost:5167',
             changeOrigin: true,
+            pathRewrite: { '^/job': '' } 
         })
     );
 
     app.use(
-        '/whatsapp', 
+        '/server',
         createProxyMiddleware({
-            target: 'https://whatsapp.ligchat.com',
+            target: 'http://localhost:5251',
             changeOrigin: true,
-        })
-    );
-
-    app.use(
-        '/server', 
-        createProxyMiddleware({
-            target: 'https://api.ligchat.com',
-            changeOrigin: true,
+            pathRewrite: { '^/server': '' }
         })
     );
 };

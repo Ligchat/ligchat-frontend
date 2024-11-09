@@ -112,7 +112,7 @@ const VariablesPage: React.FC = () => {
 
   return (
     <div style={{ padding: '24px' }}>
-                    <Title level={3}>Cadastro de Variáveis</Title>
+                    <Title style={{color: '#1890ff'}} level={3}>Cadastro de Variáveis</Title>
       {isLoading ? (
         selectedSector === null ? (
           <div className="flex justify-center items-center h-64 text-lg text-gray-500">

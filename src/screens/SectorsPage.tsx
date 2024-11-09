@@ -268,7 +268,7 @@ const SectorsPage: React.FC = () => {
         {newSector && (
           <Col xs={24} sm={12} md={8}>
             <Card>
-              <h3 className="text-lg font-semibold">Nome do Setor</h3>
+              <h3 style={{color: '#1890ff'}} className="text-lg font-semibold">Nome do Setor</h3>
               <label style={{ marginBottom: '5px', marginTop: '50px' }}>Nome do setor</label>
               <Input
                 placeholder="Nome do setor"

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Col, Row, DatePicker, Typography } from 'antd';
+import { Card, Col, Row, DatePicker, Typography, Spin } from 'antd';
 import { Line } from 'react-chartjs-2';
 import 'chart.js/auto';
 import { getWhatsAppContacts, WhatsAppContact } from '../services/WhatsappContactService';
 import SessionService from '../services/SessionService';
 import { SmileTwoTone } from '@ant-design/icons';
+import LoadingOverlay from '../components/LoadingOverlay';
 
 const { RangePicker } = DatePicker;
 const { Title } = Typography;
@@ -27,6 +28,7 @@ const Dashboard: React.FC = () => {
       },
     ],
   });
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const options = {
     maintainAspectRatio: false,
@@ -172,6 +174,7 @@ const Dashboard: React.FC = () => {
     const endDate = dates[1].endOf('day').toDate();
 
     try {
+      setIsLoading(true);
       const sectorId = SessionService.getSessionForSector();
       const contacts = await getWhatsAppContacts(sectorId);
       setWhatsAppContacts(contacts);
@@ -184,11 +187,14 @@ const Dashboard: React.FC = () => {
       calculateContacts(filteredContacts, startDate, endDate);
     } catch (error) {
       console.error('Erro ao buscar contatos:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     const fetchInitialContacts = async () => {
+      setIsLoading(true);
       const sectorId = SessionService.getSessionForSector();
       const contacts = await getWhatsAppContacts(sectorId);
       setWhatsAppContacts(contacts);
@@ -205,6 +211,7 @@ const Dashboard: React.FC = () => {
       endDate.setDate(today.getDate() + halfDays);
 
       calculateContacts(contacts, startDate, endDate);
+      setIsLoading(false);
     };
 
     fetchInitialContacts();
@@ -216,22 +223,23 @@ const Dashboard: React.FC = () => {
 
   return (
     <div style={{ padding: '24px' }}>
+      {isLoading && <LoadingOverlay />}
       <Row gutter={[16, 16]}>
         <Col span={8}>
           <Card>
-            <Title level={4}>Contatos Hoje</Title>
+            <Title style={{color: '#1890ff'}} level={4}>Contatos Hoje</Title>
             <p>{contactsToday}</p>
           </Card>
         </Col>
         <Col span={8}>
           <Card>
-            <Title level={4}>Contatos Semanais</Title>
+            <Title style={{color: '#1890ff'}} level={4}>Contatos Semanais</Title>
             <p>{contactsWeekly}</p>
           </Card>
         </Col>
         <Col span={8}>
           <Card>
-            <Title level={4}>Contatos Mensais</Title>
+            <Title style={{color: '#1890ff'}} level={4}>Contatos Mensais</Title>
             <p>{contactsMonthly}</p>
           </Card>
         </Col>

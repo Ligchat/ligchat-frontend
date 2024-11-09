@@ -10,16 +10,19 @@ export interface User {
   status?: boolean; // Campo opcional para status
 }
 
-// Interface para a criação de um usuário
-export interface UserCreate {
+interface UserCreate {
   name: string;
   email: string;
-  avatarUrl?: string;
   phoneWhatsapp: string;
-  isAdmin?: boolean; // Campo opcional para is_admin
-  status?: boolean; // Adiciona status como campo opcional
-  sectors: string[]
-  invitedBy:number | null;
+  isAdmin: boolean;
+  status: boolean;
+  sectors: SectorDTO[]; // Modify this line to accept an array of SectorDTO
+  invitedBy: number;
+}
+
+interface SectorDTO {
+  Id: number;
+  IsShared: boolean;
 }
 
 // Interface para a atualização de um usuário

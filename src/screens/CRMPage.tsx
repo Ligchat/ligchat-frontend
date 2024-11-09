@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Input, Select, Modal, message, Spin } from 'antd';
+import { Card, Button, Input, Select, Modal, message } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { createColumn, getColumns, deleteColumn, moveColumn } from '../services/ColumnService';
 import { createContact, updateContact } from '../services/ContactService';
 import SessionService from '../services/SessionService';
 import { createCard, deleteCard, moveCard } from '../services/CardService';
-import './CRMPage.css'
+import LoadingOverlay from '../components/LoadingOverlay'; // Importar LoadingOverlay
+import './CRMPage.css';
 
 const { Option } = Select;
 
@@ -41,7 +42,7 @@ const CRMPage: React.FC = () => {
   const [isSidePanelVisible, setIsSidePanelVisible] = useState(false);
   const [currentColumnId, setCurrentColumnId] = useState<number | null>(null);
   const [selectedSector, setSelectedSector] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true); // Manter o isLoading para controle do estado de carregamento
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -61,7 +62,6 @@ const CRMPage: React.FC = () => {
       setIsLoading(false);
     }
   };
-  
 
   const handleAddColumn = async () => {
     try {
@@ -267,98 +267,99 @@ const CRMPage: React.FC = () => {
   );
 
   return (
-    
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="p-8">
-        <h1 className="text-3xl font-bold mb-6">CRM</h1>
+        {isLoading && <LoadingOverlay />} {/* Exibir LoadingOverlay enquanto estiver carregando */}
+
+        <h1 style={{ color: '#1890ff' }} className="text-3xl font-bold mb-6">CRM</h1>
         {selectedSector === null && (
           <div className="flex justify-center items-center h-64 text-lg text-gray-500">
             Nenhum setor selecionado
           </div>
         )}
-<div className="flex overflow-x-auto space-x-4 pb-4">
-{selectedSector != null && (
-  <Droppable droppableId="all-columns" direction="horizontal" type="column">
-    {(provided) => (
-      <div {...provided.droppableProps} ref={provided.innerRef} className="flex space-x-4">
-        {columns
-          .sort((a, b) => a.position - b.position) // Ordenar colunas pela posição
-          .map((column, index) => (
-            <Draggable draggableId={column.id.toString()} index={index} key={column.id}>
+        <div className="flex overflow-x-auto space-x-4 pb-4">
+          {selectedSector != null && (
+            <Droppable droppableId="all-columns" direction="horizontal" type="column">
               {(provided) => (
-                <div
-                  {...provided.draggableProps}
-                  ref={provided.innerRef}
-                  className="min-w-[300px]"
-                  {...provided.dragHandleProps}
-                >
-                  <Droppable droppableId={column.id.toString()}>
-                    {(provided) => (
-                      <div
-                        {...provided.droppableProps}
-                        ref={provided.innerRef}
-                        className="bg-blue-900 text-white p-4 rounded-lg min-w-[250px] relative"
-                      >
-                        <div className="flex justify-between items-center mb-4">
-                          <h2 className="text-xl font-bold">{column.name}</h2>
-                          <Button
-                            danger
-                            icon={<DeleteOutlined />}
-                            onClick={() => handleDeleteColumn(column.id)}
-                          />
-                        </div>
-                        {column.cards
-                          .sort((a, b) => a.position - b.position)
-                          .map((card, index) => (
-                            <Draggable key={card.id} draggableId={card.id.toString()} index={index}>
-                              {(provided, snapshot) => (
+                <div {...provided.droppableProps} ref={provided.innerRef} className="flex space-x-4">
+                  {columns
+                    .sort((a, b) => a.position - b.position)
+                    .map((column, index) => (
+                      <Draggable draggableId={column.id.toString()} index={index} key={column.id}>
+                        {(provided) => (
+                          <div
+                            {...provided.draggableProps}
+                            ref={provided.innerRef}
+                            className="min-w-[300px]"
+                            {...provided.dragHandleProps}
+                          >
+                            <Droppable droppableId={column.id.toString()}>
+                              {(provided) => (
                                 <div
+                                  {...provided.droppableProps}
                                   ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  className={`contact-card-wrapper ${snapshot.isDragging ? 'dragging' : ''} ${selectedCardId === card.id ? 'selected' : ''}`}
-                                  style={{
-                                    ...provided.draggableProps.style,
-                                    marginTop: snapshot.isDragging ? '5px' : '5px', // Ajuste o margin-top ao arrastar
-                                  }}
+                                  className="bg-blue-900 text-white p-4 rounded-lg min-w-[250px] relative"
                                 >
-                                  <ContactCard card={card} columnId={column.id} />
+                                  <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold">{column.name}</h2>
+                                    <Button
+                                      danger
+                                      icon={<DeleteOutlined />}
+                                      onClick={() => handleDeleteColumn(column.id)}
+                                    />
+                                  </div>
+                                  {column.cards
+                                    .sort((a, b) => a.position - b.position)
+                                    .map((card, index) => (
+                                      <Draggable key={card.id} draggableId={card.id.toString()} index={index}>
+                                        {(provided, snapshot) => (
+                                          <div
+                                            ref={provided.innerRef}
+                                            {...provided.draggableProps}
+                                            {...provided.dragHandleProps}
+                                            className={`contact-card-wrapper ${snapshot.isDragging ? 'dragging' : ''} ${selectedCardId === card.id ? 'selected' : ''}`}
+                                            style={{
+                                              ...provided.draggableProps.style,
+                                              marginTop: snapshot.isDragging ? '5px' : '5px',
+                                            }}
+                                          >
+                                            <ContactCard card={card} columnId={column.id} />
+                                          </div>
+                                        )}
+                                      </Draggable>
+                                    ))}
+                                  {provided.placeholder}
+                                  <Button
+                                    icon={<PlusOutlined />}
+                                    type="dashed"
+                                    className="w-full mt-4"
+                                    onClick={() => openAddCardPanel(column.id)}
+                                  >
+                                    Adicionar Card
+                                  </Button>
                                 </div>
                               )}
-                            </Draggable>
-                          ))}
-                        {provided.placeholder}
-                        <Button
-                          icon={<PlusOutlined />}
-                          type="dashed"
-                          className="w-full mt-4"
-                          onClick={() => openAddCardPanel(column.id)}
-                        >
-                          Adicionar Card
-                        </Button>
-                      </div>
-                    )}
-                  </Droppable>
+                            </Droppable>
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                  {provided.placeholder}
+                  <div className="min-w-[300px]">
+                    <Button
+                      type="dashed"
+                      icon={<PlusOutlined />}
+                      className="w-full"
+                      onClick={() => setIsModalVisible(true)}
+                    >
+                      Adicionar Coluna
+                    </Button>
+                  </div>
                 </div>
               )}
-            </Draggable>
-          ))}
-        {provided.placeholder}
-        <div className="min-w-[300px]">
-          <Button
-            type="dashed"
-            icon={<PlusOutlined />}
-            className="w-full"
-            onClick={() => setIsModalVisible(true)}
-          >
-            Adicionar Coluna
-          </Button>
+            </Droppable>
+          )}
         </div>
-      </div>
-    )}
-  </Droppable>
-)}
-</div>
       </div>
 
       <Modal

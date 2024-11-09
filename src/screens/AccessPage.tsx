@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Select, Switch, Row, Col, Modal, Input, Skeleton } from 'antd';
 import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
-import { createUser, updateUser, UserCreate, getAllUsers, deleteUser } from '../services/UserService';
+import { createUser, updateUser, getAllUsers, deleteUser } from '../services/UserService';
 import { getSectors, Sector } from '../services/SectorService';
 import SessionService from '../services/SessionService';
 import { useNavigate } from 'react-router-dom';
@@ -47,23 +47,36 @@ const AccessPage: React.FC = () => {
   const userId = Number(decodedToken.userId);
   const [invitedBy, setInvitedBy] = useState<number>(userId); // Estado para armazenar o ID do convidador
 
-  useEffect(() => {
-    const fetchSectors = async () => {
-      try {
-        const tokenFromSession = SessionService.getSession('authToken');
-        const response: any = await getSectors(tokenFromSession);
-        setSectors(Array.isArray(response.data) ? response.data : []);
-      } catch (error) {
-        console.error('Failed to fetch sectors', error);
-      }
-    };
-
-    const fetchUsers = async () => {
-      try {
-        setIsLoading(true);
-        
-        const users: any = await getAllUsers(userId); // Passa o invitedBy aqui
-        const updatedPeople = users.data.map((user: any) => ({
+  const fetchSectors = async () => {
+    try {
+      setIsLoading(true);
+      const tokenFromSession = SessionService.getSession('authToken');
+      const response: any = await getSectors(tokenFromSession);
+      const sectorsData = Array.isArray(response.data) ? response.data : [];
+      setSectors(sectorsData);
+    } catch (error) {
+      console.error('Failed to fetch sectors', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const fetchUsers = async (sectorsList: Sector[]) => {
+    try {
+      setIsLoading(true);
+      const users: any = await getAllUsers(userId);
+      const updatedPeople = users.data.map((user: any) => {
+        const userSectors = user.sectors.length > 0
+          ? user.sectors
+              .map((sectorId: string) => {
+                const sector = sectorsList.find((s) => s.id === Number(sectorId));
+                return sector ? sector.name : null;
+              })
+              .filter((sectorName: string | null) => sectorName !== null)
+              .join(", ")
+          : "Não definido";
+  
+        return {
           id: user.id.toString(),
           name: user.name,
           email: user.email,
@@ -72,38 +85,32 @@ const AccessPage: React.FC = () => {
           isDeleting: false,
           isAdmin: user.isAdmin || false,
           status: user.status !== undefined ? user.status : true,
-          sectors: user.sectors || [],
-        }));
-        setPeople(updatedPeople);
-      } catch (error) {
-        console.error('Failed to fetch users', error);
-      } finally {
-        setIsLoading(false);
-        setIsAvatarLoading(false);
-      }
-    };
+          sectors: userSectors,
+        };
+      });
+      setPeople(updatedPeople);
+    } catch (error) {
+      console.error('Failed to fetch users', error);
+    } finally {
+      setIsLoading(false);
+      setIsAvatarLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchSectors();
-    fetchUsers();
   }, []);
+  
+  useEffect(() => {
+    if (sectors.length > 0) {
+      fetchUsers(sectors);
+    }
+  }, [sectors]);
 
   const refreshUsers = async () => {
-
     try {
       setIsLoading(true);
-      const users: any = await getAllUsers(invitedBy);
-      const updatedPeople = users.data.map((user: any) => ({
-        id: user.id.toString(),
-        name: user.name,
-        email: user.email,
-        enabled: user.enabled,
-        phoneWhatsapp: user.phoneWhatsapp,
-        isDeleting: false,
-        isAdmin: user.isAdmin || false,
-        status: user.status !== undefined ? user.status : true,
-        sectors: user.sectors || [],
-      }));
-      setPeople(updatedPeople);
+      await fetchUsers(sectors);
     } catch (error) {
       console.error('Failed to refresh users', error);
       setPeople([]);
@@ -111,6 +118,8 @@ const AccessPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+
 
   const handleEditPerson = (person: Person) => {
     setEditingPerson({ ...person });
@@ -122,14 +131,24 @@ const AccessPage: React.FC = () => {
     if (editingPerson) {
       try {
         setIsLoading(true);
-        const updatedUser: UserCreate = {
+
+        const sectorsToUpdate = Array.isArray(selectedSectors) ? selectedSectors.map((sectorId) => {
+          const sector = sectors.find((s) => s.id === Number(sectorId)); // Convert sectorId to number
+          return {
+            Id: sector?.id,
+            IsShared: true,  // Define whether the sector is shared
+          };
+        }) : [];
+
+        const updatedUser: any = {
           name: editingPerson.name,
           email: editingPerson.email,
+          avatarUrl: '',  // Assuming you have a logic for avatar
           phoneWhatsapp: editingPerson.phoneWhatsapp,
           isAdmin: isAdmin,
           status: editingPerson.status,
-          sectors: selectedSectors,
-          invitedBy: invitedBy
+          sectors: sectorsToUpdate,  // Now sending an array of SectorDTO
+          invitedBy: invitedBy,
         };
 
         await updateUser(Number(editingPerson.id), updatedUser);
@@ -171,14 +190,25 @@ const AccessPage: React.FC = () => {
   const handleAddPerson = async () => {
     try {
       setIsLoading(true);
-      const newUser: UserCreate = {
+
+      // Criar um array de objetos com id e is_shared para enviar
+      const sectorsToUpdate = selectedSectors.map((sectorId) => {
+        const sector = sectors.find((s) => s.id === Number(sectorId)); // Convert sectorId to number
+        return {
+          Id: sector?.id,
+          IsShared: true,  // Define whether the sector is shared
+        };
+      });
+
+      const newUser: any = {
         name: newPerson.name,
         email: newPerson.email,
+        avatarUrl: '',  // Assuming you have a logic for avatar
         phoneWhatsapp: '',
         isAdmin: isAdmin,
         status: newPerson.status,
-        sectors: selectedSectors,
-        invitedBy: invitedBy, // Passa o ID do convidador se disponível
+        sectors: sectorsToUpdate,  // Now sending an array of SectorDTO
+        invitedBy: invitedBy, // Pass the ID of the inviter if available
       };
 
       await createUser(newUser);
@@ -208,7 +238,7 @@ const AccessPage: React.FC = () => {
     <div className="p-8">
       {isLoading && <LoadingOverlay />}
 
-      <h1 className="text-3xl font-bold mb-6">Acessos</h1>
+      <h1 style={{color: '#1890ff'}} className="text-3xl font-bold mb-6">Acessos</h1>
       <Row gutter={[16, 16]}>
         {people.map((person) => (
           <Col xs={24} sm={12} md={8} key={person.id}>
@@ -306,7 +336,7 @@ const AccessPage: React.FC = () => {
                         <strong>Nível de Acesso:</strong> {person.isAdmin ? "Administrador" : "Colaborador"}
                       </p>
                       <p className="text-gray-500">
-                        <strong>Setores:</strong> {person.sectors.join(', ')}
+                      <strong>Setores:</strong> {person.sectors}
                       </p>
                       <Switch
                         checked={person.status}

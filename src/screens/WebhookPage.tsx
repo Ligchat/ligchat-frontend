@@ -133,7 +133,7 @@ const WebhookPage: React.FC = () => {
     <div className="p-8">
       {isLoading && <LoadingOverlay />}
 
-      <h1 className="text-3xl font-bold mb-6">Webhook</h1>
+      <h1 style={{color: '#1890ff'}} className="text-3xl font-bold mb-6">Webhook</h1>
       <Row gutter={[16, 16]}>
         {webhooks.map((webhook) => (
           <Col xs={24} sm={12} md={8} key={webhook.id}>
@@ -183,6 +183,7 @@ const WebhookPage: React.FC = () => {
                         {webhook.isEditing ? (
                           <>
                             <Button
+                              className='ms-3'
                               type="primary"
                               onClick={() =>
                                 newWebhook ? handleSaveNewWebhook() : handleSaveClick(webhook.id)

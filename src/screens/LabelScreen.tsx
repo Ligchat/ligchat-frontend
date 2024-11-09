@@ -103,7 +103,7 @@ const LabelPage = () => {
         <div className="p-8">
             {isLoading && <LoadingOverlay />}
 
-            <h1 className="text-3xl font-bold mb-6">Etiquetas</h1>
+            <h1 style={{color: '#1890ff'}} className="text-3xl font-bold mb-6">Etiquetas</h1>
             {selectedSectorId === null && (
                 <div className="flex justify-center items-center h-64 text-lg text-gray-500">
                     Nenhum setor selecionado
@@ -137,8 +137,8 @@ const LabelPage = () => {
                                     ) : (
                                         <>
                                             <h3 className="font-bold text-lg">{tag.name}</h3>
-                                            <p className="text-gray-500 mt-2">{tag.description}</p>
-                                            <p className="text-sm text-gray-400 mt-2">Setor: {associatedSector ? associatedSector.name : 'Setor não encontrado'}</p>
+                                            <p className="text-gray-500 mt-2">Descrição: {tag.description? tag.description : "Não definido"}</p>
+                                           
                                         </>
                                     )}
                                 </Skeleton>

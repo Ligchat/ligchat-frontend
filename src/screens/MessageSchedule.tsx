@@ -506,7 +506,7 @@ const MessageSchedule: React.FC = () => {
     <div className="relative p-8">
       {isLoading && <LoadingOverlay />}
 
-      <h1 className="text-3xl font-bold mb-6">Agendamento de mensagem</h1>
+      <h1 style={{color: '#1890ff'}} className="text-3xl font-bold mb-6">Agendamento de mensagem</h1>
       {selectedSector === null && (
         <div className="flex justify-center items-center h-64 text-lg text-gray-500">
           Nenhum setor selecionado

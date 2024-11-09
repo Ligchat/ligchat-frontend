@@ -13,7 +13,7 @@ import {
   Form,
   message,
   Spin,
-  Skeleton, // Importando Skeleton
+  Skeleton,
 } from 'antd';
 import {
   EditOutlined,
@@ -34,6 +34,7 @@ import {
 import SessionService from '../services/SessionService';
 import { getSectors, Sector } from '../services/SectorService';
 import { getFlows, createFlow, Flow, deleteFlow, updateFlow } from '../services/FlowService';
+import LoadingOverlay from '../components/LoadingOverlay';
 
 const { Option } = Select;
 
@@ -48,8 +49,7 @@ const FlowPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [noFoldersFound, setNoFoldersFound] = useState<boolean>(false);
-  const [loadingFlows, setLoadingFlows] = useState<boolean>(false);
-  const [loadingData, setLoadingData] = useState<boolean>(true); // Estado para o carregamento de dados
+  const [loadingData, setLoadingData] = useState<boolean>(true);
 
   const [isAddModalVisible, setIsAddModalVisible] = useState<boolean>(false);
   const [newFolderName, setNewFolderName] = useState<string>('');
@@ -89,6 +89,7 @@ const FlowPage: React.FC = () => {
       return;
     }
     try {
+      setLoadingData(true);
       const response: any = await getFolders(token, sectorId);
       setFolders(response.data.map((folder: any) => ({ ...folder, isEditing: false })));
       setNoFoldersFound(false);
@@ -97,10 +98,9 @@ const FlowPage: React.FC = () => {
       if (error.response && error.response.status === 404) {
         setFolders([]);
         setNoFoldersFound(true);
-      } else {
       }
     } finally {
-      setLoadingData(false); // Atualiza o estado para indicar que o carregamento terminou
+      setLoadingData(false);
     }
   };
 
@@ -117,14 +117,12 @@ const FlowPage: React.FC = () => {
     if (!token) {
       return;
     }
-    setLoadingFlows(true);
     try {
       const fetchedFlows: any = await getFlows(sectorId, folderId, token);
       setFlows(Array.isArray(fetchedFlows.data) ? fetchedFlows.data : []);
     } catch (error: any) {
       setFlows([]);
     } finally {
-      setLoadingFlows(false);
     }
   };
 
@@ -297,20 +295,21 @@ const FlowPage: React.FC = () => {
 
   return (
     <div className="p-4 md:p-8">
-      <h1 className="text-2xl md:text-3xl font-bold mb-4">Fluxos</h1>
+      {loadingData && <LoadingOverlay />}
+      <h1 style={{color: '#1890ff'}} className="text-2xl md:text-3xl font-bold mb-10">Fluxos</h1>
       {loadingData ? ( 
       selectedSector == null ? (
         <div className="flex justify-center items-center h-64 text-lg text-gray-500">
           Nenhum setor selecionado
         </div>
       ) : (
-        <Spin tip="Carregando dados..." />
+        <></>
       )
     ) : (
         <>
           {selectedSector != null && (
             <>
-              <h2 className="text-xl md:text-2xl font-semibold mb-4">Pastas</h2>
+              <h4 style={{color: '#1890ff'}} className="text-xl font-semibold mb-4">Pastas</h4>
 
               {noFoldersFound ? (
                 <div className="flex flex-col items-center justify-center h-full">
@@ -367,23 +366,21 @@ const FlowPage: React.FC = () => {
 
           {selectedSector != null && (
             <>
-              <h2 className="text-xl md:text-2xl font-semibold mb-4">Detalhes dos Fluxos</h2>
+              <h2 style={{color: '#1890ff'}} className="text-xl font-semibold mb-4">Detalhes dos Fluxos</h2>
 
-              {loadingFlows ? (
-                <Spin tip="Carregando fluxos..." />
-              ) : flows.length === 0 && selectedFolderId !== null ? (
-                <div>
-                  <p>Nenhum fluxo encontrado para esta pasta.</p>
-                  <Col xs={24} sm={12} md={8}>
-                    <Card
-                      className="flex items-center justify-center cursor-pointer shadow-md rounded-lg h-full"
-                      onClick={handleAddFlow}
-                    >
-                      <PlusOutlined className="text-blue-500 text-3xl" />
-                    </Card>
-                  </Col>
-                </div>
-              ) : (
+              {flows.length === 0 && selectedFolderId !== null ? (
+  <div>
+    <p>Nenhum fluxo encontrado para esta pasta.</p>
+    <Col xs={24} sm={12} md={8}>
+      <Card
+        className="flex items-center justify-center cursor-pointer shadow-md rounded-lg h-full"
+        onClick={handleAddFlow}
+      >
+        <PlusOutlined className="text-blue-500 text-3xl" />
+      </Card>
+    </Col>
+  </div>
+) : (
                 <Row gutter={[16, 16]}>
                   {Array.isArray(flows) && flows.length > 0 ? (
                     flows.map((flow: any) => (
