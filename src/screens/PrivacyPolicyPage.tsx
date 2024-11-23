@@ -10,7 +10,7 @@ const PrivacyPolicyPage: React.FC = () => {
       <Content style={{ padding: '50px', maxWidth: '800px', margin: '0 auto' }}>
         <Title level={2}>Política de Privacidade</Title>
         <Paragraph>
-          <strong>Última atualização:</strong> [Data]
+          <strong>Última atualização:</strong> 17/10/2024
         </Paragraph>
 
         <Paragraph>
