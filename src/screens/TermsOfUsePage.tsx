@@ -133,15 +133,6 @@ const TermsOfUsePage: React.FC = () => {
           Para perguntas ou preocupações sobre estes Termos de Uso, entre em contato conosco através dos meios
           disponíveis em nossa plataforma.
         </Paragraph>
-
-        <Paragraph>
-          <em>
-            Este documento é fornecido apenas para fins informativos e não constitui aconselhamento jurídico. Recomenda-se
-            fortemente que você consulte um advogado ou profissional legal qualificado para garantir que seus Termos de
-            Uso estejam em conformidade com todas as leis e regulamentos aplicáveis, bem como com os requisitos da Meta
-            para o WhatsApp Business.
-          </em>
-        </Paragraph>
       </Content>
     </Layout>
   );

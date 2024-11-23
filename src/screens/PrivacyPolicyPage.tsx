@@ -139,15 +139,6 @@ const PrivacyPolicyPage: React.FC = () => {
           Se tiver dúvidas ou preocupações sobre esta Política de Privacidade, entre em contato conosco através dos meios
           disponíveis em nossa plataforma.
         </Paragraph>
-
-        <Paragraph>
-          <em>
-            Este documento é fornecido apenas para fins informativos e não constitui aconselhamento jurídico. Recomenda-se
-            fortemente que você consulte um advogado ou profissional legal qualificado para garantir que sua Política de
-            Privacidade esteja em conformidade com todas as leis e regulamentos aplicáveis, bem como com os requisitos da
-            Meta para o WhatsApp Business.
-          </em>
-        </Paragraph>
       </Content>
     </Layout>
   );
