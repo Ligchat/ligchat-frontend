@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Button, Input, Row, Col, Space, Skeleton } from 'antd';
+import { Card, Button, Input, Row, Col, Space, Skeleton, Form, message } from 'antd';
 import { EditOutlined, SaveOutlined, PlusOutlined, DeleteOutlined, CloseOutlined } from '@ant-design/icons';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { Webhook, createWebhook, updateWebhook, getWebhooks, deleteWebhook } from '../services/WebhookService';
@@ -44,10 +44,18 @@ const WebhookPage: React.FC = () => {
   };
 
   const handleSaveClick = async (id: number) => {
-    setIsLoading(true);
-    const sectorId = SessionService.getSessionForSector();
     const webhookToUpdate = webhooks.find((webhook) => webhook.id === id);
     if (webhookToUpdate) {
+      if (!webhookToUpdate.name || !webhookToUpdate.callbackUrl) {
+        message.error('Por favor, preencha todos os campos obrigatórios.');
+        return;
+      }
+      if (!isValidURL(webhookToUpdate.callbackUrl)) {
+        message.error('Por favor, insira uma URL válida para o Callback URL.');
+        return;
+      }
+      setIsLoading(true);
+      const sectorId = SessionService.getSessionForSector();
       try {
         await updateWebhook(id, {
           name: webhookToUpdate.name,
@@ -91,6 +99,14 @@ const WebhookPage: React.FC = () => {
   const handleSaveNewWebhook = async () => {
     const webhookToSave = webhooks.find((webhook) => webhook.isEditing && newWebhook);
     if (webhookToSave) {
+      if (!webhookToSave.name || !webhookToSave.callbackUrl) {
+        message.error('Por favor, preencha todos os campos obrigatórios.');
+        return;
+      }
+      if (!isValidURL(webhookToSave.callbackUrl)) {
+        message.error('Por favor, insira uma URL válida para o Callback URL.');
+        return;
+      }
       setIsLoading(true);
       try {
         const createdWebhook = await createWebhook({
@@ -129,16 +145,30 @@ const WebhookPage: React.FC = () => {
     setConfirmDeleteId(null);
   };
 
+  // Função para validar se a URL é válida
+  const isValidURL = (url: string): boolean => {
+    const pattern = new RegExp(
+      '^(https?:\\/\\/)' + // protocolo obrigatório
+      '((([a-zA-Z0-9\\-]+\\.)+[a-zA-Z]{2,})|' + // domínio
+      '((\\d{1,3}\\.){3}\\d{1,3}))' + // ou IP
+      '(\\:\\d+)?' + // porta
+      '(\\/[-a-zA-Z0-9%_.~+]*)*' + // path
+      '(\\?[;&a-zA-Z0-9%_.~+=-]*)?' + // query string
+      '(\\#[-a-zA-Z0-9_]*)?$','i' // fragment locator
+    );
+    return !!pattern.test(url);
+  };
+
   return (
     <div className="p-8">
       {isLoading && <LoadingOverlay />}
 
-      <h1 style={{color: '#1890ff'}} className="text-3xl font-bold mb-6">Webhook</h1>
+      <h1 style={{ color: '#1890ff' }} className="text-3xl font-bold mb-6">Webhook</h1>
       <Row gutter={[16, 16]}>
         {webhooks.map((webhook) => (
           <Col xs={24} sm={12} md={8} key={webhook.id}>
-            <Card>
-              {confirmDeleteId === webhook.id ? (
+            {confirmDeleteId === webhook.id ? (
+              <Card>
                 <div className="text-center bg-yellow-400 p-4 rounded-lg">
                   <h3 className="text-xl font-bold mb-4">Deseja mesmo excluir?</h3>
                   <p className="mb-4">Essa ação é irreversível.</p>
@@ -158,85 +188,107 @@ const WebhookPage: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-              ) : (
-                <>
-                  <Card
-                    title={
-                      webhook.isEditing ? (
-                        <Input
-                          value={webhook.name}
-                          placeholder="Nome"
-                          onChange={(e) =>
-                            setWebhooks((prev) =>
-                              prev.map((w) =>
-                                w.id === webhook.id ? { ...w, name: e.target.value } : w
-                              )
-                            )
+              </Card>
+            ) : (
+              <Card
+                style={{ boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}
+                extra={
+                  <Space>
+                    {webhook.isEditing ? (
+                      <>
+                        <Button
+                          className='ms-3'
+                          type="primary"
+                          onClick={() =>
+                            newWebhook ? handleSaveNewWebhook() : handleSaveClick(webhook.id)
                           }
-                        />
-                      ) : (
-                        <span>{webhook.name}</span>
-                      )
-                    }
-                    extra={
-                      <Space>
-                        {webhook.isEditing ? (
-                          <>
-                            <Button
-                              className='ms-3'
-                              type="primary"
-                              onClick={() =>
-                                newWebhook ? handleSaveNewWebhook() : handleSaveClick(webhook.id)
-                              }
-                              icon={<SaveOutlined />}
-                              disabled={isLoading}
-                            >
-                              Salvar
-                            </Button>
-                            <Button
-                              onClick={() => handleCancelClick(webhook.id)}
-                              icon={<CloseOutlined />}
-                              disabled={isLoading}
-                            >
-                              Cancelar
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <EditOutlined
-                              className="text-blue-500 cursor-pointer"
-                              onClick={() => handleEditClick(webhook.id)}
-                            />
-                            <DeleteOutlined
-                              className="text-red-500 cursor-pointer"
-                              onClick={() => confirmDeleteWebhook(webhook.id)}
-                            />
-                          </>
-                        )}
-                      </Space>
-                    }
-                  >
-                    <Skeleton active loading={isLoading}>
-                      <div>
-                        <p>Callback URL</p>
-                        <Input
-                          value={webhook.callbackUrl}
-                          placeholder="Insira o callback URL"
-                          onChange={(e) =>
-                            setWebhooks((prev) =>
-                              prev.map((w) =>
-                                w.id === webhook.id ? { ...w, callbackUrl: e.target.value } : w
-                              )
-                            )
+                          icon={<SaveOutlined />}
+                          disabled={
+                            isLoading ||
+                            !webhook.name ||
+                            !webhook.callbackUrl ||
+                            !isValidURL(webhook.callbackUrl)
                           }
-                          disabled={!webhook.isEditing || isLoading}
+                        >
+                          Salvar
+                        </Button>
+                        <Button
+                          onClick={() => handleCancelClick(webhook.id)}
+                          icon={<CloseOutlined />}
+                          disabled={isLoading}
+                        >
+                          Cancelar
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <EditOutlined
+                          className="text-blue-500 cursor-pointer"
+                          onClick={() => handleEditClick(webhook.id)}
                         />
-                      </div>
-                    </Skeleton>
-                  </Card>
-                </>
-              )}
-            </Card>
+                        <DeleteOutlined
+                          className="text-red-500 cursor-pointer"
+                          onClick={() => confirmDeleteWebhook(webhook.id)}
+                        />
+                      </>
+                    )}
+                  </Space>
+                }
+              >
+                <Skeleton active loading={isLoading}>
+                  <Form layout="vertical">
+                    <Form.Item
+                      label="Nome"
+                      required
+                      validateStatus={!webhook.name && webhook.isEditing ? 'error' : ''}
+                      help={!webhook.name && webhook.isEditing ? 'Campo obrigatório' : ''}
+                    >
+                      <Input
+                        value={webhook.name}
+                        placeholder="Insira o nome"
+                        onChange={(e) =>
+                          setWebhooks((prev) =>
+                            prev.map((w) =>
+                              w.id === webhook.id ? { ...w, name: e.target.value } : w
+                            )
+                          )
+                        }
+                        disabled={!webhook.isEditing || isLoading}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      label="Callback URL"
+                      required
+                      validateStatus={
+                        webhook.isEditing && (!webhook.callbackUrl || !isValidURL(webhook.callbackUrl))
+                          ? 'error'
+                          : ''
+                      }
+                      help={
+                        webhook.isEditing && !webhook.callbackUrl
+                          ? 'Campo obrigatório'
+                          : webhook.isEditing && !isValidURL(webhook.callbackUrl)
+                          ? 'URL inválida'
+                          : ''
+                      }
+                    >
+                      <Input
+                        value={webhook.callbackUrl}
+                        placeholder="Insira o callback URL"
+                        onChange={(e) =>
+                          setWebhooks((prev) =>
+                            prev.map((w) =>
+                              w.id === webhook.id ? { ...w, callbackUrl: e.target.value } : w
+                            )
+                          )
+                        }
+                        disabled={!webhook.isEditing || isLoading}
+                      />
+                    </Form.Item>
+                  </Form>
+                </Skeleton>
+              </Card>
+            )}
           </Col>
         ))}
 
@@ -245,6 +297,7 @@ const WebhookPage: React.FC = () => {
             <Card
               className="flex items-center justify-center cursor-pointer shadow-md rounded-lg"
               onClick={handleAddWebhook}
+              style={{ boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}
             >
               <PlusOutlined className="text-blue-500 text-3xl" />
             </Card>

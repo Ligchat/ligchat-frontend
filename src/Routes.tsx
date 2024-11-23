@@ -14,12 +14,16 @@ import ProfilePage from './screens/ProfilePage';
 import FlowPage from './screens/FlowPage';
 import EditFlowPage from './screens/EditFlowPage';
 import VariablesPage from './screens/VariablesPage';
+import PrivacyPolicyPage from './screens/PrivacyPolicyPage';
+import TermsOfUsePage from './screens/TermsOfUsePage';
 
 const AppRoutes: React.FC = () => {
   return (
     <Routes>
       {/* Rota de login sem o menu */}
       <Route path="/" element={<LoginScreen />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+      <Route path="/terms-of-use" element={<TermsOfUsePage />} />
 
       {/* Rotas que usam o MainLayout */}
       <Route element={<MainLayout />}>

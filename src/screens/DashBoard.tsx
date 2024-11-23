@@ -48,20 +48,14 @@ const Dashboard: React.FC = () => {
       tooltip: {
         displayColors: false,
         callbacks: {
-          title: (tooltipItems: any) => {
-            return `Data: ${tooltipItems[0].label}`;
-          },
+          title: (tooltipItems: any) => `Data: ${tooltipItems[0].label}`,
           label: (tooltipItem: any) => `Contatos: ${tooltipItem.raw}`,
         },
       },
     },
   };
 
-  const calculateContacts = (
-    contacts: WhatsAppContact[],
-    startDate: Date,
-    endDate: Date
-  ) => {
+  const calculateContacts = (contacts: WhatsAppContact[], startDate: Date, endDate: Date) => {
     const dataMap: { [key: string]: number } = {};
     const labels: string[] = [];
     const dataPoints: number[] = [];
@@ -70,12 +64,11 @@ const Dashboard: React.FC = () => {
     const dayDiff = timeDiff / (1000 * 3600 * 24);
 
     if (dayDiff <= 31) {
-      // Exibir dias
       const currentDate = new Date(startDate);
       const dateKeys: string[] = [];
 
       while (currentDate <= endDate) {
-        const dateKey = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        const dateKey = currentDate.toISOString().split('T')[0];
         const label = currentDate.toLocaleDateString('pt-BR', {
           day: '2-digit',
           month: '2-digit',
@@ -98,7 +91,6 @@ const Dashboard: React.FC = () => {
         dataPoints.push(dataMap[dateKey] || 0);
       });
     } else {
-      // Exibir meses
       const currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
       const endMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
 
@@ -135,29 +127,25 @@ const Dashboard: React.FC = () => {
       datasets: [{ ...data.datasets[0], data: dataPoints }],
     });
 
-    // Atualizar contadores de contatos usando todos os contatos
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Início do dia de hoje
+    today.setHours(0, 0, 0, 0);
 
     const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(today.getDate() - 6); // Últimos 7 dias incluindo hoje
-    oneWeekAgo.setHours(0, 0, 0, 0); // Início do dia de 'oneWeekAgo'
+    oneWeekAgo.setDate(today.getDate() - 6);
+    oneWeekAgo.setHours(0, 0, 0, 0);
 
-    // Contatos Hoje
     const contactsTodayCount = contacts.filter((contact) => {
       const createdAt = new Date(contact.createdAt);
       return createdAt >= today;
     }).length;
     setContactsToday(contactsTodayCount);
 
-    // Contatos Semanais
     const contactsWeeklyCount = contacts.filter((contact) => {
       const createdAt = new Date(contact.createdAt);
       return createdAt >= oneWeekAgo && createdAt <= today;
     }).length;
     setContactsWeekly(contactsWeeklyCount);
 
-    // Contatos Mensais
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
     const contactsMonthlyCount = contacts.filter((contact) => {
@@ -199,9 +187,8 @@ const Dashboard: React.FC = () => {
       const contacts = await getWhatsAppContacts(sectorId);
       setWhatsAppContacts(contacts);
 
-      // Centralizando o dia atual
       const today = new Date();
-      const daysToShow = 14; // Total de dias no gráfico
+      const daysToShow = 14;
       const halfDays = Math.floor(daysToShow / 2);
 
       const startDate = new Date(today);
@@ -222,24 +209,24 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: '16px' }}>
       {isLoading && <LoadingOverlay />}
       <Row gutter={[16, 16]}>
-        <Col span={8}>
+        <Col xs={24} sm={12} md={8} lg={8}>
           <Card>
-            <Title style={{color: '#1890ff'}} level={4}>Contatos Hoje</Title>
+            <Title style={{ color: '#1890ff' }} level={4}>Contatos Hoje</Title>
             <p>{contactsToday}</p>
           </Card>
         </Col>
-        <Col span={8}>
+        <Col xs={24} sm={12} md={8} lg={8}>
           <Card>
-            <Title style={{color: '#1890ff'}} level={4}>Contatos Semanais</Title>
+            <Title style={{ color: '#1890ff' }} level={4}>Contatos Semanais</Title>
             <p>{contactsWeekly}</p>
           </Card>
         </Col>
-        <Col span={8}>
+        <Col xs={24} sm={12} md={8} lg={8}>
           <Card>
-            <Title style={{color: '#1890ff'}} level={4}>Contatos Mensais</Title>
+            <Title style={{ color: '#1890ff' }} level={4}>Contatos Mensais</Title>
             <p>{contactsMonthly}</p>
           </Card>
         </Col>
@@ -247,24 +234,24 @@ const Dashboard: React.FC = () => {
 
       <Card style={{ background: 'linear-gradient(90deg, #3A58B9 0%, #14B8A6 100%)', marginTop: 24 }}>
         <Row align="middle">
-          <Col span={18}>
-            <Title style={{color:'white'}} level={4}>Métricas</Title>
-            <p style={{color:'white'}}>CSAT</p>
-            <span style={{ fontSize: '40px', fontWeight: 'bold', color:'white' }}>{((contactsToday + contactsWeekly + contactsMonthly) / 3).toFixed(1)}</span>
+          <Col xs={16} sm={18} md={18} lg={18}>
+            <Title style={{ color: 'white' }} level={4}>Métricas</Title>
+            <p style={{ color: 'white' }}>CSAT</p>
+            <span style={{ fontSize: '40px', fontWeight: 'bold', color: 'white' }}>{((contactsToday + contactsWeekly + contactsMonthly) / 3).toFixed(1)}</span>
           </Col>
-          <Col span={6} style={{ textAlign: 'right' }}>
-            {parseFloat(((contactsToday + contactsWeekly + contactsMonthly) / 3).toFixed(1)) < 0.5 ? <SmileTwoTone style={{ fontSize: '60px' }} twoToneColor="#eb2f96" /> : <SmileTwoTone style={{ fontSize: '60px', marginRight:20 }} twoToneColor="#52c41a" />}
+          <Col xs={8} sm={6} md={6} lg={6} style={{ textAlign: 'right' }}>
+            {parseFloat(((contactsToday + contactsWeekly + contactsMonthly) / 3).toFixed(1)) < 0.5 ? <SmileTwoTone style={{ fontSize: '60px' }} twoToneColor="#eb2f96" /> : <SmileTwoTone style={{ fontSize: '60px', marginRight: 20 }} twoToneColor="#52c41a" />}
           </Col>
         </Row>
       </Card>
 
       <Card style={{ marginTop: 24 }}>
         <Row gutter={16} align="middle">
-          <Col>
+          <Col xs={24} sm={24} md={8} lg={6}>
             <Title level={4}>Filtrar por período</Title>
           </Col>
-          <Col>
-            <RangePicker onChange={handleDateChange} />
+          <Col xs={24} sm={24} md={16} lg={18}>
+            <RangePicker onChange={handleDateChange} style={{ width: '100%' }} getPopupContainer={(trigger) => trigger.parentElement || document.body} dropdownClassName="responsive-calendar-dropdown" />
           </Col>
         </Row>
 

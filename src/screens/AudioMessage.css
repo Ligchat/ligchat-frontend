@@ -8,6 +8,19 @@
     max-width: 100%;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   }
+  .cancel-recording-icon {
+    display: flex;
+    align-items: center;
+    color: #e74c3c;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  
+  .cancel-recording-icon:hover {
+    color: #ff6b6b;
+  }
+  
   
   .audio-player-custom {
     flex: 1;

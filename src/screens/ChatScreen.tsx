@@ -10,16 +10,12 @@ import {
   Drawer,
   Upload,
   Modal,
-  List as AntList,
   Skeleton,
   Divider,
-  Tag, // Importando o componente Tag do Ant Design
   Select,
   Card,
-  Radio,
   Menu
 } from 'antd';
-import './AudioMessage.css'; // Importa o CSS customizado
 import {
   UserOutlined,
   SendOutlined,
@@ -31,17 +27,14 @@ import {
   DownloadOutlined,
   DownOutlined,
 } from '@ant-design/icons';
-import { getMessagesByContactId, getWhatsAppContacts, WhatsAppContact, updateWhatsAppContact } from '../services/WhatsappContactService'; // Importar a função de atualização
+import { getMessagesByContactId, getWhatsAppContacts, updateWhatsAppContact, WhatsAppContact } from '../services/WhatsappContactService';
 import { sendMessage, sendFile, SendMessageDto, MessageType } from '../services/MessageService';
 import SessionService from '../services/SessionService';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { getTags } from '../services/LabelService';
 import AudioPlayer from 'react-h5-audio-player';
 import 'react-h5-audio-player/lib/styles.css';
-import { VideoCameraOutlined } from '@ant-design/icons';
 import Dropdown from 'antd/es/dropdown/dropdown';
-import { getSector } from '../services/SectorService';
-import { OAuth2Service } from '../services/OAuth2Service';
 
 const { Header, Sider, Content } = Layout;
 const { TextArea, Search } = Input;
@@ -73,7 +66,6 @@ const ChatPage: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [isRecordingModalVisible, setIsRecordingModalVisible] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [isImagePreviewVisible, setIsImagePreviewVisible] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<any>(null);
@@ -81,23 +73,17 @@ const ChatPage: React.FC = () => {
   const [filteredContacts, setFilteredContacts] = useState<WhatsAppContact[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
-
-
+  const [showSendCancelOptions, setShowSendCancelOptions] = useState(false);
   const [filesWithUid, setFilesWithUid] = useState<{ file: File; uid: string; }[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Estado de carregamento
-
-  // State for editing contact information
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [editableField, setEditableField] = useState<string | null>(null);
   const [currentValues, setCurrentValues] = useState<any>({
     address: '',
     phoneNumber: '',
     email: '',
     annotations: '',
-    tagIds: [], // Para gerenciar as tags
+    tagIds: [],
   });
-
-
-
 
   useEffect(() => {
     const fetchContacts = async () => {
@@ -115,9 +101,8 @@ const ChatPage: React.FC = () => {
     fetchContacts();
   }, []);
 
-
   useEffect(() => {
-    socket.current = new WebSocket(`wss://whatsapp.ligchat.com?sectorId=${sessionId}`);
+    socket.current = new WebSocket(`wss://f285-177-84-243-103.ngrok-free.app?sectorId=${sessionId}`);
 
     socket.current.onopen = () => {
       console.log('WebSocket connection established');
@@ -127,18 +112,23 @@ const ChatPage: React.FC = () => {
       const newMessage = JSON.parse(event.data);
       console.log('Message from server: ', newMessage);
 
-      if (newMessage?.IsSent != null && newMessage?.IsSent === false) {
+      if (newMessage?.IsSent != null) {
         const formattedMessage: MessageType = {
           id: newMessage.Id,
           content: newMessage.Content,
           isSent: newMessage.IsSent,
           mediaType: newMessage.MediaType,
           mediaUrl: newMessage.MediaUrl,
-          contactId: newMessage.ContactID,
+          contactID: newMessage.ContactID,
           sectorId: sessionId,
+          isRead: true,
         };
 
         setMessages((prevMessages) => [...prevMessages, formattedMessage]);
+
+        socket.current?.send(
+          JSON.stringify({ id: newMessage.MessageId, isRead: true, contactId: newMessage.ContactID })
+        );
       }
     };
 
@@ -153,33 +143,51 @@ const ChatPage: React.FC = () => {
     };
   }, [selectedContact]);
 
+  const handleSelectConversation = async (contact: WhatsAppContact) => {
+    setSelectedContact(contact);
+    setShowChat(true);
+    setIsLoading(true);
+
+    try {
+      const messagesData: any = await getMessagesByContactId(contact.id);
+      const updatedMessages = messagesData.map((message: MessageType) => ({
+        ...message,
+        isRead: true,
+      }));
+      setMessages(updatedMessages);
+      setStatus(contact.status);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    } catch (error) {
+      console.error('Erro ao buscar mensagens:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleStatusChange = async (value: number) => {
-    setStatus(value); // Atualiza o estado local
+    setStatus(value);
 
     if (selectedContact) {
       const updatedContact = {
         ...selectedContact,
-        status: value, // Atualiza o status no objeto do contato
+        status: value,
       };
 
       try {
         await updateWhatsAppContact(updatedContact);
 
-        // Atualiza a lista de contatos para refletir a alteração
         setContacts((prevContacts) =>
           prevContacts.map((contact) =>
             contact.id === updatedContact.id ? updatedContact : contact
           )
         );
 
-        // Atualiza o contato selecionado para refletir a alteração
         setSelectedContact(updatedContact);
       } catch (error) {
         console.error('Erro ao atualizar status:', error);
       }
     }
   };
-
 
   useEffect(() => {
     const fetchTags = async () => {
@@ -194,7 +202,7 @@ const ChatPage: React.FC = () => {
         setIsLoading(false);
       }
     };
-    fetchTags()
+    fetchTags();
   }, []);
 
   useEffect(() => {
@@ -212,7 +220,6 @@ const ChatPage: React.FC = () => {
   const handleFilterContacts = () => {
     let updatedContacts = [...contacts];
 
-    // Filtra por termo de pesquisa
     if (searchTerm) {
       updatedContacts = updatedContacts.filter((contact) =>
         contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -220,7 +227,6 @@ const ChatPage: React.FC = () => {
       );
     }
 
-    // Filtra por tipo (lidas, não lidas, todas)
     if (selectedFilter === 'unread') {
       updatedContacts = updatedContacts.filter((contact) => !contact.isRead);
     } else if (selectedFilter === 'read') {
@@ -228,23 +234,6 @@ const ChatPage: React.FC = () => {
     }
 
     setFilteredContacts(updatedContacts);
-  };
-
-  const handleSelectConversation = async (contact: WhatsAppContact) => {
-    setSelectedContact(contact);
-    setShowChat(true);
-    setIsLoading(true); // Inicia o carregamento das mensagens
-
-    try {
-      const messagesData: any = await getMessagesByContactId(contact.id);
-      setMessages(messagesData);
-      setStatus(contact.status); // Atualiza o estado do status com o valor do contato
-      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-    } catch (error) {
-      console.error('Erro ao buscar mensagens:', error);
-    } finally {
-      setIsLoading(false); // Finaliza o carregamento
-    }
   };
 
   const handleSendMessage = async () => {
@@ -258,27 +247,40 @@ const ChatPage: React.FC = () => {
         contactId: selectedContact.id,
       };
 
-      setIsSending(true);
+      const temporaryMessage: MessageType = {
+        id: Date.now(),
+        content: messageInput,
+        isSent: true,
+        sectorId: newMessage.sectorId,
+        contactID: newMessage.contactId,
+        isRead: true,
+      };
+
+      setMessages((prevMessages) => [...prevMessages, temporaryMessage]);
+      setMessageInput('');
 
       try {
         await sendMessage(newMessage);
-        const messageToAdd: MessageType = {
-          id: Date.now(),
-          content: messageInput,
-          isSent: true,
-          sectorId: newMessage.sectorId,
-          contactId: newMessage.contactId,
-        };
 
-        // Enviar a mensagem pelo WebSocket
-        socket.current?.send(JSON.stringify(messageToAdd));
+        setMessages((prevMessages) =>
+          prevMessages.map((msg) =>
+            msg.id === temporaryMessage.id
+              ? { ...msg, isSent: true }
+              : msg
+          )
+        );
 
-        setMessages((prevMessages) => [...prevMessages, messageToAdd]);
-        setMessageInput('');
+        socket.current?.send(JSON.stringify(newMessage));
       } catch (error) {
         console.error('Erro ao enviar mensagem:', error);
-      } finally {
-        setIsSending(false);
+
+        setMessages((prevMessages) =>
+          prevMessages.map((msg) =>
+            msg.id === temporaryMessage.id
+              ? { ...msg, isSent: false, error: true }
+              : msg
+          )
+        );
       }
     }
   };
@@ -346,7 +348,8 @@ const ChatPage: React.FC = () => {
             mediaType: response.media.mediaType,
             mediaUrl: response.media.mediaUrl,
             sectorId: response.media.sectorId,
-            contactId: response.media.contactId,
+            contactID: response.media.contactId,
+            isRead: true,
           };
 
           socket.current?.send(JSON.stringify(messageToAdd));
@@ -362,7 +365,6 @@ const ChatPage: React.FC = () => {
       reader.readAsDataURL(file);
     }
 
-    // Fechar os modais e limpar seleção de arquivos
     if (isImage) {
       setIsImageModalVisible(false);
     } else {
@@ -371,50 +373,50 @@ const ChatPage: React.FC = () => {
     setFilesWithUid([]);
   };
   const handleShowImageModal = () => {
-    setFilesToUpload([]); // Limpa a seleção anterior
-    setFilesWithUid([]); // Limpa os arquivos com UID
-    setUploadKey((prevKey) => prevKey + 1); // Atualiza a chave do upload para forçar a recriação do componente
+    setFilesToUpload([]);
+    setFilesWithUid([]);
+    setUploadKey((prevKey) => prevKey + 1);
     setIsImageModalVisible(true);
   };
 
   const handleShowAttachmentModal = () => {
     setFilesToUpload([]);
-    setFilesWithUid([]); // Limpa os arquivos com UID
-    setUploadKey((prevKey) => prevKey + 1); // Atualiza a chave do upload para forçar a recriação do componente
+    setFilesWithUid([]);
+    setUploadKey((prevKey) => prevKey + 1);
     setIsAttachmentModalVisible(true);
   };
 
   const handleCloseImageModal = () => {
     setIsImageModalVisible(false);
     setFilesToUpload([]);
-    setFilesWithUid([]); // Limpa os arquivos com UID
-    setUploadKey((prevKey) => prevKey + 1); // Atualiza a chave do upload para forçar a recriação do componente
+    setFilesWithUid([]);
+    setUploadKey((prevKey) => prevKey + 1);
   };
 
   const handleCloseAttachmentModal = () => {
     setIsAttachmentModalVisible(false);
     setFilesToUpload([]);
-    setFilesWithUid([]); // Limpa os arquivos com UID
-    setUploadKey((prevKey) => prevKey + 1); // Atualiza a chave do upload para forçar a recriação do componente
+    setFilesWithUid([]);
+    setUploadKey((prevKey) => prevKey + 1);
   };
 
   const renderSelectedFiles = () => {
     if (filesToUpload.length === 0) {
-      return null; // Retorna null se não houver arquivos
+      return null;
     }
     return filesToUpload.map((file, index) => (
-      <AntList.Item key={index}>
-        <AntList.Item.Meta
+      <List.Item key={index}>
+        <List.Item.Meta
           title={file.name}
           description={file.type}
         />
         <Button
           icon={<EyeOutlined />}
-          onClick={() => handlePreviewImage(file)} // Chama a função para visualizar a imagem
+          onClick={() => handlePreviewImage(file)}
         >
           Visualizar
         </Button>
-      </AntList.Item>
+      </List.Item>
     ));
   };
 
@@ -462,9 +464,9 @@ const ChatPage: React.FC = () => {
   };
 
   const handleTagIdsChange = (value: number[]) => {
-    const tagIdsString = value.join(','); // Converte a lista de IDs em uma string separada por vírgulas
-    setCurrentValues({ ...currentValues, tagIds: tagIdsString }); // Atualiza a string de tagIds
-    handleSave()
+    const tagIdsString = value.join(',');
+    setCurrentValues({ ...currentValues, tagIds: tagIdsString });
+    handleSave();
   };
 
   const handleSave = async () => {
@@ -476,35 +478,24 @@ const ChatPage: React.FC = () => {
         address: currentValues.address,
         email: currentValues.email,
         annotations: currentValues.annotations,
-        tagIds: currentValues.tagIds, // Atualiza a lista de tagIds
+        tagIds: currentValues.tagIds,
       };
 
       try {
-        // Chama a função para atualizar o contato
         await updateWhatsAppContact(updatedContact);
         antdMessage.success('Contato atualizado com sucesso!');
       } catch (error) {
         console.error('Erro ao atualizar contato:', error);
       }
 
-      setEditableField(null); // Fechar o campo de entrada após salvar
+      setEditableField(null);
     }
   };
 
-  // Funções de Gravação de Áudio
   const handleStartRecording = async () => {
     try {
-      let mimeType = 'audio/ogg; codecs=opus';
-
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'audio/webm; codecs=opus';
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          return;
-        }
-      }
-
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       const audioChunks: BlobPart[] = [];
 
@@ -513,37 +504,43 @@ const ChatPage: React.FC = () => {
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: mimeType });
+        const audioBlob = new Blob(audioChunks, { type: 'audio/ogg; codecs=opus' });
         setRecordedAudio(audioBlob);
-        const url = URL.createObjectURL(audioBlob);
-        setAudioUrl(url);
-        setIsRecording(false);
+        setAudioUrl(URL.createObjectURL(audioBlob));
+        setShowSendCancelOptions(true);
       };
 
       mediaRecorder.start();
       setIsRecording(true);
-    } catch (err) {
-      console.error('Erro ao acessar o microfone', err);
+    } catch (error) {
+      console.error("Erro ao iniciar a gravação:", error);
     }
   };
 
   const handleStopRecording = () => {
-    if (mediaRecorderRef.current) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
+    setIsRecording(false);
+  };
+
+  const handleCancelRecording = () => {
+    setShowSendCancelOptions(false);
+    setRecordedAudio(null);
+    setAudioUrl(null);
   };
 
   const handleSendRecording = async () => {
     if (recordedAudio && selectedContact) {
+      setIsSending(true);
       const reader = new FileReader();
       reader.onloadend = async () => {
-        const base64File = reader.result as string; // Mantém o formato completo em base64
+        const base64File = reader.result as string;
         const mimeType = recordedAudio.type.split(';')[0];
-        const extension = mimeType.split('/')[1];
-        const fileName = `audio_recording.${extension}`;
+        const fileName = `audio_recording.${mimeType.split('/')[1]}`;
 
         const fileData = {
-          base64File: base64File.split(',')[1], // Envia apenas o conteúdo do base64
+          base64File: base64File.split(',')[1],
           mediaType: mimeType,
           fileName,
           caption: '',
@@ -552,21 +549,17 @@ const ChatPage: React.FC = () => {
           sectorId: SessionService.getSessionForSector(),
         };
 
-        setIsSending(true);
-
         try {
-          // Chama a função para enviar o arquivo e armazena a resposta
           const response: any = await sendFile(fileData);
-
-          // Cria a mensagem com o `mediaUrl` retornado pela API
           const messageToAdd: MessageType = {
             id: Date.now(),
-            content: response.media.content || null, // Conteúdo pode ser nulo para mensagens de áudio
+            content: response.media.content || null,
             isSent: response.media.isSent,
             mediaType: response.media.mediaType,
-            mediaUrl: response.media.mediaUrl, // Utiliza o URL do S3 retornado pelo backend
+            mediaUrl: response.media.mediaUrl,
             sectorId: response.media.sectorId,
-            contactId: response.media.contactId,
+            contactID: response.media.contactId,
+            isRead: true,
           };
 
           setMessages((prevMessages) => [...prevMessages, messageToAdd]);
@@ -577,7 +570,7 @@ const ChatPage: React.FC = () => {
           setIsSending(false);
           setRecordedAudio(null);
           setAudioUrl(null);
-          setIsRecordingModalVisible(false);
+          setShowSendCancelOptions(false);
         }
       };
       reader.readAsDataURL(recordedAudio);
@@ -587,27 +580,16 @@ const ChatPage: React.FC = () => {
   const getSelectStyle = () => {
     switch (status) {
       case 1:
-        return { color: 'green' }; // Em Atendimento
+        return { color: 'green' };
       case 2:
-        return { color: 'red' }; // Inativo
+        return { color: 'red' };
       case 3:
-        return { color: 'blue' }; // Concluído
+        return { color: 'blue' };
       default:
         return {};
     }
   };
 
-  const handleCancelRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    setIsRecording(false);
-    setRecordedAudio(null);
-    setAudioUrl(null);
-    setIsRecordingModalVisible(false);
-  };
-
-  // Scroll to the bottom when messages update
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -622,10 +604,9 @@ const ChatPage: React.FC = () => {
     </Menu>
   );
 
-
   return (
     <Layout style={{ height: '80vh', backgroundColor: '#f4f4f4' }}>
-      {isLoading && <LoadingOverlay />} {/* Exibe o loading overlay */}
+      {isLoading && <LoadingOverlay />}
 
       <Sider width={350} style={{ padding: 20, backgroundColor: '#fff', borderRight: '5px solid #f0f0f0', borderBottom: '2px solid #f0f0f0', borderTop: '2px solid #f0f0f0', borderLeft: '2px solid #f0f0f0', borderRadius: '20px 0 0 20px' }}>
         <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'center' }}>
@@ -661,9 +642,6 @@ const ChatPage: React.FC = () => {
           </Dropdown>
         </div>
 
-
-
-        {/* Lista de contatos filtrados */}
         <List
           itemLayout="horizontal"
           locale={{ emptyText: 'Nenhum contato encontrado' }}
@@ -694,7 +672,7 @@ const ChatPage: React.FC = () => {
             padding: '16px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between', // Espaçamento entre os itens
+            justifyContent: 'space-between',
             borderTop: '2px solid #f0f0f0',
             borderRight: '2px solid #f0f0f0',
             borderBottom: '2px solid #f0f0f0',
@@ -722,7 +700,6 @@ const ChatPage: React.FC = () => {
               <Select.Option value={2}>Inativo</Select.Option>
               <Select.Option value={3}>Concluído</Select.Option>
             </Select>
-
 
             <Button style={{ marginLeft: '10px' }} onClick={handleShowDrawer} type="primary">Mais informações</Button>
           </Header>
@@ -769,7 +746,6 @@ const ChatPage: React.FC = () => {
                           <AudioMessage audioUrl={message.mediaUrl} />
                         ) : null}
 
-                        {/* Renderização de documentos */}
                         {(message?.mediaType && (message?.mediaType?.includes("document") || message?.mediaType?.includes("application"))) && message?.mediaUrl ? (
                           <div style={{ display: 'flex', alignItems: 'center' }}>
                             <a
@@ -781,7 +757,7 @@ const ChatPage: React.FC = () => {
                             </a>
                           </div>
                         ) : null}
-                        
+
                         {message.content && (
                           <span style={{ color: message.isSent ? 'white' : 'black' }}>
                             {message.content}
@@ -808,7 +784,6 @@ const ChatPage: React.FC = () => {
             </div>
           </Content>
 
-
           <div style={{ padding: '16px', backgroundColor: '#fff', borderTop: '1px solid #f0f0f0' }}>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <TextArea
@@ -828,7 +803,6 @@ const ChatPage: React.FC = () => {
                 }}
               />
 
-              {/* Icons inside the input */}
               <div style={{
                 position: 'absolute',
                 right: '10px',
@@ -861,21 +835,48 @@ const ChatPage: React.FC = () => {
                     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)'
                   }}
                 />
-                <Button
-                  type="link"
-                  icon={<AudioOutlined />}
-                  onClick={() => {
-                    setIsRecordingModalVisible(true);
-                    handleStartRecording();
-                  }}
-                  style={{
-                    padding: '8px',
-                    backgroundColor: '#fff',
-                    border: '1px solid #d9d9d9',
-                    borderRadius: '4px',
-                    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)'
-                  }}
-                />
+                <div style={{ position: 'relative' }}>
+                  {!showSendCancelOptions ? (
+                    <Button
+                      type="link"
+                      icon={<AudioOutlined />}
+                      onMouseDown={handleStartRecording}
+                      onMouseUp={handleStopRecording}
+                      style={{
+                        color: isRecording ? 'red' : '',
+                        padding: '8px',
+                        backgroundColor: '#fff',
+                        border: '1px solid #d9d9d9',
+                        borderRadius: '4px',
+                        boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)'
+                      }}
+                      onTouchStart={handleStartRecording}
+                      onTouchEnd={handleStopRecording}
+                    />
+                  ) : (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <Button
+                        type="default"
+                        onClick={handleCancelRecording}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="primary"
+                        style={{ backgroundColor: 'primary', borderColor: 'primary', color: 'white' }}
+                        onClick={handleSendRecording}
+                      >
+                        Enviar Áudio
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {isSending && (
+                  <div className="loading-overlay">
+                    <LoadingOverlay />
+                  </div>
+                )}
                 <Button
                   type="link"
                   icon={<SendOutlined />}
@@ -892,7 +893,6 @@ const ChatPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Modal para selecionar imagens */}
           <Modal
             title="Selecionar Imagens"
             visible={isImageModalVisible}
@@ -910,12 +910,12 @@ const ChatPage: React.FC = () => {
           >
             <div style={{ marginBottom: '16px' }}>
               <Upload
-                key={uploadKey} // Usa a chave para recriar o componente
+                key={uploadKey}
                 multiple
                 showUploadList={false}
                 accept="image/png,image/jpeg,image/bmp"
                 onChange={handleImageUploadChange}
-                beforeUpload={() => false} // Evita o upload automático
+                beforeUpload={() => false}
                 fileList={filesWithUid.map((fileObj) => ({
                   uid: fileObj.uid,
                   name: fileObj.file.name,
@@ -926,26 +926,25 @@ const ChatPage: React.FC = () => {
                 <Button icon={<PictureOutlined />}>Selecionar Imagens</Button>
               </Upload>
             </div>
-            <AntList
+            <List
               style={{ marginTop: '16px' }}
               bordered
               locale={{ emptyText: 'Nenhum arquivo encontrado' }}
               dataSource={filesWithUid}
               renderItem={(fileObj) => (
-                <AntList.Item key={fileObj.uid}>
-                  <AntList.Item.Meta title={fileObj.file.name} description={fileObj.file.type} />
+                <List.Item key={fileObj.uid}>
+                  <List.Item.Meta title={fileObj.file.name} description={fileObj.file.type} />
                   <Button
                     icon={<EyeOutlined />}
                     onClick={() => handlePreviewImage(fileObj.file)}
                   >
                     Visualizar
                   </Button>
-                </AntList.Item>
+                </List.Item>
               )}
             />
           </Modal>
 
-          {/* Modal para Upload de Anexos */}
           <Modal
             title="Selecionar Anexos"
             visible={isAttachmentModalVisible}
@@ -966,7 +965,7 @@ const ChatPage: React.FC = () => {
               multiple
               beforeUpload={(file) => {
                 setFilesToUpload((prevFiles) => [...prevFiles, file]);
-                return false; // Não faz upload automaticamente
+                return false;
               }}
               showUploadList={false}
               accept="*/*"
@@ -974,7 +973,7 @@ const ChatPage: React.FC = () => {
             >
               <Button icon={<PaperClipOutlined />}>Selecionar Anexos</Button>
             </Upload>
-            <AntList
+            <List
               locale={{ emptyText: 'Nenhum arquivo encontrado' }}
               style={{ marginTop: '16px' }}
               bordered
@@ -982,36 +981,9 @@ const ChatPage: React.FC = () => {
                 key: index,
                 name: file.name,
                 type: file.type,
-              }))} // Mostra a lista de arquivos selecionados
-              renderItem={renderSelectedFiles} // Chama a função para renderizar os arquivos selecionados
+              }))}
+              renderItem={renderSelectedFiles}
             />
-          </Modal>
-
-          {/* Modal para Gravação de Áudio */}
-          <Modal
-            title="Gravando Áudio"
-            visible={isRecordingModalVisible}
-            onCancel={handleCancelRecording}
-            footer={null}
-          >
-            <div style={{ textAlign: 'center' }}>
-              {isRecording ? (
-                <>
-                  <p>Gravando...</p>
-                  <Button onClick={handleStopRecording}>Parar</Button>
-                </>
-              ) : recordedAudio ? (
-                <>
-                  <audio controls src={audioUrl || undefined} />
-                  <div style={{ marginTop: '16px' }}>
-                    <Button type="primary" onClick={handleSendRecording}>Enviar</Button>
-                    <Button style={{ marginLeft: '8px' }} onClick={handleCancelRecording}>Cancelar</Button>
-                  </div>
-                </>
-              ) : (
-                <p>Clique no botão abaixo para começar a gravar.</p>
-              )}
-            </div>
           </Modal>
 
           <Drawer
@@ -1147,7 +1119,6 @@ const ChatPage: React.FC = () => {
             <Divider />
           </Drawer>
 
-
         </Layout>
       )}
     </Layout>
@@ -1169,8 +1140,5 @@ const AudioMessage: React.FC<{ audioUrl: string }> = ({ audioUrl }) => {
     </div>
   );
 };
-
-
-
 
 export default ChatPage;

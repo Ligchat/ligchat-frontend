@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Input, Layout, Form, Tabs, Typography, Spin, message, Modal } from 'antd';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Button, Input, Layout, Form, Tabs, Typography, Spin, Modal } from 'antd';
+import { useNavigate, useLocation, Link } from 'react-router-dom'; // Importar Link
 import Logo from '../assets/images/Logo.png';
 import { SendVerificationCodeRequestDTO, VerifyCodeRequestDTO } from '../interfaces/AuthInterface';
 import { sendVerificationCode, verifyCode } from '../services/AuthService';
 import SessionService from '../services/SessionService';
 
-const { Content } = Layout;
+const { Content, Footer } = Layout; // Importar Footer
 const { TabPane } = Tabs;
 const { Text } = Typography;
 
@@ -33,6 +33,11 @@ const LoginScreen: React.FC = () => {
   const handleCloseModal = () => {
     setIsModalVisible(false);
   };
+
+  // Remover funções e estados relacionados ao modal de Política de Privacidade
+  // const [isPrivacyTermsVisible, setIsPrivacyTermsVisible] = useState(false);
+  // const handlePrivacyTermsClose = () => { setIsPrivacyTermsVisible(false); };
+  // const handlePrivacyTermsOpen = () => { setIsPrivacyTermsVisible(true); };
 
   // Função para validar o formato de email
   const validateEmail = (value: string) => {
@@ -116,7 +121,7 @@ const LoginScreen: React.FC = () => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          height: '100vh',
+          minHeight: '100vh',
           padding: '0 50px',
           flexDirection: 'row',
         }}
@@ -136,8 +141,15 @@ const LoginScreen: React.FC = () => {
           <p>Efetue o login novamente.</p>
         </Modal>
 
+        {/* Remover o modal de Política de Privacidade e Termos de Uso */}
+        {/* ... Modal removido ... */}
+
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <img src={Logo} alt="LigChat Logo" style={{ maxWidth: '150px', minWidth: '150px', maxHeight: 150, minHeight: 150 }} />
+          <img
+            src={Logo}
+            alt="LigChat Logo"
+            style={{ maxWidth: '150px', minWidth: '150px', maxHeight: 150, minHeight: 150 }}
+          />
         </div>
 
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
@@ -217,9 +229,21 @@ const LoginScreen: React.FC = () => {
                 </Form>
               </TabPane>
             </Tabs>
+
+            {/* Adicionar links para Política de Privacidade e Termos de Uso abaixo do formulário */}
+            <div style={{ marginTop: 20, textAlign: 'center' }}>
+              <Link to="/privacy-policy">Política de Privacidade</Link> |{' '}
+              <Link to="/terms-of-use">Termos de Uso</Link>
+            </div>
           </div>
         </div>
       </Content>
+
+      {/* Footer opcional com os links */}
+      <Footer style={{ textAlign: 'center' }}>
+        <Link to="/privacy-policy">Política de Privacidade</Link> |{' '}
+        <Link to="/terms-of-use">Termos de Uso</Link>
+      </Footer>
     </Layout>
   );
 };

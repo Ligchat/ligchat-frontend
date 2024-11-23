@@ -31,7 +31,8 @@ export interface MessageType {
   mediaType?: string; // Tipo de mídia (opcional)
   mediaUrl?: string; // URL da mídia (opcional)
   sectorId: number; // ID do setor associado (se necessário)
-  contactId: number; // ID do contato associado (se necessário)
+  contactID: number; // ID do contato associado (se necessário)
+  isRead:boolean
 }
 
 
