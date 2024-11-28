@@ -12,6 +12,7 @@ import {
 import SessionService from '../services/SessionService';
 import LoadingOverlay from '../components/LoadingOverlay';
 import axios from 'axios';
+import { validateMetaCredentials } from '../services/MetaValidationService';
 
 const { TextArea } = Input;
 
@@ -111,7 +112,7 @@ const SectorsPage: React.FC = () => {
 
   const handleSave = async () => {
     let validationErrors: { [key: string]: string } = {};
-
+  
     if (!sectorData.name) {
       validationErrors.name = 'O nome do setor é obrigatório.';
     }
@@ -124,44 +125,42 @@ const SectorsPage: React.FC = () => {
     if (!sectorData.description) {
       validationErrors.description = 'A descrição é obrigatória.';
     }
-
+  
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       return;
     } else {
       setErrors({});
     }
-
+  
     try {
+      const validationResult = await validateMetaCredentials(sectorData.accessToken, sectorData.phoneNumberId);
+  
+      if (validationResult.message !== 'Token e phone_id são válidos.') {
+        setErrors({
+          ...validationErrors,
+          accessToken: 'Token ou id da telefone inválido.',
+        });
+        return;
+      }
+  
       setIsLoading(true);
       const token = SessionService.getSession('authToken');
       const decodedToken = token ? SessionService.decodeToken(token) : null;
       const userBusinessId = decodedToken ? decodedToken.userId : null;
-
+  
       if (userBusinessId) {
         const updatedSectorData: Sector = {
           ...sectorData,
           userBusinessId,
         };
-
+  
         if (newSector) {
           await createSector(updatedSectorData);
         } else if (updatedSectorData.id) {
           await updateSector(updatedSectorData.id, updatedSectorData);
         }
-
-        // Integração com o Google após salvar o setor
-        if (sectorData.googleClientId && sectorData.googleApiKey) {
-          try {
-            await makeGoogleApiRequest(sectorData.googleClientId, sectorData.googleApiKey);
-            // Você pode fazer algo com a resposta da API do Google aqui
-          } catch (error) {
-            console.error('Erro ao chamar a API do Google:', error);
-          }
-        } else {
-          console.warn('googleClientId e googleApiKey não fornecidos para integração com o Google.');
-        }
-
+  
         await fetchSectors();
         setNewSector(false);
         closeDrawer();

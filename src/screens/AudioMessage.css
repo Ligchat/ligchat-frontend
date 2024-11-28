@@ -95,6 +95,15 @@
   .select-status-3 .ant-select-selector {
     border: 2px solid blue !important;
   }
+
+  .ant-modal-body {
+    padding-top: 48px !important; /* Adiciona espaço suficiente no topo */
+  }
+
+  .ant-modal-content{
+    padding-top: 50px !important;
+    padding-bottom: 50px !important;
+  }
   
   
   .contact-list-item:hover::after {

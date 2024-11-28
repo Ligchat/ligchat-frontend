@@ -1,4 +1,5 @@
 import axios from 'axios';
+
 export interface Contact {
   id: number;
   name: string;
@@ -7,6 +8,7 @@ export interface Contact {
   attachmentId?: number;
   generalInfo?: string;
   sectorId: number;
+  responsibleId?: number; // Adicionado responsável
 }
 
 export interface CreateContactRequestDTO {
@@ -21,12 +23,16 @@ export interface CreateContactRequestDTO {
 export interface UpdateContactRequestDTO {
   name: string;
   phone: string;
-  labels:any;
-  lastContact:any;
+  labels: any;
+  lastContact: any;
   messageId?: number;
   attachmentId?: number;
   generalInfo: string;
   sectorId: number;
+}
+
+export interface UpdateResponsibleRequestDTO {
+  responsibleId: number; // DTO para atualizar o responsável
 }
 
 export const createContact = async (contactData: CreateContactRequestDTO) => {
@@ -51,11 +57,24 @@ export const updateContact = async (id: number, data: UpdateContactRequestDTO) =
   }
 };
 
+export const updateResponsible = async (id: number, data: UpdateResponsibleRequestDTO) => {
+  try {
+    const response = await axios.put(`/job/contact/${id}/responsible`, data, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(`Failed to update responsible for contact with id ${id}: ${error}`);
+  }
+};
+
 export const getContact = async (id: number): Promise<Contact> => {
   try {
     const response = await axios.get(`/server/api/contatos/${id}`, {
       headers: {
-        'Accept': '*/*',
+        Accept: '*/*',
       },
     });
     return response.data;
@@ -68,7 +87,7 @@ export const getContacts = async (): Promise<Contact[]> => {
   try {
     const response = await axios.get('/server/api/contatos', {
       headers: {
-        'Accept': '*/*',
+        Accept: '*/*',
       },
     });
     return response.data;

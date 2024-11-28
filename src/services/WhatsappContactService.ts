@@ -12,7 +12,9 @@ export interface WhatsAppContact {
     status: number; // Altera de boolean para number
     sectorId?: number; // Tornar opcional
     createdAt: any;
+    isViewed:any;
     isRead:any
+    responsibleId:any
 }
 
 export interface Messages {

@@ -48,7 +48,7 @@ const CustomNode2: React.FC<NodeProps> = ({ data }) => {
           fontSize: '32px',
         }}
       >
-        {data.label}
+        {data?.label}
       </div>
 
       {/* Conteúdo do Nó "Início" */}

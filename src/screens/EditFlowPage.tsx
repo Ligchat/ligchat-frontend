@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent, useEffect } from 'react';
+import React, { useState, ChangeEvent, useEffect, ReactNode } from 'react';
 import ReactFlow, {
   addEdge,
   Background,
@@ -50,6 +50,7 @@ interface Variable {
 interface Tag {
   id: number;      // ID da tag
   name: string;        // Nome da tag (assumindo que a API retorna um nome)
+  tagId: number; 
 }
 // Interface para opções de menu
 interface MenuOption {
@@ -93,13 +94,12 @@ interface FlowData {
   edges: FlowEdge[];        // Array de arestas do fluxo
 }
 
-// Interface para as arestas do fluxo
 interface FlowEdge {
-  id: string;              // ID da aresta
-  source: string;          // ID do nó de origem
-  target: string;          // ID do nó de destino
-  label?: string;          // Rótulo da aresta (opcional)
-  animated?: boolean;      // Se a aresta é animada (opcional)
+  id: string;
+  source: string;
+  target: string;
+  label?: string | ReactNode; // Permite ReactNode além de string
+  animated?: boolean;
 }
 
 // Função para definir a cor do nó com base no tipo
@@ -129,9 +129,9 @@ const getNodeColor = (label: string) => {
 // Componente de nó personalizado
 const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
   const [showOptions, setShowOptions] = useState(false);
-  const [blocks, setBlocks] = useState<Block[]>(data.blocks || []);
+  const [blocks, setBlocks] = useState<Block[]>(data?.blocks || []);
   const [selectedCondition, setSelectedCondition] = useState<string>('');
-  const [menuOptions, setMenuOptions] = useState<MenuOption>(data.menuOptions || { title: '', content: [] });
+  const [menuOptions, setMenuOptions] = useState<MenuOption>(data?.menuOptions || { title: '', content: [] });
 
 
   const [variables, setVariables] = useState<Variable[]>([]);
@@ -143,8 +143,31 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
       try {
         const variablesData = await getAllVariables();
         setVariables(variablesData);
-        const response: any = await getTags();
-        setTags(Array.isArray(response.data) ? response.data : []);
+  
+        const tagsResponse:any = await getTags();
+        setTags(Array.isArray(tagsResponse.data) ? tagsResponse.data : []);
+  
+        // Atualiza os nós para incluir nomes de variáveis
+        setNodes((nds) =>
+          nds.map((node) => {
+            if (node.data?.condition?.variableId) {
+              const variableName = variablesData.find(
+                (v: Variable) => v.id === node.data.condition.variableId
+              )?.name;
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  condition: {
+                    ...node.data.condition,
+                    variableName,
+                  },
+                },
+              };
+            }
+            return node;
+          })
+        );
       } catch (error) {
         console.error('Erro ao buscar variáveis ou tags:', error);
       }
@@ -247,8 +270,8 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
         background: '#fff',
         border: '1px solid #ddd',
         borderRadius: 10,
-        width: data.label === 'Condições' ? '450px' : '350px',
-        minHeight: data.label === 'Condições' ? '150px' : 'auto', // Diminuindo a altura do nó Condições
+        width: data?.label === 'Condições' ? '450px' : '350px',
+        minHeight: data?.label === 'Condições' ? '150px' : 'auto', // Diminuindo a altura do nó Condições
         position: 'relative',
       }}
     >
@@ -268,7 +291,7 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
       <div
         style={{
           padding: '5px 10px',
-          background: getNodeColor(data.label),
+          background: getNodeColor(data?.label),
           color: '#fff',
           borderRadius: '5px 5px 0 0',
           fontSize: '16px',
@@ -277,7 +300,7 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
           alignItems: 'center',
         }}
       >
-        {data.label}
+        {data?.label}
         {/* Ícone de Lixeira para Deletar o Nó */}
         <DeleteOutlined
           style={{ cursor: 'pointer', color: '#fff' }}
@@ -288,7 +311,7 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
 
       {/* Renderização condicional do conteúdo de cada nó */}
       <div style={{ padding: '10px' }}>
-        {data.label === 'Conteúdo' && (
+        {data?.label === 'Conteúdo' && (
           <>
             {blocks.map((block, index) => (
               <div
@@ -302,13 +325,13 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
                   border: '1px solid #ddd',
                 }}
               >
-{block.type === 'text' && (
+{block?.type === 'text' && (
   <Input.TextArea
     placeholder="Insira o seu texto"
     rows={2}
     style={{ width: '100%' }}
     className="nodrag"
-    value={block.content || ''}
+    value={block?.content || ''}
     onChange={(e) => {
       const newContent = e.target.value;
       setBlocks((prevBlocks) => {
@@ -471,83 +494,89 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
           </>
         )}
 
-{data.label === 'Condições' && (
+{data?.label === 'Condições' && (
   <>
-<Select
-  notFoundContent="Nenhuma condição encontrada"
-  placeholder="Selecione a variável"
-  className="nodrag"
-  style={{ width: '100%', marginTop: 10 }}
-  value={data.condition?.variableId ?? undefined}
-  onChange={(value) => {
-    setNodes((nds) =>
-      nds.map((node) => {
-        if (node.id === id) {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              condition: {
-                ...node.data.condition,
-                variableId: value,
-                condition: node.data.condition?.condition || '', // Inicializar caso seja `undefined`
-                value: node.data.condition?.value || '', // Inicializar caso seja `undefined`
-              },
-            },
-          };
-        }
-        return node;
-      })
-    );
-  }}
->
-  {variables.map((variable: Variable) => (
-    <Option key={variable.id} value={variable.id}>
-      {variable.name}
-    </Option>
-  ))}
-</Select>
+    {/* Seleção da variável */}
+    <Select
+      notFoundContent="Nenhuma variável encontrada"
+      placeholder="Selecione a variável"
+      style={{ width: '100%', marginTop: 10 }}
+      className="nodrag"
+      value={data?.condition?.variableId || undefined}
+      onChange={(value) => {
+        const variableName = variables.find((v) => v.id === value)?.name || '';
+        setNodes((nds) =>
+          nds.map((node) => {
+            if (node.id === id) {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  condition: {
+                    ...node.data.condition,
+                    variableId: value,
+                    variableName,
+                  },
+                },
+              };
+            }
+            return node;
+          })
+        );
+      }}
+    >
+      {variables.map((variable) => (
+        <Option key={variable.id} value={variable.id}>
+          {variable.name}
+        </Option>
+      ))}
+    </Select>
 
-
-
+    {/* Seleção da condição */}
     <Select
       notFoundContent="Nenhuma condição encontrada"
       placeholder="Selecione a condição"
-      className="nodrag"
       style={{ width: '100%', marginTop: 10 }}
+      className="nodrag"
+      value={data?.condition?.condition || undefined}
       onChange={(value) => {
-        setSelectedCondition(value);
         setNodes((nds) =>
           nds.map((node) =>
-            node.id === id ? { ...node, data: { ...node.data, condition: { ...node.data.condition, condition: value } } } : node
+            node.id === id
+              ? { ...node, data: { ...node.data, condition: { ...node.data.condition, condition: value } } }
+              : node
           )
         );
       }}
     >
       <Option value="contém">Contém</Option>
       <Option value="não contém">Não contém</Option>
-      <Option value="existe algum valor">Existe algum valor</Option>
+      <Option value="é igual a">É igual a</Option>
     </Select>
-    {(selectedCondition === 'contém' || selectedCondition === 'não contém') && (
-      <Input
-        placeholder="Insira o valor"
-        style={{ width: '100%', marginTop: 10 }}
-        className="nodrag"
-        onChange={(e) => {
-          const inputValue = e.target.value;
-          setNodes((nds) =>
-            nds.map((node) =>
-              node.id === id ? { ...node, data: { ...node.data, condition: { ...node.data.condition, value: inputValue } } } : node
-            )
-          );
-        }}
-      />
-    )}
+
+    {/* Campo de entrada do valor */}
+    <Input
+      placeholder="Insira o valor"
+      style={{ width: '100%', marginTop: 10 }}
+      className="nodrag"
+      value={data?.condition?.value || ''}
+      onChange={(e) => {
+        const inputValue = e.target.value;
+        setNodes((nds) =>
+          nds.map((node) =>
+            node.id === id
+              ? { ...node, data: { ...node.data, condition: { ...node.data.condition, value: inputValue } } }
+              : node
+          )
+        );
+      }}
+    />
   </>
 )}
 
 
-        {data.label === 'Atraso Inteligente' && (
+
+        {data?.label === 'Atraso Inteligente' && (
           <>
             <div className="nodrag">Selecione o tempo de espera</div>
             <Slider
@@ -560,7 +589,7 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
           </>
         )}
 
-{data.label === 'Menu de Opções' && (
+{data?.label === 'Menu de Opções' && (
   <>
     <Input
       value={menuOptions.title} // Preenchendo o título do menu
@@ -604,62 +633,63 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
 )}
 
 
-{data.label === 'Tag' && (
-<Select
-  notFoundContent="Nenhuma etiqueta encontrada"
-  placeholder="Selecione a tag"
-  style={{ width: '100%', marginTop: 10 }}
-  className="nodrag"
-  value={data.selectedTag?.id ?? undefined}
-  onChange={(value) => {
-    setNodes((nds) =>
-      nds.map((node) => {
-        if (node.id === id) {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              selectedTag: {
-                ...node.data.selectedTag,
-                tag_id: value,
+{data?.label === 'Tag' && (
+  <Select
+    notFoundContent="Nenhuma etiqueta encontrada"
+    placeholder="Selecione a tag"
+    style={{ width: '100%', marginTop: 10 }}
+    className="nodrag"
+    value={data?.selectedTag?.tagId || undefined} // Seleciona pelo ID da tag
+    onChange={(value) => {
+      const selectedTag = tags.find((tag) => tag.id === value); // Busca a tag selecionada pelo ID
+      setNodes((nds) =>
+        nds.map((node) => {
+          if (node.id === id) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                selectedTag: selectedTag
+                  ? { tagId: selectedTag.id, name: selectedTag.name }
+                  : null,
               },
-            },
-          };
-        }
-        return node;
-      })
-    );
-  }}
->
-  {tags.map((tag: Tag) => (
-    <Option key={tag.id} value={tag.id}>
-      {tag.name}
-    </Option>
-  ))}
-</Select>
+            };
+          }
+          return node;
+        })
+      );
+    }}
+  >
+    {tags.map((tag: Tag) => (
+      <Option key={tag.id} value={tag.id}>
+        {tag.name}
+      </Option>
+    ))}
+  </Select>
 )}
 
 
 
-        {data.label === 'Reiniciar Flow' && (
+
+        {data?.label === 'Reiniciar Flow' && (
           <>
             <p className="nodrag">Esta ação irá reiniciar todo o fluxo do flow</p>
           </>
         )}
 
-        {data.label === 'Resetar Variáveis' && (
+        {data?.label === 'Resetar Variáveis' && (
           <>
             <p className="nodrag">Esta ação irá limpar todas as variáveis do chat</p>
           </>
         )}
 
         {/* Handles para conexão de saída no nó Condições */}
-        {data.label === 'Condições' && (
+        {data?.label === 'Condições' && (
           <>
             <Handle
               type="source"
               position={Position.Right}
-              id="true-connection"
+              id="true"
               style={{
                 top: '30%',
                 background: '#333',
@@ -671,7 +701,7 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
             <Handle
               type="source"
               position={Position.Right}
-              id="false-connection"
+              id="false"
               style={{
                 top: '70%',
                 background: '#333',
@@ -684,7 +714,7 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
         )}
 
         {/* Handle padrão para conexão de saída */}
-        {data.label !== 'Condições' && (
+        {data?.label !== 'Condições' && (
           <Handle
             type="source"
             position={Position.Right}
@@ -732,9 +762,7 @@ const initialNodes: Node[] = [
   },
 ];
 
-const initialEdges: Edge[] = [
-  { id: 'e1-2', source: '1', target: '2', animated: true }, // Alterando para "animated" para animação das linhas
-];
+const initialEdges: Edge[] = [];
 
 const nodeTypes = {
   customNode: CustomNode,
@@ -758,56 +786,130 @@ const EditFlowPage: React.FC<EditFlowPageProps> = ({ flowId }:any) => {
     }
   }, [flowId]);
 
+  const validateEdges = (edges: Edge[], nodes: Node[]) => {
+    const nodeIds = nodes.map((node) => node.id);
+    return edges.filter((edge) => nodeIds.includes(edge.source) && nodeIds.includes(edge.target));
+  };
+  
+
   const fetchFlowById = async (flowId: string) => {
     try {
-      const flow = await getFlowById(flowId);
+      const flow:any = await getFlowById(flowId);
+      const tagsResponse:any = await getTags(); // Busca todas as tags disponíveis
+      const tags:any = Array.isArray(tagsResponse.data) ? tagsResponse.data : [];
+  
       if (flow) {
-        // Parse os dados dos nós e arestas do fluxo retornado
-        setNodes(flow.nodes || []);
-        setEdges(flow.edges || []);
+        const updatedNodes: Node[] = (flow.nodes || []).map((node: any) => {
+          // Atualiza o selectedTag para incluir o nome correspondente
+          const tagId = node.selectedTag?.tagId || null;
+          const tagName = tags.find((tag:any) => tag.id === tagId)?.name || null;
+  
+          return {
+            id: node.id,
+            type: node.type || 'customNode',
+            position: node.position || { x: 0, y: 0 },
+            data: {
+              id: node.id,
+              label: node.label || 'Nó sem título',
+              blocks: node.blocks || [],
+              menuOptions: node.menuOptions || { title: '', content: [] },
+              selectedTag: tagId
+                ? {
+                    tagId,
+                    name: tagName, // Inclui o nome da tag
+                  }
+                : null,
+              condition: node.condition || { variableId: null, condition: '', value: '' },
+            },
+          };
+        });
+  
+        const validatedEdges = validateEdges(flow.edges || [], updatedNodes);
+        setNodes(updatedNodes);
+        setEdges(validatedEdges);
       }
     } catch (error) {
       console.error('Erro ao obter flow:', error);
     }
   };
-
+  
+  
+  
+  
+  
   const handleSaveFlow = async () => {
     if (!reactFlowInstance) return;
   
     try {
-      const flowData: FlowData = {
-        id: id,
+      const flowData = {
+        id: flowId,
         name: 'Nome do Flow',
         description: 'Descrição do Flow',
         sectorId: SessionService.getSession('selectedSector'),
         nodes: reactFlowInstance.getNodes().map((node: any) => ({
           id: node.id,
-          label: node.data.label,
-          blocks: node.data.blocks || [], // Aqui garantimos que os blocos sejam salvos
-          menuOptions: node.data.menuOptions || [],
-          selectedTag: node.data.selectedTag || null,
-          condition: node.data.condition || null,
+          label: node.data?.label,
+          type: node.type || 'customNode',
+          blocks: (node.data?.blocks || []).map((block: any, index: number) => ({
+            id: block.id || `block-${index}`,
+            type: block.type || 'text',
+            content: block.content || '',
+            media: block.media
+              ? {
+                  id: block.media.id || `media-${index}`,
+                  name: block.media.name || '',
+                  mimeType: block.media.mimeType || '',
+                  base64: block.media.base64 || '',
+                }
+              : null,
+            duration: block.duration || 0,
+          })),
+          menuOptions: node.data?.menuOptions
+            ? {
+                id: node.data?.menuOptions.id || 'menuOption-1',
+                title: node.data?.menuOptions.title || '',
+                content: node.data?.menuOptions.content || [],
+              }
+            : { id: 'menuOption-1', title: '', content: [] },
+          selectedTag: node.data?.selectedTag
+            ? {
+                tagId: node.data?.selectedTag.tagId || node.data?.selectedTag.tag_id || null, // Usa o campo correto
+              }
+            : null,
+          condition: node.data?.condition
+            ? {
+                id: node.data?.condition.id || 'condition-1',
+                variableId: node.data?.condition.variableId || 0,
+                condition: node.data?.condition.condition || '',
+                value: node.data?.condition.value || '',
+              }
+            : null,
+          position: node.position || { x: 0, y: 0 },
         })),
-        edges: reactFlowInstance.getEdges(),
+        edges: reactFlowInstance.getEdges().map((edge: any) => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          animated: edge.animated || false,
+          sourceHandle: edge.sourceHandle || null,
+          targetHandle: edge.targetHandle || null,
+        })),
       };
   
-      // Aqui é onde ocorre a atualização ou criação do fluxo
-      const existingFlow = await getFlowById(id);
-      if (existingFlow) {
-        const response = await updateFlow(id, flowData);
-        if (response) {
-          message.success('Flow atualizado com sucesso!');
-        }
+      if (flowId) {
+        const response = await updateFlow(flowData.id, flowData);
+        message.success('Flow atualizado com sucesso!');
       } else {
         const response = await createFlow(flowData);
-        if (response) {
-          message.success('Flow criado com sucesso!');
-        }
+        message.success('Flow criado com sucesso!');
       }
     } catch (error) {
-      console.error('Erro ao criar ou atualizar o flow:', error);
+      console.error('Erro ao salvar o Flow:', error);
+      message.error('Erro ao salvar o Flow.');
     }
   };
+  
+  
 
   
   
@@ -854,15 +956,6 @@ const EditFlowPage: React.FC<EditFlowPageProps> = ({ flowId }:any) => {
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  const exampleNodes = [
-  {
-    id: '1',
-    type: 'customNode2',
-    data: { label: 'Início' },
-    position: { x: 50, y: 100 }
-  }
-];
-
   return (
     <div style={{ height: '80vh', display: 'flex' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -883,7 +976,9 @@ const EditFlowPage: React.FC<EditFlowPageProps> = ({ flowId }:any) => {
           onConnect={(params) => setEdges((eds) => addEdge(params, eds))}
           onDrop={onDrop}
           onDragOver={onDragOver}
-          onInit={setReactFlowInstance}
+          onInit={(instance) => {
+            if (instance) setReactFlowInstance(instance);
+          }}
           nodeTypes={nodeTypes}
           fitView
         >
