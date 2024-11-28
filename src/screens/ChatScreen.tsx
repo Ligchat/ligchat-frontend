@@ -1304,7 +1304,7 @@ const ChatPage: React.FC = () => {
                 </strong>
                 {/* Endereço */}
                 <Text>
-                  <strong style={{ marginRight: 8, color: '#9CA3AF' }}>Mora em:</strong>
+                  <strong style={{ marginRight: 8, marginBottom:5, color: '#9CA3AF' }}>Mora em:</strong>
                   {editableField === 'address' ? (
                     <Input
                       value={currentValues.address}
@@ -1325,7 +1325,7 @@ const ChatPage: React.FC = () => {
 
                 {/* Telefone */}
                 <Text>
-                  <strong style={{ marginRight: 8, color: '#9CA3AF' }}>Telefone:</strong>
+                  <strong style={{ marginRight: 8, marginBottom:5, color: '#9CA3AF' }}>Telefone:</strong>
                   {editableField === 'phoneNumber' ? (
                     <Input
                       value={currentValues.phoneNumber}
