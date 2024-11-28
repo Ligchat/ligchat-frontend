@@ -208,7 +208,7 @@ const ChatPage: React.FC = () => {
   };
 
   useEffect(() => {
-    socket.current = new WebSocket(`wss://17a0-177-84-243-103.ngrok-free.app?sectorId=${sessionId}`);
+    socket.current = new WebSocket(`wss://whatsapp.ligchat.com/?sectorId=${sessionId}`);
 
     socket.current.onopen = () => {
       console.log('WebSocket connection established');
@@ -973,9 +973,8 @@ const ChatPage: React.FC = () => {
                         padding: '8px',
                         boxShadow: message.isSent ? '0 2px 10px rgba(0, 0, 0, 0.1)' : 'none',
                         wordWrap: 'break-word',
-                        wordBreak: 'break-all',
                         overflowWrap: 'break-word',
-                        whiteSpace: 'pre-wrap',
+                        whiteSpace: 'normal',
                       }}>
                         {message?.mediaType && message?.mediaType?.includes("image") && message.mediaUrl ? (
                           <img
