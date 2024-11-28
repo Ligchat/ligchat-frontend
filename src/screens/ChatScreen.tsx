@@ -89,7 +89,7 @@ const ChatPage: React.FC = () => {
   const [previewImageUrl, setPreviewImageUrl] = useState<any>(null);
   const [status, setStatus] = useState(1);
   const [filteredContacts, setFilteredContacts] = useState<WhatsAppContact[]>([]);
-  const [selectedFilter, setSelectedFilter] = useState<string>('all');
+  const [selectedFilter, setSelectedFilter] = useState<string>('Todos');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showSendCancelOptions, setShowSendCancelOptions] = useState(false);
   const [filesWithUid, setFilesWithUid] = useState<{ file: File; uid: string; }[]>([]);
