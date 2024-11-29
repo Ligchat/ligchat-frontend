@@ -92,6 +92,7 @@ const FlowPage: React.FC = () => {
   const fetchFolders = async (token: string, sectorId: any) => {
     if (!sectorId) {
       console.error('sectorId não está definido');
+      setLoadingData(false);
       return;
     }
     try {
