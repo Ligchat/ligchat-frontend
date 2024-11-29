@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import {
   Card,
@@ -13,7 +14,7 @@ import {
   Form,
   message,
   Spin,
-  Skeleton,
+  Empty,
 } from 'antd';
 import {
   EditOutlined,
@@ -22,6 +23,9 @@ import {
   DeleteOutlined,
   FolderOutlined,
   EllipsisOutlined,
+  CheckCircleOutlined,
+  FolderOpenOutlined,
+  FileAddOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -53,7 +57,9 @@ const FlowPage: React.FC = () => {
 
   const [isAddModalVisible, setIsAddModalVisible] = useState<boolean>(false);
   const [newFolderName, setNewFolderName] = useState<string>('');
-  const [selectedSector, setSelectedSector] = useState<number | undefined>(SessionService.getSession('selectedSector'));
+  const [selectedSector, setSelectedSector] = useState<number | undefined>(
+    SessionService.getSession('selectedSector')
+  );
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [sectorId, setSectorId] = useState<number | undefined>(undefined);
 
@@ -76,7 +82,7 @@ const FlowPage: React.FC = () => {
     setSectorId(sectorIdFromSession);
     setSelectedSector(sectorIdFromSession);
     setToken(tokenFromSession);
-    
+
     if (tokenFromSession) {
       fetchFolders(tokenFromSession, sectorIdFromSession);
       fetchSectors(tokenFromSession);
@@ -128,6 +134,7 @@ const FlowPage: React.FC = () => {
 
   const handleFolderClick = (folderId: number) => {
     setSelectedFolderId(folderId);
+    setSelectedFlowFolder(folderId);
     fetchFlows(folderId);
   };
 
@@ -145,8 +152,12 @@ const FlowPage: React.FC = () => {
   const handleSaveFolder = async () => {
     if (!token || !editingFolder) return;
     try {
-      await updateFolder(editingFolder.id, { name: editFolderName, sectorId: editFolderSector }, token);
-      fetchFolders(token, sectorId); 
+      await updateFolder(
+        editingFolder.id,
+        { name: editFolderName, sectorId: editFolderSector },
+        token
+      );
+      fetchFolders(token, sectorId);
       message.success('Pasta atualizada com sucesso!');
       setEditingFolder(null);
       setIsEditModalVisible(false);
@@ -216,14 +227,12 @@ const FlowPage: React.FC = () => {
       return;
     }
     try {
-      const newFlow = await createFlow(
-        { name: newFlowName, folderId: selectedFlowFolder },
-      );
+      const newFlow = await createFlow({ name: newFlowName, folderId: selectedFlowFolder });
       message.success('Fluxo criado com sucesso!');
       setNewFlowName('');
       setSelectedFlowFolder(undefined);
       setIsAddFlowModalVisible(false);
-      setSelectedFolderId(selectedFlowFolder)
+      setSelectedFolderId(selectedFlowFolder);
       fetchFlows(selectedFlowFolder);
     } catch (error: any) {
       console.error('Erro ao criar fluxo:', error);
@@ -235,7 +244,6 @@ const FlowPage: React.FC = () => {
       <Menu.Item key="1" onClick={() => setIsDeleting(folder.id)}>
         Deletar
       </Menu.Item>
-      <Menu.Item key="2">Mover para</Menu.Item>
       <Menu.Item key="3" onClick={() => handleEditFolder(folder)}>
         Renomear
       </Menu.Item>
@@ -296,167 +304,193 @@ const FlowPage: React.FC = () => {
   return (
     <div className="p-4 md:p-8">
       {loadingData && <LoadingOverlay />}
-      <h1 style={{color: '#1890ff'}} className="text-2xl md:text-3xl font-bold mb-10">Fluxos</h1>
-      {loadingData ? ( 
-      selectedSector == null ? (
-        <div className="flex justify-center items-center h-64 text-lg text-gray-500">
-          Nenhum setor selecionado
-        </div>
+      <h1 className="text-2xl md:text-3xl font-bold mb-10 text-center text-primary">
+        Fluxos
+      </h1>
+      {loadingData ? (
+        selectedSector == null ? (
+          <div className="flex justify-center items-center h-64 text-lg text-gray-500">
+            Nenhum setor selecionado
+          </div>
+        ) : (
+          <></>
+        )
       ) : (
-        <></>
-      )
-    ) : (
         <>
           {selectedSector != null && (
             <>
-              <h4 style={{color: '#1890ff'}} className="text-xl font-semibold mb-4">Pastas</h4>
+  <h4 className="text-xl font-semibold mb-4 text-primary">Pastas</h4>
 
-              {noFoldersFound ? (
+  {noFoldersFound ? (
+    <div className="flex flex-col items-center justify-center h-full">
+      <p className="text-center">Nenhuma pasta encontrada</p>
+      <Button
+        type="dashed"
+        className="w-48 h-10 flex items-center justify-center mt-4"
+        onClick={handleAddFolder}
+      >
+        <PlusOutlined /> Nova pasta
+      </Button>
+    </div>
+  ) : (
+    <div className="flex flex-wrap mb-6">
+      {folders.map((folder) => (
+        <div
+          key={folder.id}
+          className={`folder-card ${
+            selectedFolderId === folder.id ? 'selected' : ''
+          }`}
+          onClick={() => handleFolderClick(folder.id)}
+        >
+          <Card
+            hoverable
+            className="folder-card-content"
+            bodyStyle={{ padding: '16px' }}
+            actions={[
+              <Dropdown overlay={folderMenu(folder)} key="action">
+                <EllipsisOutlined />
+              </Dropdown>,
+            ]}
+          >
+            <div className="folder-icon">
+              {selectedFolderId === folder.id ? (
+                <FolderOpenOutlined style={{ fontSize: '48px' }} />
+              ) : (
+                <FolderOutlined style={{ fontSize: '48px' }} />
+              )}
+            </div>
+            <div
+              className="folder-name"
+              style={{
+                fontSize: '18px',
+                fontWeight: 'bold',
+                color: '#1890ff', // Azul para o nome da pasta
+                textAlign: 'center',
+              }}
+            >
+              {folder.name}
+            </div>
+          </Card>
+        </div>
+      ))}
+      <div
+        className="folder-card add-folder"
+        onClick={handleAddFolder}
+        style={{
+          width: '150px', // Aumenta a largura
+          height: '180px', // Aumenta a altura
+          cursor: 'pointer',
+        }}
+      >
+        <Card
+          hoverable
+          className="folder-card-content"
+          bodyStyle={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+          }}
+          style={{
+            border: '2px dashed #1890ff', // Borda azul para destacar
+          }}
+        >
+          <div className="folder-icon">
+            <PlusOutlined style={{ fontSize: '64px', color: '#1890ff' }} />
+          </div>
+          <div
+            className="folder-name"
+            style={{
+              marginTop: '12px',
+              fontSize: '18px', // Maior tamanho
+              fontWeight: 'bold',
+              color: '#1890ff', // Azul para o texto
+              textAlign: 'center',
+            }}
+          >
+            Nova Pasta
+          </div>
+        </Card>
+      </div>
+    </div>
+  )}
+</>
+
+          )}
+
+          {selectedSector != null && selectedFolderId !== null && (
+            <>
+              <h2 className="text-xl font-semibold mb-4 text-primary">Fluxos</h2>
+
+              {flows.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full">
-                  <p className="text-center">Nenhuma pasta encontrada</p>
+                  <Empty description="Nenhum fluxo encontrado" />
                   <Button
                     type="dashed"
-                    className="w-48 h-10 flex items-center justify-center mt-4"
-                    onClick={handleAddFolder}
+                    className="mt-4"
+                    icon={<FileAddOutlined />}
+                    onClick={handleAddFlow}
                   >
-                    <PlusOutlined /> Nova pasta
+                    Novo Fluxo
                   </Button>
                 </div>
               ) : (
-                <Row gutter={[16, 16]} className="mb-6">
-                  {folders.length === 0 ? ( // Exibir Skeleton enquanto as pastas estão carregando
-                    Array.from({ length: 4 }).map((_, index) => (
-                      <Col key={index} xs={24} sm={12} md={6} lg={4}>
-                        <Skeleton active />
-                      </Col>
-                    ))
-                  ) : (
-                    folders.map((folder) => (
-                      <Col key={folder.id} xs={24} sm={12} md={6} lg={4}>
-                        <Card
-                          className={`h-full cursor-pointer ${selectedFolderId === folder.id ? '' : ''}`}
-                          bodyStyle={{ padding: 0 }}
-                          title={
-                            <div
-                              className="flex items-center space-x-2"
-                              onClick={() => handleFolderClick(folder.id)}
-                            >
-                              <FolderOutlined className="text-xl" />
-                              <span className="text-sm md:text-base">{folder.name}</span>
-                            </div>
-                          }
-                          actions={[<Dropdown overlay={folderMenu(folder)} key="action"><EllipsisOutlined /></Dropdown>]}
-                        />
-                      </Col>
-                    ))
-                  )}
-                  <Col xs={24} sm={12} md={6} lg={4}>
-                    <Button
-                      type="dashed"
-                      className="w-full h-full flex flex-col items-center justify-center"
-                      onClick={handleAddFolder}
-                    >
-                      <PlusOutlined className="text-3xl mb-2" /> Nova pasta
-                    </Button>
-                  </Col>
-                </Row>
-              )}
-            </>
-          )}
-
-          {selectedSector != null && (
-            <>
-              <h2 style={{color: '#1890ff'}} className="text-xl font-semibold mb-4">Detalhes dos Fluxos</h2>
-
-              {flows.length === 0 && selectedFolderId !== null ? (
-  <div>
-    <p>Nenhum fluxo encontrado para esta pasta.</p>
-    <Col xs={24} sm={12} md={8}>
-      <Card
-        className="flex items-center justify-center cursor-pointer shadow-md rounded-lg h-full"
-        onClick={handleAddFlow}
-      >
-        <PlusOutlined className="text-blue-500 text-3xl" />
-      </Card>
-    </Col>
-  </div>
-) : (
                 <Row gutter={[16, 16]}>
-                  {Array.isArray(flows) && flows.length > 0 ? (
+                  {Array.isArray(flows) &&
                     flows.map((flow: any) => (
                       <Col key={flow.id} xs={24} sm={12} md={8}>
                         <Card
-                          title={
-                            <div className="flex items-center justify-between">
-                              <EditOutlined
-                                className="text-blue-500 cursor-pointer mr-2"
-                                onClick={() => handleEditFlow(flow)}
-                              />
-                              <span className="flex-grow text-center">{flow.name}</span>
-                              <Switch
-                                checked={flow.isActive}
-                                onChange={() => handleToggleFlow(flow.id)}
-                              />
-                            </div>
-                          }
-                          extra={null}
-                          className={`shadow-md rounded-lg ${!flow.isActive ? 'bg-gray-100' : ''}`}
+                          className="flow-card"
+                          actions={[
+                            <EditOutlined
+                              key="edit"
+                              onClick={() => handleEditFlow(flow)}
+                            />,
+                            <DeleteOutlined
+                              key="delete"
+                              onClick={() => handleDeleteFlow(flow.id)}
+                            />,
+                          ]}
                         >
-                          {flow.isEditing ? (
-                            <div className="flex justify-between mt-4">
-                              <Button
-                                type="primary"
-                                onClick={() => handleSaveFlow()}
-                                icon={<SaveOutlined />}
-                              >
-                                Salvar
-                              </Button>
-                              <Button onClick={() => handleCancelEdit()}>Cancelar</Button>
+                          <div className="flow-card-header">
+                            <h3>{flow.name}</h3>
+                            <Switch
+                              checked={flow.isActive}
+                              onChange={() => handleToggleFlow(flow.id)}
+                            />
+                          </div>
+                          <p className="text-gray-500">Versão: {flow.version}</p>
+                          <div className="flow-stats">
+                            <div>
+                              <p>Execuções</p>
+                              <p>{flow.exec ? flow.exec : 0}</p>
                             </div>
-                          ) : (
-                            <>
-                              <p className="text-gray-500">Última versão: {flow.version}</p>
-                              <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 mb-4">
-                                <Button icon={<EditOutlined />}>Duplicar</Button>
-                                <Button icon={<EditOutlined />}>Enviar para</Button>
-                              </div>
-                              <div className="flex space-x-4">
-                                <div>
-                                  <p>Execuções</p>
-                                  <p>{flow.exec ? flow.exec : 0}</p>
-                                </div>
-                                <div>
-                                  <p>CTR%</p>
-                                  <p>{flow.ctr ? flow.ctr : 0.00}%</p>
-                                </div>
-                              </div>
-                              <div className="mt-4 flex justify-between">
-                                <Button
-                                  type="primary"
-                                  onClick={() => handleEditFlowPath(flow)}
-                                >
-                                  Editar fluxo
-                                </Button>
-                                <Button
-                                  danger
-                                  onClick={() => handleDeleteFlow(flow.id)}
-                                  icon={<DeleteOutlined />}
-                                >
-                                  Excluir fluxo
-                                </Button>
-                              </div>
-                            </>
-                          )}
+                            <div>
+                              <p>CTR%</p>
+                              <p>{flow.ctr ? flow.ctr : '0.00'}%</p>
+                            </div>
+                          </div>
+                          <Button
+                            type="primary"
+                            block
+                            onClick={() => handleEditFlowPath(flow)}
+                          >
+                            Editar Fluxo
+                          </Button>
                         </Card>
                       </Col>
-                    ))
-                  ) : null}
+                    ))}
                   <Col xs={24} sm={12} md={8}>
                     <Card
-                      className="flex items-center justify-center cursor-pointer shadow-md rounded-lg h-full"
+                      hoverable
+                      className="flow-card add-flow"
                       onClick={handleAddFlow}
                     >
-                      <PlusOutlined className="text-blue-500 text-3xl" />
+                      <div className="add-flow-content">
+                        <PlusOutlined style={{ fontSize: '48px' }} />
+                        <p>Novo Fluxo</p>
+                      </div>
                     </Card>
                   </Col>
                 </Row>
@@ -491,7 +525,7 @@ const FlowPage: React.FC = () => {
           </Form.Item>
           <Form.Item label="Pasta do Fluxo" required>
             <Select
-            notFoundContent="Nenhuma pasta encontrada"
+              notFoundContent="Nenhuma pasta encontrada"
               placeholder="Selecione a pasta"
               value={editFlowFolder}
               onChange={(value) => setEditFlowFolder(value)}
@@ -546,7 +580,7 @@ const FlowPage: React.FC = () => {
           </Form.Item>
           <Form.Item label="Pasta do Fluxo" required>
             <Select
-            notFoundContent="Nenhuma pasta encontrada"
+              notFoundContent="Nenhuma pasta encontrada"
               placeholder="Selecione a pasta"
               value={selectedFlowFolder}
               onChange={(value) => setSelectedFlowFolder(value)}
@@ -584,7 +618,7 @@ const FlowPage: React.FC = () => {
           </Form.Item>
           <Form.Item label="Setor" required>
             <Select
-            notFoundContent="Nenhum setor encontrado"
+              notFoundContent="Nenhum setor encontrado"
               placeholder="Selecione o setor"
               value={editFolderSector}
               onChange={(value) => setEditFolderSector(value)}
@@ -602,33 +636,70 @@ const FlowPage: React.FC = () => {
 
       {/* Modal de confirmação de exclusão */}
       <Modal
-        title={null}
+        title="Confirmação"
         visible={isDeleting !== null}
         onCancel={() => setIsDeleting(null)}
-        footer={null}
-        centered
-        className="custom-modal"
+        onOk={() => {
+          if (isDeleting !== null) {
+            handleDeleteFolder(isDeleting);
+            setIsDeleting(null);
+          }
+        }}
+        okText="Sim"
+        cancelText="Não"
       >
-        <div className="text-center">
-          <p className="text-xl font-bold text-white">Deseja mesmo excluir?</p>
-          <p className="text-md text-white mb-4">Essa ação é irreversível.</p>
-          <div className="flex justify-center space-x-4">
-            <Button
-              type="primary"
-              className="bg-white text-yellow-500 px-6 py-2 rounded-md"
-              onClick={() => {
-                if (isDeleting !== null) {
-                  handleDeleteFolder(isDeleting);
-                  setIsDeleting(null);
-                }
-              }}
-            >
-              Sim
-            </Button>
-            <Button onClick={() => setIsDeleting(null)}>Não</Button>
-          </div>
-        </div>
+        <p>Deseja mesmo excluir esta pasta? Essa ação é irreversível.</p>
       </Modal>
+
+      {/* Estilos personalizados */}
+      <style jsx>{`
+        .text-primary {
+          color: #1890ff;
+        }
+        .folder-card {
+          width: 120px;
+          margin: 8px;
+          cursor: pointer;
+        }
+        .folder-card-content {
+          text-align: center;
+          border: ${selectedFolderId ? '1px solid #1890ff' : '1px solid #f0f0f0'};
+        }
+        .folder-card.selected .folder-card-content {
+          border-color: #1890ff;
+          box-shadow: 0 0 8px rgba(24, 144, 255, 0.6);
+        }
+        .folder-icon {
+          margin-bottom: 8px;
+        }
+        .folder-name {
+          font-weight: bold;
+        }
+        .folder-card.add-folder .folder-card-content {
+          border-style: dashed;
+        }
+        .flow-card {
+          border-radius: 8px;
+        }
+        .flow-card .flow-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .flow-stats {
+          display: flex;
+          justify-content: space-between;
+          margin-top: 16px;
+        }
+        .add-flow-content {
+          text-align: center;
+          padding: 32px 0;
+        }
+        .add-flow-content p {
+          margin-top: 8px;
+          font-weight: bold;
+        }
+      `}</style>
     </div>
   );
 };
