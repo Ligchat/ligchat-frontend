@@ -549,9 +549,9 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
         );
       }}
     >
-      <Option value="contém">Contém</Option>
-      <Option value="não contém">Não contém</Option>
-      <Option value="é igual a">É igual a</Option>
+      <Option value="contem">Contém</Option>
+      <Option value="diferente">Não contém</Option>
+      <Option value="igual">É igual a</Option>
     </Select>
 
     {/* Campo de entrada do valor */}
