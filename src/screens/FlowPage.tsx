@@ -305,7 +305,7 @@ const FlowPage: React.FC = () => {
   return (
     <div className="p-4 md:p-8">
       {loadingData && <LoadingOverlay />}
-      <h1 className="text-2xl md:text-3xl font-bold mb-10 text-center text-primary">
+      <h1 className="text-2xl md:text-3xl font-bold mb-10 text-left text-primary">
         Fluxos
       </h1>
       {loadingData ? (
