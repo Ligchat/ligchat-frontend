@@ -12,6 +12,7 @@ import {
 import SessionService from '../services/SessionService';
 import LoadingOverlay from '../components/LoadingOverlay';
 import axios from 'axios';
+import './SectorsPage.css';
 
 const { TextArea } = Input;
 
@@ -21,7 +22,7 @@ interface Sector {
   userBusinessId?: number;
   phoneNumberId: string;
   accessToken: string;
-  description: string;
+  description: string; 
   googleClientId?: string;
   googleApiKey?: string;
 }
@@ -235,12 +236,12 @@ const SectorsPage: React.FC = () => {
           <Col xs={24} sm={12} md={8} key={sector.id}>
             <Card
               title={sector.name}
-              extra={
+              extra={(
                 <div className="flex space-x-2">
                   <EditOutlined className="text-blue-500 cursor-pointer" onClick={() => handleEditSector(sector)} />
                   <DeleteOutlined className="text-red-500 cursor-pointer" onClick={() => handleDeleteClick(sector.id)} />
                 </div>
-              }
+              )}
             >
               <Skeleton active loading={isLoading}>
                 <p><strong>Descrição:</strong> {truncateText(sector.description, 50)}</p>
@@ -376,115 +377,129 @@ const SectorsPage: React.FC = () => {
       </Row>
 
       <Drawer
-        title={currentSector?.name}
+        title={<div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1890ff' }}>{currentSector?.name}</div>}
         placement="right"
         onClose={closeDrawer}
         visible={isDrawerVisible}
         width={400}
+        bodyStyle={{ margin: '20px', backgroundColor: '#f9f9f9' }} // Cor de fundo mais suave
+        mask={false}
       >
-        <label style={{ marginBottom: '10px', marginTop: '10px' }}>Nome do setor</label>
-        <Input
-          placeholder="Nome do setor"
-          value={sectorData.name}
-          onChange={(e) => setSectorData({ ...sectorData, name: e.target.value })}
-          style={{
-            marginTop: 10,
-            marginBottom: '10px',
-            borderColor: errors.name ? 'red' : undefined,
-            maxWidth: '100%',
-          }}
-          disabled={isLoading}
-        />
-        {errors.name && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.name}</p>}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ marginBottom: '5px', display: 'block' }}>Nome do setor</label>
+          <Input
+            placeholder="Nome do setor"
+            value={sectorData.name}
+            onChange={(e) => setSectorData({ ...sectorData, name: e.target.value })}
+            style={{
+              marginBottom: '10px',
+              borderColor: errors.name ? 'red' : undefined,
+              borderRadius: '4px', // Bordas arredondadas
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)', // Sombra leve
+            }}
+            disabled={isLoading}
+          />
+          {errors.name && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.name}</p>}
+        </div>
 
-        <label style={{ marginBottom: '5px', marginTop: '10px' }}>Descrição</label>
-        <TextArea
-          rows={2}
-          placeholder="Descrição"
-          value={sectorData.description}
-          onChange={(e) => setSectorData({ ...sectorData, description: e.target.value })}
-          style={{
-            marginTop: 10,
-            marginBottom: '10px',
-            resize: 'none',
-            borderColor: errors.description ? 'red' : undefined,
-            maxWidth: '100%',
-            overflow: 'hidden',
-          }}
-          disabled={isLoading}
-        />
-        {errors.description && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.description}</p>}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ marginBottom: '5px', display: 'block' }}>Descrição</label>
+          <TextArea
+            rows={2}
+            placeholder="Descrição"
+            value={sectorData.description}
+            onChange={(e) => setSectorData({ ...sectorData, description: e.target.value })}
+            style={{
+              marginBottom: '10px',
+              resize: 'none',
+              borderColor: errors.description ? 'red' : undefined,
+              borderRadius: '4px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            }}
+            disabled={isLoading}
+          />
+          {errors.description && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.description}</p>}
+        </div>
 
         <h3 className="text-lg font-semibold mb-2" style={{ color: '#1890ff', marginTop: '10px' }}>Configuração da Meta</h3>
-        <label style={{ marginBottom: '5px', marginTop: '10px' }}>Identificação do telefone</label>
-        <Input
-          placeholder="Identificação do telefone"
-          value={sectorData.phoneNumberId}
-          onChange={(e) => setSectorData({ ...sectorData, phoneNumberId: e.target.value })}
-          style={{
-            marginTop: 10,
-            marginBottom: '10px',
-            borderColor: errors.phoneNumberId ? 'red' : undefined,
-            maxWidth: '100%',
-          }}
-          disabled={isLoading}
-        />
-        {errors.phoneNumberId && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.phoneNumberId}</p>}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ marginBottom: '5px', display: 'block' }}>Identificação do telefone</label>
+          <Input
+            placeholder="Identificação do telefone"
+            value={sectorData.phoneNumberId}
+            onChange={(e) => setSectorData({ ...sectorData, phoneNumberId: e.target.value })}
+            style={{
+              marginBottom: '10px',
+              borderColor: errors.phoneNumberId ? 'red' : undefined,
+              borderRadius: '4px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            }}
+            disabled={isLoading}
+          />
+          {errors.phoneNumberId && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.phoneNumberId}</p>}
+        </div>
 
-        <label style={{ marginBottom: '5px', marginTop: '10px' }}>Token de acesso</label>
-        <TextArea
-          rows={5}
-          placeholder="Token de acesso"
-          value={sectorData.accessToken}
-          onChange={(e) => setSectorData({ ...sectorData, accessToken: e.target.value })}
-          style={{
-            marginTop: 10,
-            marginBottom: '10px',
-            borderColor: errors.accessToken ? 'red' : undefined,
-            maxWidth: '100%',
-            whiteSpace: 'normal',
-          }}
-          disabled={isLoading}
-        />
-        {errors.accessToken && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.accessToken}</p>}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ marginBottom: '5px', display: 'block' }}>Token de acesso</label>
+          <TextArea
+            rows={2}
+            placeholder="Token de acesso"
+            value={sectorData.accessToken}
+            onChange={(e) => setSectorData({ ...sectorData, accessToken: e.target.value })}
+            style={{
+              marginBottom: '10px',
+              borderColor: errors.accessToken ? 'red' : undefined,
+              borderRadius: '4px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            }}
+            disabled={isLoading}
+          />
+          {errors.accessToken && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.accessToken}</p>}
+        </div>
 
         <h3 className="text-lg font-semibold mb-2" style={{ color: '#1890ff', marginTop: '10px' }}>Configuração do Google</h3>
-        <label style={{ marginBottom: '5px', marginTop: '10px' }}>Google Client ID</label>
-        <Input
-          placeholder="Google Client ID"
-          value={sectorData.googleClientId}
-          onChange={(e) => setSectorData({ ...sectorData, googleClientId: e.target.value })}
-          style={{
-            marginTop: 10,
-            marginBottom: '10px',
-            borderColor: errors.googleClientId ? 'red' : undefined,
-            maxWidth: '100%',
-          }}
-          disabled={isLoading}
-        />
-        {errors.googleClientId && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.googleClientId}</p>}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ marginBottom: '5px', display: 'block' }}>Google Client ID</label>
+          <Input
+            placeholder="Google Client ID"
+            value={sectorData.googleClientId}
+            onChange={(e) => setSectorData({ ...sectorData, googleClientId: e.target.value })}
+            style={{
+              marginBottom: '10px',
+              borderColor: errors.googleClientId ? 'red' : undefined,
+              borderRadius: '4px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            }}
+            disabled={isLoading}
+          />
+          {errors.googleClientId && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.googleClientId}</p>}
+        </div>
 
-        <label style={{ marginBottom: '5px', marginTop: '10px' }}>Google API Key</label>
-        <Input
-          placeholder="Google API Key"
-          value={sectorData.googleApiKey}
-          onChange={(e) => setSectorData({ ...sectorData, googleApiKey: e.target.value })}
-          style={{
-            marginTop: 10,
-            marginBottom: '10px',
-            borderColor: errors.googleApiKey ? 'red' : undefined,
-            maxWidth: '100%',
-          }}
-          disabled={isLoading}
-        />
-        {errors.googleApiKey && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.googleApiKey}</p>}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ marginBottom: '5px', display: 'block' }}>Google API Key</label>
+          <Input
+            placeholder="Google API Key"
+            value={sectorData.googleApiKey}
+            onChange={(e) => setSectorData({ ...sectorData, googleApiKey: e.target.value })}
+            style={{
+              marginBottom: '10px',
+              borderColor: errors.googleApiKey ? 'red' : undefined,
+              borderRadius: '4px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            }}
+            disabled={isLoading}
+          />
+          {errors.googleApiKey && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.googleApiKey}</p>}
+        </div>
 
-        <Button className="mt-4" type="primary" onClick={handleSave} disabled={isLoading}>
-          Salvar
-        </Button>
-        <Button className="mt-4 ml-2" onClick={closeDrawer} disabled={isLoading}>
-          Cancelar
-        </Button>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Button className="mt-4" type="primary" onClick={handleSave} disabled={isLoading}>
+            Salvar
+          </Button>
+          <Button className="mt-4 ml-2" onClick={closeDrawer} disabled={isLoading}>
+            Cancelar
+          </Button>
+        </div>
       </Drawer>
     </div>
   );

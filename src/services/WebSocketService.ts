@@ -11,7 +11,7 @@ export class WebSocketService {
   private currentSectorId: string | null = null;
   private isIntentionalClose = false;
 
-  constructor(private baseUrl: string = 'wss://7f1d-177-84-243-104.ngrok-free.app') {}
+  constructor(private baseUrl: string = 'wss://whatsapp.ligchat.site') {}
 
   connect(sectorId: string) {
     if (this.ws?.readyState === WebSocket.OPEN) {

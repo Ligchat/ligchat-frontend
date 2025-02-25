@@ -1,0 +1,9 @@
+/* Estilos personalizados para o SectorsPage */
+
+.ant-drawer {
+    z-index: 1001; /* Garantindo que o Drawer fique acima do overlay */
+}
+
+.ant-drawer-body {
+    padding: 20px; /* Ajustando o padding do corpo do Drawer */
+} 

@@ -5,6 +5,7 @@ import Logo from '../assets/images/Logo.png';
 import { SendVerificationCodeRequestDTO, VerifyCodeRequestDTO } from '../interfaces/AuthInterface';
 import { sendVerificationCode, verifyCode } from '../services/AuthService';
 import SessionService from '../services/SessionService';
+import '../styles/LoginScreen/LoginScreen.css'; // Importar um arquivo CSS para estilos adicionais
 
 const { Content, Footer } = Layout; // Importar Footer
 const { TabPane } = Tabs;
@@ -117,14 +118,7 @@ const LoginScreen: React.FC = () => {
   return (
     <Layout className="layout">
       <Content
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          minHeight: '100vh',
-          padding: '0 50px',
-          flexDirection: 'row',
-        }}
+        className="content"
       >
         {/* Modal para Sessão Expirada */}
         <Modal
@@ -141,19 +135,16 @@ const LoginScreen: React.FC = () => {
           <p>Efetue o login novamente.</p>
         </Modal>
 
-        {/* Remover o modal de Política de Privacidade e Termos de Uso */}
-        {/* ... Modal removido ... */}
-
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div className="logo-container">
           <img
             src={Logo}
             alt="LigChat Logo"
-            style={{ maxWidth: '150px', minWidth: '150px', maxHeight: 150, minHeight: 150 }}
+            className="logo"
           />
         </div>
 
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-          <div style={{ width: '100%', maxWidth: '400px' }}>
+        <div className="form-container">
+          <div className="form-wrapper">
             <Tabs activeKey={activeTab} centered>
               <TabPane tab="Email ou número" key="1">
                 <Form layout="vertical" onFinish={handleSendEmail}>
@@ -230,7 +221,7 @@ const LoginScreen: React.FC = () => {
               </TabPane>
             </Tabs>
 
-            {/* Adicionar links para Política de Privacidade e Termos de Uso abaixo do formulário */}
+            {/* Links para Política de Privacidade e Termos de Uso */}
             <div style={{ marginTop: 20, textAlign: 'center' }}>
               <Link to="/privacy-policy">Política de Privacidade</Link> |{' '}
               <Link to="/terms-of-use">Termos de Uso</Link>
@@ -238,12 +229,6 @@ const LoginScreen: React.FC = () => {
           </div>
         </div>
       </Content>
-
-      {/* Footer opcional com os links */}
-      <Footer style={{ textAlign: 'center' }}>
-        <Link to="/privacy-policy">Política de Privacidade</Link> |{' '}
-        <Link to="/terms-of-use">Termos de Uso</Link>
-      </Footer>
     </Layout>
   );
 };

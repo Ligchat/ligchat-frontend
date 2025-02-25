@@ -1,26 +1,29 @@
 import React from 'react';
-import { Layout, Typography } from 'antd';
+import { Layout, Typography, Divider } from 'antd';
+import '../styles/PrivacyPolicyPage.css'; // Importar o CSS
 
 const { Content } = Layout;
 const { Title, Paragraph } = Typography;
 
 const PrivacyPolicyPage: React.FC = () => {
   return (
-    <Layout className="layout">
-      <Content style={{ padding: '50px', maxWidth: '800px', margin: '0 auto' }}>
-        <Title level={2}>Política de Privacidade</Title>
-        <Paragraph>
+    <Layout className="privacy-policy-layout">
+      <Content className="privacy-policy-content">
+        <Title level={2} className="privacy-policy-title">Política de Privacidade</Title>
+        <Paragraph className="privacy-policy-paragraph">
           <strong>Última atualização:</strong> 17/10/2024
         </Paragraph>
 
-        <Paragraph>
+        <Paragraph className="privacy-policy-paragraph">
           Bem-vindo à nossa plataforma SaaS. Sua privacidade é importante para nós. Esta Política de Privacidade
           descreve como coletamos, usamos, compartilhamos e protegemos suas informações pessoais.
         </Paragraph>
 
-        <Title level={3}>1. Informações que Coletamos</Title>
-        <Paragraph>
-          <ul>
+        <Divider />
+
+        <Title level={3} className="privacy-policy-title">1. Informações que Coletamos</Title>
+        <Paragraph className="privacy-policy-paragraph">
+          <ul className="privacy-policy-list">
             <li>
               <strong>Dados de Registro:</strong> Nome, endereço de e-mail, número de telefone e outras informações
               necessárias para criar sua conta.
@@ -40,9 +43,11 @@ const PrivacyPolicyPage: React.FC = () => {
           </ul>
         </Paragraph>
 
-        <Title level={3}>2. Como Usamos suas Informações</Title>
-        <Paragraph>
-          <ul>
+        <Divider />
+
+        <Title level={3} className="privacy-policy-title">2. Como Usamos suas Informações</Title>
+        <Paragraph className="privacy-policy-paragraph">
+          <ul className="privacy-policy-list">
             <li>
               <strong>Fornecimento de Serviços:</strong> Para operar e manter a plataforma.
             </li>
@@ -59,9 +64,11 @@ const PrivacyPolicyPage: React.FC = () => {
           </ul>
         </Paragraph>
 
-        <Title level={3}>3. Compartilhamento de Informações</Title>
-        <Paragraph>
-          <ul>
+        <Divider />
+
+        <Title level={3} className="privacy-policy-title">3. Compartilhamento de Informações</Title>
+        <Paragraph className="privacy-policy-paragraph">
+          <ul className="privacy-policy-list">
             <li>
               <strong>Com Terceiros de Confiança:</strong> Prestadores de serviços que auxiliam na operação da
               plataforma, sob acordos de confidencialidade.
@@ -75,16 +82,20 @@ const PrivacyPolicyPage: React.FC = () => {
           </ul>
         </Paragraph>
 
-        <Title level={3}>4. Segurança dos Dados</Title>
-        <Paragraph>
+        <Divider />
+
+        <Title level={3} className="privacy-policy-title">4. Segurança dos Dados</Title>
+        <Paragraph className="privacy-policy-paragraph">
           Implementamos medidas de segurança adequadas para proteger suas informações contra acesso não autorizado,
           alteração, divulgação ou destruição. Utilizamos protocolos seguros de comunicação e armazenamento, além de
           controles de acesso restrito às informações pessoais.
         </Paragraph>
 
-        <Title level={3}>5. Seus Direitos</Title>
-        <Paragraph>
-          <ul>
+        <Divider />
+
+        <Title level={3} className="privacy-policy-title">5. Seus Direitos</Title>
+        <Paragraph className="privacy-policy-paragraph">
+          <ul className="privacy-policy-list">
             <li>
               <strong>Acesso e Correção:</strong> Você pode acessar e atualizar suas informações pessoais a qualquer
               momento através das configurações da sua conta.
@@ -99,43 +110,19 @@ const PrivacyPolicyPage: React.FC = () => {
           </ul>
         </Paragraph>
 
-        <Title level={3}>6. Retenção de Dados</Title>
-        <Paragraph>
-          Manteremos suas informações pelo tempo necessário para cumprir os propósitos descritos nesta política, a menos
-          que um período de retenção mais longo seja exigido ou permitido por lei. Ao final deste período, as informações
-          serão excluídas ou anonimizadas de forma segura.
-        </Paragraph>
+        <Divider />
 
-        <Title level={3}>7. Transferência Internacional de Dados</Title>
-        <Paragraph>
-          Suas informações podem ser transferidas e mantidas em servidores localizados fora do seu estado, província ou
-          país, onde as leis de proteção de dados podem ser diferentes das de sua jurisdição. Tomamos medidas para
-          assegurar que suas informações sejam tratadas de forma segura e de acordo com esta política.
-        </Paragraph>
-
-        <Title level={3}>8. Sites de Terceiros</Title>
-        <Paragraph>
-          Nossa plataforma pode conter links para outros sites que não são operados por nós. Não nos responsabilizamos
-          pelo conteúdo ou práticas de privacidade de sites de terceiros. Recomendamos que você revise a política de
-          privacidade de cada site que visitar.
-        </Paragraph>
-
-        <Title level={3}>9. Privacidade de Menores</Title>
-        <Paragraph>
-          Nossos serviços não são direcionados a menores de 18 anos. Não coletamos intencionalmente informações pessoais
-          de menores. Se você é pai ou responsável e sabe que seu filho nos forneceu informações pessoais, entre em
-          contato conosco para que possamos tomar as medidas necessárias.
-        </Paragraph>
-
-        <Title level={3}>10. Alterações nesta Política</Title>
-        <Paragraph>
+        <Title level={3} className="privacy-policy-title">6. Alterações nesta Política</Title>
+        <Paragraph className="privacy-policy-paragraph">
           Podemos atualizar nossa Política de Privacidade periodicamente. Notificaremos sobre quaisquer alterações
           publicando a nova política nesta página e atualizando a data de "Última atualização" no topo. Recomendamos que
           você revise esta política regularmente para se manter informado sobre como protegemos suas informações.
         </Paragraph>
 
-        <Title level={3}>11. Contato</Title>
-        <Paragraph>
+        <Divider />
+
+        <Title level={3} className="privacy-policy-title">7. Contato</Title>
+        <Paragraph className="privacy-policy-paragraph">
           Se tiver dúvidas ou preocupações sobre esta Política de Privacidade, entre em contato conosco através dos meios
           disponíveis em nossa plataforma.
         </Paragraph>

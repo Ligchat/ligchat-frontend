@@ -1,0 +1,65 @@
+/* LoginScreen.css */
+.layout {
+  padding: 0 50px; /* Padding padrão para web */
+}
+
+.content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 100vh;
+  flex-direction: row;
+}
+
+.logo-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.logo {
+  max-width: 150px;
+  height: auto;
+}
+
+.form-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.form-wrapper {
+  width: 100%;
+  max-width: 400px;
+}
+
+/* Media Queries para Responsividade */
+@media (max-width: 768px) {
+  .layout {
+    padding: 0 10px; /* Reduzir o padding em telas menores */
+  }
+
+  .content {
+    flex-direction: column; /* Mudar para coluna em telas menores */
+    align-items: center; /* Centralizar os itens */
+  }
+
+  .logo {
+    max-width: 100%; /* Ajustar a imagem para ser responsiva */
+    max-height: 150px; /* Limitar a altura máxima */
+  }
+
+  .form-wrapper {
+    width: 100%; /* Formulário ocupa toda a largura */
+  }
+
+  .ant-tabs {
+    font-size: 14px; /* Ajustar o tamanho da fonte das tabs */
+  }
+
+  .ant-btn {
+    width: 100%; /* Botões ocupam toda a largura */
+  }
+}

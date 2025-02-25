@@ -1,0 +1,33 @@
+.privacy-policy-layout {
+  padding: 0 20px; /* Padding padrão para mobile */
+  background-color: #e6f7ff; /* Fundo azul claro */
+}
+
+.privacy-policy-content {
+  background-color: #ffffff; /* Fundo branco para o conteúdo */
+  border-radius: 12px; /* Bordas arredondadas */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15); /* Sombra mais suave */
+  padding: 40px; /* Padding interno aumentado */
+  margin: 30px auto; /* Margem centralizada */
+  max-width: 900px; /* Largura máxima aumentada */
+}
+
+.privacy-policy-title {
+  color: #007bff; /* Tom azul vibrante para títulos */
+  margin-bottom: 20px; /* Espaçamento inferior */
+}
+
+.privacy-policy-paragraph {
+  color: #333; /* Texto escuro para parágrafos */
+  line-height: 1.6; /* Aumentar a altura da linha para melhor legibilidade */
+}
+
+.privacy-policy-list {
+  margin-left: 20px; /* Margem para listas */
+}
+
+@media (min-width: 768px) {
+  .privacy-policy-layout {
+    padding: 0 60px; /* Padding padrão para web */
+  }
+} 
