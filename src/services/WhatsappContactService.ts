@@ -41,7 +41,7 @@ export const getMessagesByContactId = async (contactId: number): Promise<Message
 
 export const getWhatsAppContacts = async (sectorId: number): Promise<WhatsAppContact[]> => {
     try {
-        const response = await axios.get(`${WHATSAPP_API_URL}/contacts/${sectorId}`);
+        const response = await axios.get(`${WHATSAPP_API_URL}/contact/${sectorId}`);
         // Garante que sempre retornamos um array
         const contacts = Array.isArray(response.data) ? response.data : 
                         response.data?.data ? response.data.data : [];
