@@ -140,7 +140,7 @@ export const normalizeMessage = (message: MessageType): MessageType => {
 // Função para buscar contatos
 export const getWhatsAppContacts = async (sectorId: number): Promise<any[]> => {
   try {
-    const response = await axios.get(`/server/api/whatsapp/contacts/${sectorId}`);
+    const response = await axios.get(`/server/api/whatsapp/contact/${sectorId}`);
     return response.data || [];
   } catch (error) {
     console.error("Erro ao buscar contatos:", error);
