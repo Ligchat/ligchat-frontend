@@ -16,32 +16,35 @@ import EditFlowPage from './screens/EditFlowPage';
 import VariablesPage from './screens/VariablesPage';
 import PrivacyPolicyPage from './screens/PrivacyPolicyPage';
 import TermsOfUsePage from './screens/TermsOfUsePage';
+import { MenuProvider } from './contexts/MenuContext';
 
 const AppRoutes: React.FC = () => {
   return (
-    <Routes>
-      {/* Rota de login sem o menu */}
-      <Route path="/" element={<LoginScreen />} />
-      <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-      <Route path="/terms-of-use" element={<TermsOfUsePage />} />
+    <MenuProvider>
+      <Routes>
+        {/* Rota de login sem o menu */}
+        <Route path="/" element={<LoginScreen />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms-of-use" element={<TermsOfUsePage />} />
 
-      {/* Rotas que usam o MainLayout */}
-      <Route element={<MainLayout />}>
-        {/* Coloque aqui as rotas que terão o menu lateral */}
-        <Route path="/dashboard" element={<HomeScreen />} />
-        <Route path="/chat" element={<ChatPage />} />
-        <Route path="/labels" element={<LabelPage/>}/>
-        <Route path="/crm" element={<CRMPage/>}/>
-        <Route path="/message/schedule" element={<MessageSchedule/>}/>
-        <Route path="/access" element={<AccessPage/>}/>
-        <Route path="/sector" element={<SectorsPage/>}/>
-        <Route path="/webhook" element={<WebhookPage/>}/>
-        <Route path="/profile" element={<ProfilePage/>}/>
-        <Route path="/flow" element={<FlowPage/>}/>
-        <Route path="/flow/variable" element={<VariablesPage/>}/>
-        <Route path="/flow/edit/:id" element={<EditFlowPage flowId={''} />} />
-      </Route>
-    </Routes>
+        {/* Rotas que usam o MainLayout */}
+        <Route element={<MainLayout />}>
+          {/* Coloque aqui as rotas que terão o menu lateral */}
+          <Route path="/dashboard" element={<HomeScreen />} />
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/labels" element={<LabelPage/>}/>
+          <Route path="/crm" element={<CRMPage/>}/>
+          <Route path="/message/schedule" element={<MessageSchedule/>}/>
+          <Route path="/access" element={<AccessPage/>}/>
+          <Route path="/sector" element={<SectorsPage/>}/>
+          <Route path="/webhook" element={<WebhookPage/>}/>
+          <Route path="/profile" element={<ProfilePage/>}/>
+          <Route path="/flow" element={<FlowPage/>}/>
+          <Route path="/flow/variable" element={<VariablesPage/>}/>
+          <Route path="/flow/edit/:id" element={<EditFlowPage flowId={''} />} />
+        </Route>
+      </Routes>
+    </MenuProvider>
   );
 };
 

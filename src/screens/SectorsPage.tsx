@@ -12,12 +12,11 @@ import {
 import SessionService from '../services/SessionService';
 import LoadingOverlay from '../components/LoadingOverlay';
 import axios from 'axios';
-import { validateMetaCredentials } from '../services/MetaValidationService';
 
 const { TextArea } = Input;
 
 interface Sector {
-  id?: number;
+  id?: number; 
   name: string;
   userBusinessId?: number;
   phoneNumberId: string;
@@ -134,39 +133,44 @@ const SectorsPage: React.FC = () => {
     }
   
     try {
-      const validationResult = await validateMetaCredentials(sectorData.accessToken, sectorData.phoneNumberId);
-  
-      if (validationResult.message !== 'Token e phone_id são válidos.') {
-        setErrors({
-          ...validationErrors,
-          accessToken: 'Token ou id da telefone inválido.',
-        });
-        return;
-      }
-  
       setIsLoading(true);
       const token = SessionService.getSession('authToken');
-      const decodedToken = token ? SessionService.decodeToken(token) : null;
-      const userBusinessId = decodedToken ? decodedToken.userId : null;
-  
-      if (userBusinessId) {
-        const updatedSectorData: Sector = {
-          ...sectorData,
-          userBusinessId,
-        };
-  
-        if (newSector) {
-          await createSector(updatedSectorData);
-        } else if (updatedSectorData.id) {
-          await updateSector(updatedSectorData.id, updatedSectorData);
-        }
-  
-        await fetchSectors();
-        setNewSector(false);
-        closeDrawer();
-      } else {
-        console.error('Erro ao obter userBusinessId do token.');
+      
+      if (!token) {
+        console.error('Token de autenticação não encontrado');
+        return;
       }
+
+      const decodedToken = SessionService.decodeToken(token);
+      console.log('Token decodificado:', decodedToken); // Debug
+
+      if (!decodedToken) {
+        console.error('Falha ao decodificar o token');
+        return;
+      }
+
+      const userBusinessId = decodedToken.userId;
+      console.log('userBusinessId:', userBusinessId); // Debug
+
+      if (!userBusinessId) {
+        console.error('userId não encontrado no token decodificado');
+        return;
+      }
+
+      const updatedSectorData: Sector = {
+        ...sectorData,
+        userBusinessId,
+      };
+  
+      if (newSector) {
+        await createSector(updatedSectorData);
+      } else if (updatedSectorData.id) {
+        await updateSector(updatedSectorData.id, updatedSectorData);
+      }
+  
+      await fetchSectors();
+      setNewSector(false);
+      closeDrawer();
     } catch (error) {
       console.error('Erro ao salvar setor:', error);
     } finally {

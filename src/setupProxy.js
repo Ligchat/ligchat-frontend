@@ -1,21 +1,25 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = function(app) {
+    // Proxy para o serviço WhatsApp
     app.use(
-        '/job',  
+        '/whatsapp',
         createProxyMiddleware({
             target: 'http://localhost:5167',
             changeOrigin: true,
-            pathRewrite: { '^/job': '' } 
+            secure: false,
+            logLevel: 'debug'
         })
     );
 
+    // Proxy para o backend principal
     app.use(
-        '/server',
+        '/api',
         createProxyMiddleware({
             target: 'http://localhost:5251',
             changeOrigin: true,
-            pathRewrite: { '^/server': '' }
+            secure: false,
+            logLevel: 'debug'
         })
     );
 };

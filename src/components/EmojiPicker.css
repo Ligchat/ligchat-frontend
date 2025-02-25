@@ -1,0 +1,70 @@
+.emoji-picker-wrapper {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 8px;
+  z-index: 1000;
+}
+
+.emoji-picker-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  width: 352px;
+}
+
+/* Estilização do Emoji Mart */
+.emoji-picker-container [data-emoji-mart] {
+  border: none !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Cabeçalho de pesquisa */
+.emoji-picker-container [data-emoji-mart] input {
+  border-radius: 8px !important;
+  border: 1px solid #e0e0e0 !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  margin: 8px !important;
+  width: calc(100% - 16px) !important;
+}
+
+/* Categorias */
+.emoji-picker-container [data-emoji-mart] nav {
+  padding: 0 8px !important;
+}
+
+.emoji-picker-container [data-emoji-mart] button {
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+}
+
+.emoji-picker-container [data-emoji-mart] button:hover {
+  background-color: #f0f2f5 !important;
+}
+
+/* Container dos emojis */
+.emoji-picker-container [data-emoji-mart] section {
+  padding: 0 8px !important;
+}
+
+/* Emojis individuais */
+.emoji-picker-container [data-emoji-mart] button.emoji-mart-emoji {
+  border-radius: 6px !important;
+  margin: 2px !important;
+  transition: transform 0.1s ease !important;
+}
+
+.emoji-picker-container [data-emoji-mart] button.emoji-mart-emoji:hover {
+  transform: scale(1.2) !important;
+  background-color: transparent !important;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .emoji-picker-container {
+    width: 100%;
+    max-width: 352px;
+  }
+} 

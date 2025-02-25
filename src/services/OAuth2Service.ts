@@ -1,6 +1,8 @@
 import { getSector, updateSector } from '../services/SectorService';
 import SessionService from '../services/SessionService';
 
+const API_URL = process.env.REACT_APP_API_URL; // Adicionando a variável de ambiente
+
 declare global {
   interface Window {
     gapi: any; 

@@ -37,13 +37,13 @@ import SessionService from '../services/SessionService';
 import { getUser } from '../services/UserService';
 import { getSectors, Sector } from '../services/SectorService';
 import EditFlowPage from '../screens/EditFlowPage';
+import { useMenu } from '../contexts/MenuContext';
 
 const { Header, Sider, Content } = Layout;
 const { Option } = Select;
 
 const CombinedMenu: React.FC = () => {
     const [sectors, setSectors] = useState<Sector[]>([]);
-    const [drawerVisible, setDrawerVisible] = useState(false);
     const [collapsed, setCollapsed] = useState(false);
     const [selectedComponent, setSelectedComponent] = useState<JSX.Element | null>(<DashBoard />);
     const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768);
@@ -57,6 +57,7 @@ const CombinedMenu: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { id } = useParams<{ id: string }>();
+    const { drawerVisible, setDrawerVisible, drawerType, setDrawerType } = useMenu();
 
     useEffect(() => {
         const storedMenuKey = localStorage.getItem('selectedMenuKey');
@@ -298,11 +299,13 @@ const CombinedMenu: React.FC = () => {
     const dropdownMenu = { items: dropdownMenuItems };
 
     const showDrawer = () => {
+        setDrawerType('menu');
         setDrawerVisible(true);
     };
 
     const onClose = () => {
         setDrawerVisible(false);
+        setDrawerType(null);
     };
 
     return (
@@ -318,13 +321,15 @@ const CombinedMenu: React.FC = () => {
                 }}
             >
                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <Button
-                        type="text"
-                        onClick={showDrawer}
-                        icon={<MenuOutlined />}
-                        style={{ fontSize: '20px', marginRight: '16px' }}
-                        className="menu-button"
-                    />
+                    {isMobile && (
+                        <Button
+                            type="text"
+                            onClick={showDrawer}
+                            icon={<MenuOutlined />}
+                            style={{ fontSize: '20px', marginRight: '16px' }}
+                            className="menu-button"
+                        />
+                    )}
                     <img src={Logo} alt="LigChat Logo" style={{ maxWidth: '40px', maxHeight: '40px' }} />
                 </div>
                 <Dropdown menu={dropdownMenu}>
@@ -409,40 +414,82 @@ const CombinedMenu: React.FC = () => {
                     </Sider>
                 )}
 
-                {isMobile && (
+                {isMobile && drawerType === 'menu' && (
                     <Drawer
-                        title="Menu"
+                        title={null}
                         placement="left"
                         onClose={onClose}
-                        visible={drawerVisible}
-                        bodyStyle={{ padding: '0' }}
+                        open={drawerVisible}
+                        bodyStyle={{ 
+                            padding: '0',
+                            height: '100vh',
+                            overflow: 'auto',
+                            backgroundColor: '#fff'
+                        }}
+                        width="100%"
+                        height="100vh"
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            height: '100vh'
+                        }}
+                        contentWrapperStyle={{
+                            backgroundColor: '#fff'
+                        }}
+                        mask={false}
+                        maskClosable={false}
+                        closeIcon={<MenuOutlined style={{ color: '#000', fontSize: '20px' }} />}
                     >
-                        <Menu
-                            theme="dark"
-                            mode="inline"
-                            selectedKeys={[selectedMenuKey]}
-                            items={menuItems}
-                            style={{ height: '100%', backgroundColor: '#1f1f1f' }}
-                            onClick={({ key }) => {
-                                handleMenuClick(key);
-                                onClose();
-                            }}
-                        />
-                        <div style={{ margin: '16px' }}>
-                            <Select
-                                value={selectedSector}
-                                style={{ width: '100%' }}
-                                placeholder="Selecione o setor"
-                                onChange={handleSectorChange}
-                            >
-                                <Option value={null}>Selecione o setor</Option>
-                                {sectors.map((sector) => (
-                                    <Option key={sector.id} value={sector.id}>
-                                        {sector.name}
-                                    </Option>
-                                ))}
-                            </Select>
-                        </div>
+                        <Layout style={{ 
+                            height: '100vh',
+                            backgroundColor: '#fff'
+                        }}>
+                            <div style={{ 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                height: '100%',
+                                backgroundColor: '#fff',
+                                padding: '0 16px'
+                            }}>
+                                <div style={{
+                                    padding: '16px 0',
+                                    borderBottom: '1px solid rgba(0,0,0,0.1)',
+                                }}>
+                                    <Select
+                                        value={selectedSector}
+                                        style={{ width: '100%' }}
+                                        placeholder="Selecione o setor"
+                                        onChange={handleSectorChange}
+                                    >
+                                        <Option value={null}>Selecione o setor</Option>
+                                        {sectors.map((sector) => (
+                                            <Option key={sector.id} value={sector.id}>
+                                                {sector.name}
+                                            </Option>
+                                        ))}
+                                    </Select>
+                                </div>
+
+                                <Menu
+                                    theme="light"
+                                    mode="inline"
+                                    selectedKeys={[selectedMenuKey]}
+                                    items={menuItems}
+                                    style={{ 
+                                        backgroundColor: '#fff',
+                                        border: 'none',
+                                        flex: 1,
+                                        padding: '16px 0'
+                                    }}
+                                    className="mobile-menu"
+                                    onClick={({ key }) => {
+                                        handleMenuClick(key);
+                                        onClose();
+                                    }}
+                                />
+                            </div>
+                        </Layout>
                     </Drawer>
                 )}
 

@@ -1,0 +1,105 @@
+.audio-message {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  min-width: 280px;
+  max-width: 380px;
+  transition: all 0.3s ease-in-out;
+}
+
+.audio-message.sent {
+  background: var(--primary-color);
+}
+
+.audio-message.received {
+  background: white;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Estilos das barras para mensagens enviadas */
+.audio-message.sent .waveform-bar {
+  background-color: rgba(255, 255, 255, 0.4);
+}
+
+.audio-message.sent .waveform-bar.played {
+  background-color: white;
+  transition: all 0.1s ease-in-out;
+}
+
+/* Estilos das barras para mensagens recebidas */
+.audio-message.received .waveform-bar {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.audio-message.received .waveform-bar.played {
+  background-color: var(--primary-color);
+  transition: all 0.1s ease-in-out;
+}
+
+.waveform-container {
+  width: 100%;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.waveform-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.waveform-bar {
+  width: 2px;
+  min-height: 6px;
+  border-radius: 1px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: all 0.1s ease-in-out;
+}
+
+.play-button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease-in-out;
+  color: white;
+}
+
+.audio-message.received .play-button {
+  color: var(--primary-color);
+}
+
+.message-time {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.audio-message.received .message-time {
+  color: var(--text-secondary);
+}
+
+.message-info {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 4px;
+}
+
+.message-time-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+} 
