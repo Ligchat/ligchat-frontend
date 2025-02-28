@@ -31,6 +31,7 @@ import { createFlow, getFlowById, updateFlow } from '../services/FlowWhatsappSer
 import SessionService from '../services/SessionService';
 import { getAllVariables } from '../services/VariablesService';
 import { getTags } from '../services/LabelService';
+import EdgeDeleteButton from './EdgeDeleteButton';
 
 const { Option } = Select;
 
@@ -136,7 +137,7 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
 
   const [variables, setVariables] = useState<Variable[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
-  const { setNodes } = useReactFlow();
+  const { setNodes, setEdges } = useReactFlow();
 
   useEffect(() => {
     const fetchVariablesAndTags = async () => {
@@ -261,6 +262,7 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
   // Função para deletar o nó
   const handleDeleteNode = () => {
     setNodes((nds) => nds.filter((node) => node.id !== id));
+    setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id)); // Remove arestas conectadas ao nó
   };
 
   return (
@@ -450,45 +452,12 @@ const CustomNode = ({ id, data }: { id: string; data: FlowNodeData }) => {
             />
             {showOptions && (
               <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  justifyContent: 'center',
-                  marginTop: '10px',
-                }}
+                style={optionBoxStyle}
+                onClick={() => addBlock('text')}
+                className="nodrag"
               >
-                <div
-                  style={optionBoxStyle}
-                  onClick={() => addBlock('text')}
-                  className="nodrag"
-                >
-                  <FileTextOutlined style={iconStyle} />
-                  <div>Texto</div>
-                </div>
-                <div
-                  style={optionBoxStyle}
-                  onClick={() => addBlock('image')}
-                  className="nodrag"
-                >
-                  <PictureOutlined style={iconStyle} />
-                  <div>Imagem</div>
-                </div>
-                <div
-                  style={optionBoxStyle}
-                  onClick={() => addBlock('attachment')}
-                  className="nodrag"
-                >
-                  <FileOutlined style={iconStyle} />
-                  <div>Anexo</div>
-                </div>
-                <div
-                  style={optionBoxStyle}
-                  onClick={() => addBlock('timer')}
-                  className="nodrag"
-                >
-                  <ClockCircleOutlined style={iconStyle} />
-                  <div>Timer</div>
-                </div>
+                <FileTextOutlined style={iconStyle} />
+                <div>Texto</div>
               </div>
             )}
           </>
@@ -917,31 +886,20 @@ const EditFlowPage: React.FC<EditFlowPageProps> = ({ flowId }:any) => {
   const onDrop = (event: React.DragEvent) => {
     event.preventDefault();
     const nodeType = event.dataTransfer.getData('application/reactflow');
-  
+
     const bounds = event.currentTarget.getBoundingClientRect();
     const position = reactFlowInstance.project({
-      x: event.clientX - bounds.left,
-      y: event.clientY - bounds.top,
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
     });
-  
-    let newNode: Node;
-  
-    if (nodeType === 'Menu de Opções') {
-      newNode = {
-        id: `${nodes.length + 1}`,
-        type: 'customNode',
-        position,
-        data: { label: 'Menu de Opções', menuOptions: { title: '', content: [] } }, // Define apenas o título inicial
-      };
-    } else {
-      newNode = {
+
+    const newNode: Node = {
         id: `${nodes.length + 1}`,
         type: 'customNode',
         position,
         data: { label: nodeType },
-      };
-    }
-  
+    };
+
     setNodes((nds) => nds.concat(newNode));
   };
   
@@ -954,6 +912,11 @@ const EditFlowPage: React.FC<EditFlowPageProps> = ({ flowId }:any) => {
   const onDragStart = (event: React.DragEvent, nodeType: string) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
     event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const onEdgeContextMenu = (event: React.MouseEvent, edge: Edge) => {
+    event.preventDefault(); // Previne o menu de contexto padrão
+    setEdges((eds) => eds.filter((e) => e.id !== edge.id)); // Remove a aresta clicada
   };
 
   return (
@@ -984,6 +947,23 @@ const EditFlowPage: React.FC<EditFlowPageProps> = ({ flowId }:any) => {
         >
           <Background />
           <Controls />
+          {edges.map((edge) => {
+            const sourceNode = nodes.find((node) => node.id === edge.source);
+            const targetNode = nodes.find((node) => node.id === edge.target);
+
+            if (!sourceNode || !targetNode) return null;
+
+            return (
+              <React.Fragment key={edge.id}>
+                <div
+                  onContextMenu={(event) => onEdgeContextMenu(event, edge)}
+                  style={{ position: 'absolute', width: '100%', height: '100%', cursor: 'pointer' }}
+                >
+                  {/* Renderização da aresta */}
+                </div>
+              </React.Fragment>
+            );
+          })}
         </ReactFlow>
       </div>
 

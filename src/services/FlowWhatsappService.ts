@@ -1,9 +1,11 @@
 import axios from 'axios';
 
+const API_URL = process.env.REACT_APP_API_URL; // Adicionando a variável de ambiente
+
 // Função para obter todos os fluxos
 export const getAllFlows = async (): Promise<any[]> => {
   try {
-    const response = await axios.get(`/server/api/FlowWhatsapp`, {
+    const response = await axios.get(`${API_URL}/FlowWhatsapp`, {
       headers: {
         'Accept': '*/*',
       },
@@ -18,7 +20,7 @@ export const getAllFlows = async (): Promise<any[]> => {
 // Função para obter um fluxo por ID
 export const getFlowById = async (id: string): Promise<any> => {
   try {
-    const response = await axios.get(`/server/api/FlowWhatsapp/${id}`, {
+    const response = await axios.get(`${API_URL}/FlowWhatsapp/${id}`, {
       headers: {
         'Accept': '*/*',
       },
@@ -33,7 +35,7 @@ export const getFlowById = async (id: string): Promise<any> => {
 // Função para criar um fluxo
 export const createFlow = async (flowData: any): Promise<any> => {
   try {
-    const response = await axios.post(`/server/api/FlowWhatsapp`, flowData, {
+    const response = await axios.post(`${API_URL}/FlowWhatsapp`, flowData, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -48,7 +50,7 @@ export const createFlow = async (flowData: any): Promise<any> => {
 // Função para atualizar um fluxo
 export const updateFlow = async (id: string, flowData: any): Promise<any> => {
   try {
-    const response = await axios.put(`/server/api/FlowWhatsapp/${id}`, flowData, {
+    const response = await axios.put(`${API_URL}/FlowWhatsapp/${id}`, flowData, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -63,7 +65,7 @@ export const updateFlow = async (id: string, flowData: any): Promise<any> => {
 // Função para deletar um fluxo
 export const deleteFlow = async (id: string): Promise<void> => {
   try {
-    await axios.delete(`/server/api/FlowWhatsapp/${id}`);
+    await axios.delete(`${API_URL}/FlowWhatsapp/${id}`);
   } catch (error) {
     console.error(`Erro ao deletar fluxo com ID ${id}:`, error);
   }

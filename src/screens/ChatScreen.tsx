@@ -783,9 +783,6 @@ const ChatPage: React.FC = () => {
         title={
           <div className="contact-header">
             <span className="contact-name">{contact.name}</span>
-            <Text type="secondary" className="contact-time">
-              {dayjs(contact.lastMessageTime).fromNow()}
-            </Text>
         </div>
         }
         description={

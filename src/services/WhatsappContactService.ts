@@ -17,21 +17,33 @@ export interface WhatsAppContact {
     isViewed: boolean;
     isRead: boolean;
     responsibleId?: number;
+    isOnline?: boolean;
+    assignedTo?: { 
+        name: string; 
+        avatar: string; 
+    };
+    unreadCount?: number;
 }
 
 export interface Messages {
     id: number;
-    content: string;
+    content: string | null; // Deve ser compatível com MessageType
     mediaType?: string;
-    mediaUrl?: string;
+    mediaUrl?: string | null; // Deve ser compatível com MessageType
     sectorId: number;
     contactId: number;
-    sentAt?: Date;
+    sentAt?: string; // Mude de Date para string para compatibilidade
+    isSent?: boolean; // Adicione esta propriedade para compatibilidade
+    isRead?: boolean; // Adicione esta propriedade para compatibilidade
 }
 
 export const getMessagesByContactId = async (contactId: number): Promise<Messages[]> => {
     try {
-        const response = await axios.get(`${WHATSAPP_API_URL}/messages/${contactId}`);
+        const response = await axios.get(`${WHATSAPP_API_URL}/contact/${contactId}/messages`, {
+            headers: {
+                'accept': 'text/plain'
+            }
+        });
         return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
         console.error(`Failed to get messages for contact with ID ${contactId}:`, error);
@@ -42,9 +54,11 @@ export const getMessagesByContactId = async (contactId: number): Promise<Message
 export const getWhatsAppContacts = async (sectorId: number): Promise<WhatsAppContact[]> => {
     try {
         const response = await axios.get(`${WHATSAPP_API_URL}/contact/${sectorId}`);
+        console.log('Contatos retornados:', response.data);
         // Garante que sempre retornamos um array
-        const contacts = Array.isArray(response.data) ? response.data : 
-                        response.data?.data ? response.data.data : [];
+        const contacts = Array.isArray(response.data) 
+        ? response.data 
+        : response.data ? [response.data] : [];
                         
         return contacts.map((contact: any) => ({
             id: contact.id,
@@ -60,11 +74,14 @@ export const getWhatsAppContacts = async (sectorId: number): Promise<WhatsAppCon
             createdAt: contact.createdAt,
             isViewed: Boolean(contact.isViewed),
             isRead: Boolean(contact.isRead),
-            responsibleId: contact.responsibleId
+            responsibleId: contact.responsibleId,
+            isOnline: contact.isOnline,
+            assignedTo: contact.assignedTo,
+            unreadCount: contact.unreadCount
         }));
     } catch (error) {
-        console.error(`Failed to get WhatsApp contacts:`, error);
-        return [];
+        console.error('Erro ao buscar contatos:', error);
+        throw error;
     }
 };
 

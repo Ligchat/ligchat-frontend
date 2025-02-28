@@ -5,7 +5,7 @@ module.exports = function(app) {
     app.use(
         '/whatsapp',
         createProxyMiddleware({
-            target: 'http://localhost:5167',
+            target: 'https://whatsapp.ligchat.site',
             changeOrigin: true,
             secure: false,
             logLevel: 'debug'
@@ -16,7 +16,7 @@ module.exports = function(app) {
     app.use(
         '/api',
         createProxyMiddleware({
-            target: 'http://localhost:5251',
+            target: 'https://server.ligchat.site',
             changeOrigin: true,
             secure: false,
             logLevel: 'debug'
