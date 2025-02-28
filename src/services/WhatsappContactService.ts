@@ -53,13 +53,20 @@ export const getMessagesByContactId = async (contactId: number): Promise<Message
 
 export const getWhatsAppContacts = async (sectorId: number): Promise<WhatsAppContact[]> => {
     try {
+        // Verifica se o sectorId é válido
+        if (!sectorId || sectorId === null) {
+            console.error('Sector ID inválido ou nulo. Não é possível buscar contatos.');
+            return [];
+        }
+
         const response = await axios.get(`${WHATSAPP_API_URL}/contact/${sectorId}`);
         console.log('Contatos retornados:', response.data);
+        
         // Garante que sempre retornamos um array
         const contacts = Array.isArray(response.data) 
-        ? response.data 
-        : response.data ? [response.data] : [];
-                        
+            ? response.data 
+            : response.data ? [response.data] : [];
+        
         return contacts.map((contact: any) => ({
             id: contact.id,
             name: contact.name || '',

@@ -184,6 +184,14 @@ const Dashboard: React.FC = () => {
     const fetchInitialContacts = async () => {
       setIsLoading(true);
       const sectorId = SessionService.getSessionForSector();
+      
+      // Verifica se o sectorId é válido
+      if (!sectorId || sectorId === null) {
+          console.error('Sector ID inválido ou nulo. Não é possível buscar contatos.');
+          setIsLoading(false);
+          return;
+      }
+
       const contacts = await getWhatsAppContacts(sectorId);
       setWhatsAppContacts(contacts);
 
