@@ -17,6 +17,7 @@ import VariablesPage from './screens/VariablesPage';
 import PrivacyPolicyPage from './screens/PrivacyPolicyPage';
 import TermsOfUsePage from './screens/TermsOfUsePage';
 import { MenuProvider } from './contexts/MenuContext';
+import ChatNew from './screens/ChatNew';
 
 const AppRoutes: React.FC = () => {
   return (
@@ -31,7 +32,7 @@ const AppRoutes: React.FC = () => {
         <Route element={<MainLayout />}>
           {/* Coloque aqui as rotas que terão o menu lateral */}
           <Route path="/dashboard" element={<HomeScreen />} />
-          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/chat" element={<ChatNew />} />
           <Route path="/labels" element={<LabelPage/>}/>
           <Route path="/crm" element={<CRMPage/>}/>
           <Route path="/message/schedule" element={<MessageSchedule/>}/>

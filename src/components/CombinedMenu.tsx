@@ -1,26 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import {
-    Layout,
-    Menu,
-    Avatar,
-    Dropdown,
-    Button,
-    Drawer,
-    Select,
-    message,
-    Spin
-} from 'antd';
-import {
-    DashboardOutlined,
-    MessageOutlined,
-    CalendarOutlined,
-    TagsOutlined,
-    UserOutlined,
-    SettingOutlined,
-    LogoutOutlined,
-    MenuOutlined,
-} from '@ant-design/icons';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Logo from '../assets/images/Logo.png';
 import DashBoard from '../screens/DashBoard';
 import ChatPage from '../screens/ChatScreen';
@@ -31,58 +10,128 @@ import AccessPage from '../screens/AccessPage';
 import SectorsPage from '../screens/SectorsPage';
 import WebhookPage from '../screens/WebhookPage';
 import ProfilePage from '../screens/ProfilePage';
-import FlowPage from '../screens/FlowPage';
 import VariablesPage from '../screens/VariablesPage';
 import SessionService from '../services/SessionService';
 import { getUser } from '../services/UserService';
 import { getSectors, Sector } from '../services/SectorService';
-import EditFlowPage from '../screens/EditFlowPage';
 import { useMenu } from '../contexts/MenuContext';
-
-const { Header, Sider, Content } = Layout;
-const { Option } = Select;
+import '../styles/CombinedMenu/CombinedMenu.css';
+import ChatNew from '../screens/ChatNew';
 
 const CombinedMenu: React.FC = () => {
     const [sectors, setSectors] = useState<Sector[]>([]);
     const [collapsed, setCollapsed] = useState(false);
-    const [selectedComponent, setSelectedComponent] = useState<JSX.Element | null>(<DashBoard />);
+    const [selectedComponent, setSelectedComponent] = useState<JSX.Element>(<DashBoard />);
     const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768);
     const [isLoading, setIsLoading] = useState(false);
     const [name, setName] = useState('');
     const [avatar, setAvatar] = useState<string | null>(null);
     const [selectedSector, setSelectedSector] = useState<string | null>(null);
-    const [isEditingFlow, setIsEditingFlow] = useState(false);
     const [selectedMenuKey, setSelectedMenuKey] = useState<string>('1');
     const [isAdmin, setIsAdmin] = useState<boolean>(false);
+    const [expandedSubmenus, setExpandedSubmenus] = useState<string[]>([]);
+    const [showUserDropdown, setShowUserDropdown] = useState(false);
+    const userDropdownRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
     const location = useLocation();
-    const { id } = useParams<{ id: string }>();
-    const { drawerVisible, setDrawerVisible, drawerType, setDrawerType } = useMenu();
+    const { drawerVisible, setDrawerVisible } = useMenu();
+    const initialRenderRef = useRef(true);
+    const navigationInProgressRef = useRef(false);
 
     useEffect(() => {
-        const storedMenuKey = localStorage.getItem('selectedMenuKey');
-        if (storedMenuKey) {
-            setSelectedMenuKey(storedMenuKey);
-            navigate(getPathFromKey(storedMenuKey));
-        } else {
-            navigate('/dashboard');
+        setSelectedComponent(<DashBoard />);
+    }, []);
+
+    useEffect(() => {
+        if (initialRenderRef.current) {
+            initialRenderRef.current = false;
+            
+            const currentPath = location.pathname;
+            if (currentPath === '/' || currentPath === '') {
+                navigate('/dashboard');
+                return;
+            }
+            
+            const validPaths = [
+                '/dashboard', '/chat', '/schedule', '/crm', 
+                '/profile', '/labels', '/access', '/sectors', 
+                '/webhook', '/variables'
+            ];
+            
+            const isValidPath = validPaths.some(path => 
+                currentPath === path || currentPath.startsWith(`${path}/`)
+            );
+            
+            if (isValidPath) {
+                updateSelectedMenuFromPath(currentPath);
+                return;
+            }
+            
+            const storedMenuKey = localStorage.getItem('selectedMenuKey');
+            if (storedMenuKey) {
+                setSelectedMenuKey(storedMenuKey);
+                const path = getPathFromKey(storedMenuKey);
+                navigate(path);
+            } else {
+                navigate('/dashboard');
+            }
         }
-    }, [navigate]);
+    }, [navigate, location.pathname]);
+
+    const updateSelectedMenuFromPath = (path: string) => {
+        if (path.includes('/dashboard')) {
+            setSelectedMenuKey('1');
+        } else if (path.includes('/chat')) {
+            setSelectedMenuKey('2');
+        } else if (path.includes('/schedule')) {
+            setSelectedMenuKey('3');
+        } else if (path.includes('/crm')) {
+            setSelectedMenuKey('5');
+        } else if (path.includes('/profile')) {
+            setSelectedMenuKey('7');
+        } else if (path.includes('/labels')) {
+            setSelectedMenuKey('8');
+        } else if (path.includes('/access')) {
+            setSelectedMenuKey('9');
+        } else if (path.includes('/sectors')) {
+            setSelectedMenuKey('10');
+        } else if (path.includes('/webhook')) {
+            setSelectedMenuKey('11');
+        } else if (path.includes('/variables')) {
+            setSelectedMenuKey('12');
+        }
+    };
 
     useEffect(() => {
         const tokenFromSession = SessionService.getSession('authToken');
         if (tokenFromSession) {
             fetchSectors(tokenFromSession);
         }
-    }, [navigate]);
+    }, []);
 
     useEffect(() => {
         const handleResize = () => {
             setIsMobile(window.innerWidth < 768);
+            if (window.innerWidth >= 768) {
+                setDrawerVisible(false);
+            }
         };
         window.addEventListener('resize', handleResize);
         handleResize();
         return () => window.removeEventListener('resize', handleResize);
+    }, [setDrawerVisible]);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
+                setShowUserDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
     }, []);
 
     const fetchSectors = async (token: string) => {
@@ -98,53 +147,6 @@ const CombinedMenu: React.FC = () => {
             setSectors([]);
         }
     };
-
-    useEffect(() => {
-        const path = location.pathname;
-        if (path.startsWith('/flow/edit/')) {
-            setSelectedComponent(<EditFlowPage flowId={id} />);
-            setIsEditingFlow(true);
-        } else if (!isEditingFlow) {
-            switch (path) {
-                case '/dashboard':
-                    setSelectedComponent(<DashBoard />);
-                    break;
-                case '/chat':
-                    setSelectedComponent(<ChatPage />);
-                    break;
-                case '/message/schedule':
-                    setSelectedComponent(<MessageSchedule />);
-                    break;
-                case '/flow':
-                    setSelectedComponent(<FlowPage />);
-                    break;
-                case '/flow/variable':
-                    setSelectedComponent(<VariablesPage />);
-                    break;
-                case '/crm':
-                    setSelectedComponent(<CRMPage />);
-                    break;
-                case '/labels':
-                    setSelectedComponent(<LabelPage />);
-                    break;
-                case '/profile':
-                    setSelectedComponent(<ProfilePage />);
-                    break;
-                case '/access':
-                    setSelectedComponent(<AccessPage />);
-                    break;
-                case '/sector':
-                    setSelectedComponent(<SectorsPage />);
-                    break;
-                case '/webhook':
-                    setSelectedComponent(<WebhookPage />);
-                    break;
-                default:
-                    setSelectedComponent(<DashBoard />);
-                    break;
-            }
-        }
-    }, [location.pathname, isEditingFlow, id]);
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -170,347 +172,340 @@ const CombinedMenu: React.FC = () => {
         fetchUserData();
     }, [navigate]);
 
-    const handleSectorChange = (value: string) => {
+    const handleSectorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const value = e.target.value;
         setIsLoading(true);
         setSelectedSector(value);
         SessionService.setSession('selectedSector', value);
-
         setTimeout(() => {
             setIsLoading(false);
-        }, 0);
+        }, 500);
+    };
+
+    const toggleSidebar = () => {
+        setCollapsed(!collapsed);
+    };
+
+    const toggleMobileMenu = () => {
+        setDrawerVisible(!drawerVisible);
+    };
+
+    const toggleUserDropdown = () => {
+        setShowUserDropdown(!showUserDropdown);
+    };
+
+    const toggleSubmenu = (key: string) => {
+        if (expandedSubmenus.includes(key)) {
+            setExpandedSubmenus(expandedSubmenus.filter(item => item !== key));
+        } else {
+            setExpandedSubmenus([...expandedSubmenus, key]);
+        }
     };
 
     const handleLogout = () => {
         SessionService.clearSession();
-        message.success('Sessão encerrada com sucesso.');
-        navigate('/');
+        navigate('/login');
     };
 
-    const handleMenuClick = (menuKey: string) => {
-        setSelectedMenuKey(menuKey);
-        localStorage.setItem('selectedMenuKey', menuKey);
-        switch (menuKey) {
-            case '1':
-                setSelectedComponent(<DashBoard />);
-                navigate('/dashboard');
-                break;
-            case '2':
-                setSelectedComponent(<ChatPage />);
-                navigate('/chat');
-                break;
-            case '3':
-                setSelectedComponent(<MessageSchedule />);
-                navigate('/message/schedule');
-                break;
-            case '4-1':
-                setSelectedComponent(<FlowPage />);
-                navigate('/flow');
-                break;
-            case '4-2':
-                setSelectedComponent(<VariablesPage />);
-                navigate('/flow/variable');
-                break;
-            case '5':
-                setSelectedComponent(<CRMPage />);
-                navigate('/crm');
-                break;
-            case '6':
-                setSelectedComponent(<LabelPage />);
-                navigate('/labels');
-                break;
-            case '7':
-                setSelectedComponent(<ProfilePage />);
-                navigate('/profile');
-                break;
-            case '8-1':
-                setSelectedComponent(<AccessPage />);
-                navigate('/access');
-                break;
-            case '8-2':
-                setSelectedComponent(<SectorsPage />);
-                navigate('/sector');
-                break;
-            case '8-3':
-                setSelectedComponent(<WebhookPage />);
-                navigate('/webhook');
-                break;
-            case '9':
-                handleLogout();
-                break;
-            default:
-                setSelectedComponent(<DashBoard />);
-                navigate('/dashboard');
-        }
-    };
-
-    const getPathFromKey = (key: string) => {
+    const getPathFromKey = (key: string): string => {
         switch (key) {
             case '1': return '/dashboard';
             case '2': return '/chat';
-            case '3': return '/message/schedule';
-            case '4-1': return '/flow';
-            case '4-2': return '/flow/variable';
+            case '3': return '/schedule';
             case '5': return '/crm';
-            case '6': return '/labels';
             case '7': return '/profile';
-            case '8-1': return '/access';
-            case '8-2': return '/sector';
-            case '8-3': return '/webhook';
+            case '8': return '/labels';
+            case '9': return '/access';
+            case '10': return '/sectors';
+            case '11': return '/webhook';
+            case '12': return '/variables';
             default: return '/dashboard';
         }
     };
 
-    const menuItems = [
-        { key: '1', icon: <DashboardOutlined />, label: 'DashBoard' },
-        { key: '2', icon: <MessageOutlined />, label: 'Chat ao vivo' },
-        { key: '3', icon: <MessageOutlined />, label: 'Agendamento de Mensagens' },
-        {
-            key: '4',
-            icon: <CalendarOutlined />,
-            label: 'Flow',
-            children: [
-                { key: '4-1', label: 'Flow' },
-                { key: '4-2', label: 'Variáveis' },
-            ],
-        },
-        { key: '5', icon: <TagsOutlined />, label: 'CRM' },
-        { key: '6', icon: <TagsOutlined />, label: 'Etiqueta' },
-        { key: '7', icon: <UserOutlined />, label: 'Perfil' },
-        ...(isAdmin ? [
-            {
-                key: '8',
-                icon: <SettingOutlined />,
-                label: 'Configurações',
-                children: [
-                    { key: '8-1', label: 'Acessos' },
-                    { key: '8-2', label: 'Gerenciar Setores' },
-                    { key: '8-3', label: 'Webhook' },
-                ],
-            }
-        ] : []),
-        { key: '9', icon: <LogoutOutlined />, label: 'Sair' },
-    ];
+    const handleMenuClick = (key: string) => {
+        if (key === '6') {
+            toggleSubmenu(key);
+            return;
+        }
 
-    const dropdownMenuItems = [
-        { key: '10', label: 'Perfil', icon: <UserOutlined /> },
-        { key: '11', label: 'Editar Fluxo' },
-    ];
+        setSelectedMenuKey(key);
+        localStorage.setItem('selectedMenuKey', key);
 
-    const dropdownMenu = { items: dropdownMenuItems };
+        const path = getPathFromKey(key);
+        
+        updateSelectedComponent(key);
+        
+        if (location.pathname !== path) {
+            navigate(path);
+        }
 
-    const showDrawer = () => {
-        setDrawerType('menu');
-        setDrawerVisible(true);
+        if (isMobile) {
+            setDrawerVisible(false);
+        }
+
+        setShowUserDropdown(false);
     };
 
-    const onClose = () => {
-        setDrawerVisible(false);
-        setDrawerType(null);
+    const handleSubmenuClick = (parentKey: string, childKey: string) => {
+        setSelectedMenuKey(childKey);
+        localStorage.setItem('selectedMenuKey', childKey);
+
+        const path = getPathFromKey(childKey);
+        
+        updateSelectedComponent(childKey);
+        
+        navigate(path);
+
+        if (isMobile) {
+            setDrawerVisible(false);
+        }
     };
+
+    const updateSelectedComponent = (key: string) => {
+        const timestamp = new Date().getTime();
+        
+        switch (key) {
+            case '1':
+                setSelectedComponent(<DashBoard key={`dashboard-${timestamp}`} />);
+                break;
+            case '2':
+                setSelectedComponent(<ChatNew key={`chat-${timestamp}`} />);
+                break;
+            case '3':
+                setSelectedComponent(<MessageSchedule key={`schedule-${timestamp}`} />);
+                break;
+            case '5':
+                setSelectedComponent(<CRMPage key={`crm-${timestamp}`} />);
+                break;
+            case '7':
+                setSelectedComponent(<ProfilePage key={`profile-${timestamp}`} />);
+                break;
+            case '8':
+                setSelectedComponent(<LabelPage key={`label-${timestamp}`} />);
+                break;
+            case '9':
+                setSelectedComponent(<AccessPage key={`access-${timestamp}`} />);
+                break;
+            case '10':
+                setSelectedComponent(<SectorsPage key={`sectors-${timestamp}`} />);
+                break;
+            case '11':
+                setSelectedComponent(<WebhookPage key={`webhook-${timestamp}`} />);
+                break;
+            case '12':
+                setSelectedComponent(<VariablesPage key={`variables-${timestamp}`} />);
+                break;
+            default:
+                setSelectedComponent(<DashBoard key={`dashboard-default-${timestamp}`} />);
+        }
+    };
+
+    const renderMenuItems = () => {
+        return (
+            <ul className="menu-items">
+                <li className={`menu-item ${selectedMenuKey === '1' ? 'active' : ''}`}>
+                    <div className="menu-item-content" onClick={() => handleMenuClick('1')}>
+                        <span className="menu-icon icon-dashboard"></span>
+                        <span className="menu-label">Dashboard</span>
+                        {collapsed && <div className="menu-tooltip">Dashboard</div>}
+                    </div>
+                </li>
+                <li className={`menu-item ${selectedMenuKey === '2' ? 'active' : ''}`}>
+                    <div className="menu-item-content" onClick={() => handleMenuClick('2')}>
+                        <span className="menu-icon icon-message"></span>
+                        <span className="menu-label">Chat</span>
+                        {collapsed && <div className="menu-tooltip">Chat</div>}
+                    </div>
+                </li>
+                <li className={`menu-item ${selectedMenuKey === '3' ? 'active' : ''}`}>
+                    <div className="menu-item-content" onClick={() => handleMenuClick('3')}>
+                        <span className="menu-icon icon-schedule"></span>
+                        <span className="menu-label">Agendamento</span>
+                        {collapsed && <div className="menu-tooltip">Agendamento</div>}
+                    </div>
+                </li>
+                <li className={`menu-item ${selectedMenuKey === '5' ? 'active' : ''}`}>
+                    <div className="menu-item-content" onClick={() => handleMenuClick('5')}>
+                        <span className="menu-icon icon-crm"></span>
+                        <span className="menu-label">CRM</span>
+                        {collapsed && <div className="menu-tooltip">CRM</div>}
+                    </div>
+                </li>
+                <li className={`menu-item ${selectedMenuKey === '8' ? 'active' : ''}`}>
+                    <div className="menu-item-content" onClick={() => handleMenuClick('8')}>
+                        <span className="menu-icon icon-tag"></span>
+                        <span className="menu-label">Etiquetas</span>
+                        {collapsed && <div className="menu-tooltip">Etiquetas</div>}
+                    </div>
+                </li>
+                {isAdmin && (
+                    <li className={`menu-item ${expandedSubmenus.includes('6') ? 'expanded' : ''}`}>
+                        <div className="menu-item-content" onClick={() => handleMenuClick('6')}>
+                            <span className="menu-icon icon-settings"></span>
+                            <span className="menu-label">Configurações</span>
+                            <span className="menu-submenu-arrow">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18">
+                                    <path fill="currentColor" d="M7 10l5 5 5-5z"/>
+                                </svg>
+                            </span>
+                            {collapsed && <div className="menu-tooltip">Configurações</div>}
+                        </div>
+                        <ul className="menu-submenu">
+                            <li 
+                                className={`menu-submenu-item ${selectedMenuKey === '9' ? 'active' : ''}`}
+                                onClick={() => handleSubmenuClick('6', '9')}
+                            >
+                                <span className="submenu-dot"></span>
+                                <span className="submenu-label">Acessos</span>
+                            </li>
+                            <li 
+                                className={`menu-submenu-item ${selectedMenuKey === '10' ? 'active' : ''}`}
+                                onClick={() => handleSubmenuClick('6', '10')}
+                            >
+                                <span className="submenu-dot"></span>
+                                <span className="submenu-label">Setores</span>
+                            </li>
+                            <li 
+                                className={`menu-submenu-item ${selectedMenuKey === '11' ? 'active' : ''}`}
+                                onClick={() => handleSubmenuClick('6', '11')}
+                            >
+                                <span className="submenu-dot"></span>
+                                <span className="submenu-label">Webhook</span>
+                            </li>
+                            <li 
+                                className={`menu-submenu-item ${selectedMenuKey === '12' ? 'active' : ''}`}
+                                onClick={() => handleSubmenuClick('6', '12')}
+                            >
+                                <span className="submenu-dot"></span>
+                                <span className="submenu-label">Variáveis</span>
+                            </li>
+                        </ul>
+                    </li>
+                )}
+            </ul>
+        );
+    };
+
+    useEffect(() => {
+        const path = location.pathname;
+        let key = '1'; // Default to dashboard
+        
+        if (path === '/' || path.includes('/dashboard')) {
+            key = '1';
+        } else if (path.includes('/chat')) {
+            key = '2';
+        } else if (path.includes('/schedule')) {
+            key = '3';
+        } else if (path.includes('/crm')) {
+            key = '5';
+        } else if (path.includes('/profile')) {
+            key = '7';
+        } else if (path.includes('/labels')) {
+            key = '8';
+        } else if (path.includes('/access')) {
+            key = '9';
+        } else if (path.includes('/sectors')) {
+            key = '10';
+        } else if (path.includes('/webhook')) {
+            key = '11';
+        } else if (path.includes('/variables')) {
+            key = '12';
+        }
+        
+        // Atualize o menu selecionado
+        setSelectedMenuKey(key);
+        
+        // Atualize o componente apenas se a navegação não foi iniciada por um clique no menu
+        if (!navigationInProgressRef.current) {
+            updateSelectedComponent(key);
+        }
+        
+        navigationInProgressRef.current = false;
+    }, [location.pathname]);
 
     return (
-        <Layout>
-            <Header
-                className="site-layout-background"
-                style={{
-                    padding: '0 16px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    backgroundColor: '#fff',
-                }}
-            >
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                    {isMobile && (
-                        <Button
-                            type="text"
-                            onClick={showDrawer}
-                            icon={<MenuOutlined />}
-                            style={{ fontSize: '20px', marginRight: '16px' }}
-                            className="menu-button"
-                        />
-                    )}
-                    <img src={Logo} alt="LigChat Logo" style={{ maxWidth: '40px', maxHeight: '40px' }} />
-                </div>
-                <Dropdown menu={dropdownMenu}>
-                    <div className="flex items-center cursor-pointer">
-                        {isLoading ? (
-                            <div className="w-10 h-10 rounded-full bg-gray-300 animate-pulse"></div>
-                        ) : (
-                            <Avatar
-                                size={40}
-                                icon={!avatar ? <UserOutlined /> : undefined}
-                                src={avatar ? avatar : undefined}
-                            />
-                        )}
-                        <span className="ml-2 text-black">
-                            {isLoading ? (
-                                <div className="w-24 h-4 bg-gray-300 animate-pulse rounded"></div>
-                            ) : (
-                                name
-                            )}
-                        </span>
+        <div className="menu-layout">
+            <header className="menu-header">
+                <div className="menu-header-left">
+                    <button className="menu-toggle-button" onClick={isMobile ? toggleMobileMenu : toggleSidebar}>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+                            <path fill="currentColor" d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+                        </svg>
+                    </button>
+                    <div className="menu-logo-container">
+                        <img src={Logo} alt="Logo" className="menu-logo" />
                     </div>
-                </Dropdown>
-            </Header>
+                </div>
+                <div className="menu-header-right">
+                    <div className="menu-user-profile" onClick={toggleUserDropdown} ref={userDropdownRef}>
+                        {avatar ? (
+                            <img src={avatar} alt={name} className="menu-avatar" />
+                        ) : (
+                            <div className="menu-avatar-placeholder">
+                                {name.charAt(0).toUpperCase()}
+                            </div>
+                        )}
+                        <span className="menu-username">{name}</span>
+                        <span className="menu-dropdown-arrow">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18">
+                                <path fill="currentColor" d="M7 10l5 5 5-5z"/>
+                            </svg>
+                        </span>
+                        {showUserDropdown && (
+                            <div className="menu-user-dropdown">
+                                <div className="menu-dropdown-item" onClick={() => handleMenuClick('7')}>
+                                    <span className="menu-dropdown-icon icon-user"></span>
+                                    <span>Perfil</span>
+                                </div>
+                                <div className="menu-dropdown-item" onClick={handleLogout}>
+                                    <span className="menu-dropdown-icon icon-logout"></span>
+                                    <span>Sair</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </header>
 
-            <Layout>
-                {!isMobile && (
-                    <Sider
-                        width={300}
-                        collapsible
-                        collapsed={collapsed}
-                        onCollapse={(collapsed) => setCollapsed(collapsed)}
-                        breakpoint="lg"
-                        collapsedWidth="0"
-                        className="site-layout-background menu-sider"
-                        style={{
-                            height: '85vh',
-                            backgroundColor: '#1f1f1f',
-                            borderRadius: '20px',
-                            padding: '20px',
-                            margin: '20px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                        }}
-                    >
+            <div className="menu-content-layout">
+                <aside className={`menu-sidebar ${collapsed ? 'collapsed' : ''} ${isMobile ? 'mobile' : ''} ${drawerVisible && isMobile ? 'visible' : ''}`}>
+                    <div className="menu-sidebar-content">
                         {isLoading ? (
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                height: '100%'
-                            }}>
-                                <Spin size="large" />
+                            <div className="menu-loading">
+                                <div className="menu-spinner"></div>
                             </div>
                         ) : (
                             <>
-                                <Menu
-                                    theme="dark"
-                                    mode="inline"
-                                    selectedKeys={[selectedMenuKey]}
-                                    onClick={({ key }) => handleMenuClick(key)}
-                                    items={menuItems}
-                                    style={{ backgroundColor: '#1f1f1f', borderRadius: '10px' }}
-                                />
-                                <div style={{ marginTop: '20px' }}>
-                                    <Select
-                                        value={selectedSector || null}
-                                        style={{ width: '100%' }}
-                                        placeholder="Selecione o setor"
+                                {renderMenuItems()}
+                                <div className="menu-sector-selector">
+                                    <select 
+                                        value={selectedSector || ''} 
                                         onChange={handleSectorChange}
+                                        className="menu-select"
                                     >
-                                        <Option value={null}>Selecione o setor</Option>
+                                        <option value="">Selecione o setor</option>
                                         {sectors.map((sector) => (
-                                            <Option key={sector.id} value={sector.id}>
+                                            <option key={sector.id} value={sector.id}>
                                                 {sector.name}
-                                            </Option>
+                                            </option>
                                         ))}
-                                    </Select>
+                                    </select>
                                 </div>
                             </>
                         )}
-                    </Sider>
-                )}
+                    </div>
+                </aside>
 
-                {isMobile && drawerType === 'menu' && (
-                    <Drawer
-                        title={null}
-                        placement="left"
-                        onClose={onClose}
-                        open={drawerVisible}
-                        bodyStyle={{ 
-                            padding: '0',
-                            height: '100vh',
-                            overflow: 'auto',
-                            backgroundColor: '#fff'
-                        }}
-                        width="100%"
-                        height="100vh"
-                        style={{
-                            position: 'fixed',
-                            top: 0,
-                            left: 0,
-                            height: '100vh'
-                        }}
-                        contentWrapperStyle={{
-                            backgroundColor: '#fff'
-                        }}
-                        mask={false}
-                        maskClosable={false}
-                        closeIcon={<MenuOutlined style={{ color: '#000', fontSize: '20px' }} />}
-                    >
-                        <Layout style={{ 
-                            height: '100vh',
-                            backgroundColor: '#fff'
-                        }}>
-                            <div style={{ 
-                                display: 'flex', 
-                                flexDirection: 'column', 
-                                height: '100%',
-                                backgroundColor: '#fff',
-                                padding: '0 16px'
-                            }}>
-                                <div style={{
-                                    padding: '16px 0',
-                                    borderBottom: '1px solid rgba(0,0,0,0.1)',
-                                }}>
-                                    <Select
-                                        value={selectedSector}
-                                        style={{ width: '100%' }}
-                                        placeholder="Selecione o setor"
-                                        onChange={handleSectorChange}
-                                    >
-                                        <Option value={null}>Selecione o setor</Option>
-                                        {sectors.map((sector) => (
-                                            <Option key={sector.id} value={sector.id}>
-                                                {sector.name}
-                                            </Option>
-                                        ))}
-                                    </Select>
-                                </div>
+                <main className="menu-content">
+                    {selectedComponent}
+                </main>
+            </div>
 
-                                <Menu
-                                    theme="light"
-                                    mode="inline"
-                                    selectedKeys={[selectedMenuKey]}
-                                    items={menuItems}
-                                    style={{ 
-                                        backgroundColor: '#fff',
-                                        border: 'none',
-                                        flex: 1,
-                                        padding: '16px 0'
-                                    }}
-                                    className="mobile-menu"
-                                    onClick={({ key }) => {
-                                        handleMenuClick(key);
-                                        onClose();
-                                    }}
-                                />
-                            </div>
-                        </Layout>
-                    </Drawer>
-                )}
-
-                <Layout style={{ padding: '24px' }}>
-                    <Content>
-                        {isLoading ? (
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                height: '100%'
-                            }}>
-                                <Spin size="large" />
-                            </div>
-                        ) : (
-                            selectedComponent
-                        )}
-                    </Content>
-                </Layout>
-            </Layout>
-        </Layout>
+            {isMobile && drawerVisible && (
+                <div className="menu-overlay" onClick={toggleMobileMenu}></div>
+            )}
+        </div>
     );
 };
 

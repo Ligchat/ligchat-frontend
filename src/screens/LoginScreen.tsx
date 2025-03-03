@@ -1,15 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Input, Layout, Form, Tabs, Typography, Spin, Modal } from 'antd';
-import { useNavigate, useLocation, Link } from 'react-router-dom'; // Importar Link
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import Logo from '../assets/images/Logo.png';
 import { SendVerificationCodeRequestDTO, VerifyCodeRequestDTO } from '../interfaces/AuthInterface';
 import { sendVerificationCode, verifyCode } from '../services/AuthService';
 import SessionService from '../services/SessionService';
-import '../styles/LoginScreen/LoginScreen.css'; // Importar um arquivo CSS para estilos adicionais
-
-const { Content, Footer } = Layout; // Importar Footer
-const { TabPane } = Tabs;
-const { Text } = Typography;
+import '../styles/LoginScreen/LoginScreen.css';
 
 const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -17,11 +12,12 @@ const LoginScreen: React.FC = () => {
   const [isEmailValid, setIsEmailValid] = useState(true);
   const [isCodeValid, setIsCodeValid] = useState(true);
   const [isFormValid, setIsFormValid] = useState(false);
-  const [activeTab, setActiveTab] = useState('1');
+  const [activeTab, setActiveTab] = useState('email');
   const [timer, setTimer] = useState(0);
   const [loadingEmail, setLoadingEmail] = useState(false);
   const [loadingCode, setLoadingCode] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -35,12 +31,6 @@ const LoginScreen: React.FC = () => {
     setIsModalVisible(false);
   };
 
-  // Remover funções e estados relacionados ao modal de Política de Privacidade
-  // const [isPrivacyTermsVisible, setIsPrivacyTermsVisible] = useState(false);
-  // const handlePrivacyTermsClose = () => { setIsPrivacyTermsVisible(false); };
-  // const handlePrivacyTermsOpen = () => { setIsPrivacyTermsVisible(true); };
-
-  // Função para validar o formato de email
   const validateEmail = (value: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const isValid = emailRegex.test(value);
@@ -48,13 +38,12 @@ const LoginScreen: React.FC = () => {
     setIsFormValid(isValid && value.trim() !== '');
   };
 
-  // Validação do código de acesso
   const validateCode = (value: string) => {
     setIsCodeValid(value.length === 6);
   };
 
-  // Função de envio de email com mensagem de erro no formulário
-  const handleSendEmail = async () => {
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (isFormValid) {
       setLoadingEmail(true);
       try {
@@ -63,22 +52,19 @@ const LoginScreen: React.FC = () => {
           phoneNumber: '',
         };
         await sendVerificationCode(requestData);
-        setActiveTab('2');
+        setActiveTab('code');
       } catch (error: any) {
         console.error('Erro ao enviar código de verificação:', error);
-        if (error.response && error.response.status === 404) {
-          setIsEmailValid(false);
-        } else {
-          setIsEmailValid(false);
-        }
+        setIsEmailValid(false);
+        setErrorMessage('E-mail não encontrado');
       } finally {
         setLoadingEmail(false);
       }
     }
   };
 
-  // Função de envio de código
-  const handleSendCode = async () => {
+  const handleSendCode = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (isCodeValid) {
       setLoadingCode(true);
       try {
@@ -91,6 +77,7 @@ const LoginScreen: React.FC = () => {
       } catch (error) {
         console.error('Erro ao verificar código:', error);
         setIsCodeValid(false);
+        setErrorMessage('Código inválido');
       } finally {
         setLoadingCode(false);
       }
@@ -106,6 +93,13 @@ const LoginScreen: React.FC = () => {
 
   const handleResendCode = () => {
     setTimer(30);
+    const requestData: SendVerificationCodeRequestDTO = {
+      email,
+      phoneNumber: '',
+    };
+    sendVerificationCode(requestData).catch(error => {
+      console.error('Erro ao reenviar código:', error);
+    });
   };
 
   useEffect(() => {
@@ -116,120 +110,202 @@ const LoginScreen: React.FC = () => {
   }, [timer]);
 
   return (
-    <Layout className="layout">
-      <Content
-        className="content"
-      >
-        {/* Modal para Sessão Expirada */}
-        <Modal
-          title="Sessão Expirada"
-          visible={isModalVisible}
-          onCancel={handleCloseModal}
-          footer={[
-            <Button key="close" type="primary" onClick={handleCloseModal}>
-              Fechar
-            </Button>,
-          ]}
-          centered
-        >
-          <p>Efetue o login novamente.</p>
-        </Modal>
-
-        <div className="logo-container">
-          <img
-            src={Logo}
-            alt="LigChat Logo"
-            className="logo"
-          />
-        </div>
-
-        <div className="form-container">
-          <div className="form-wrapper">
-            <Tabs activeKey={activeTab} centered>
-              <TabPane tab="Email ou número" key="1">
-                <Form layout="vertical" onFinish={handleSendEmail}>
-                  <Form.Item
-                    validateStatus={!isEmailValid ? 'error' : ''}
-                    help={!isEmailValid ? 'E-mail não encontrado' : ''}
-                  >
-                    <Input
-                      value={email}
-                      onChange={(e: any) => {
-                        setEmail(e.target.value);
-                        validateEmail(e.target.value);
-                        setIsEmailValid(true);
-                      }}
-                      placeholder="Email ou Número com DDD"
-                    />
-                  </Form.Item>
-                  <Form.Item>
-                    <Button
-                      style={{ marginTop: 5 }}
-                      type="primary"
-                      htmlType="submit"
-                      block
-                      disabled={!isFormValid || loadingEmail}
-                    >
-                      {loadingEmail ? <Spin size="small" /> : 'Enviar'}
-                    </Button>
-                  </Form.Item>
-                </Form>
-              </TabPane>
-
-              <TabPane tab="Código de acesso" key="2" disabled={activeTab === '1'}>
-                <Form layout="vertical" onFinish={handleSendCode}>
-                  <Form.Item
-                    validateStatus={!isCodeValid ? 'error' : ''}
-                    help={!isCodeValid ? 'Código inválido.' : ''}
-                  >
-                    <Input
-                      value={code}
-                      onChange={(e: any) => {
-                        setCode(e.target.value);
-                        validateCode(e.target.value);
-                      }}
-                      placeholder="Digite o código recebido"
-                    />
-                  </Form.Item>
-                  <Form.Item>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      block
-                      disabled={!isCodeValid || loadingCode}
-                    >
-                      {loadingCode ? <Spin size="small" /> : 'Enviar'}
-                    </Button>
-                  </Form.Item>
-                  <Form.Item style={{ marginBottom: 0 }}>
-                    {timer > 0 ? (
-                      <Text type="secondary">Aguarde {timer} segundos para reenviar o código</Text>
-                    ) : (
-                      <Button
-                        type="link"
-                        onClick={handleResendCode}
-                        style={{
-                          padding: 0,
-                          float: 'right',
-                        }}
-                      >
-                        Reenviar código
-                      </Button>
-                    )}
-                  </Form.Item>
-                </Form>
-              </TabPane>
-            </Tabs>
-
-            {/* Links para Política de Privacidade e Termos de Uso */}
-            <div style={{ marginTop: 20, textAlign: 'center' }}>
-              <Link to="/privacy-policy">Política de Privacidade</Link> |{' '}
-              <Link to="/terms-of-use">Termos de Uso</Link>
+    <div className="loginScreen-layout">
+      <div className="loginScreen-sidebar">
+        <div className="loginScreen-sidebarContent">
+          <div className="loginScreen-brandSection">
+            <h1>LigChat</h1>
+            <h2>Plataforma de comunicação empresarial</h2>
+          </div>
+          
+          <div className="loginScreen-features">
+            <div className="loginScreen-feature">
+              <div className="loginScreen-featureIcon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                  <path d="M5.636 4.636a9 9 0 0 1 0 12.728M4.343 3.343a11 11 0 0 1 0 15.314M7.05 6.05a7 7 0 0 1 0 9.9M18.364 4.636a9 9 0 0 0 0 12.728M19.657 3.343a11 11 0 0 0 0 15.314M16.95 6.05a7 7 0 0 0 0 9.9M8 12h8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div className="loginScreen-featureText">
+                <h3>Velocidade em Comunicação</h3>
+                <p>Respostas instantâneas e integração multicanal para atendimento ágil e eficiente</p>
+              </div>
+            </div>
+            
+            <div className="loginScreen-feature">
+              <div className="loginScreen-featureIcon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                  <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="loginScreen-featureText">
+                <h3>Segurança Avançada</h3>
+                <p>Proteção de dados com criptografia de ponta a ponta e conformidade com LGPD</p>
+              </div>
+            </div>
+            
+            <div className="loginScreen-feature">
+              <div className="loginScreen-featureIcon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                  <path d="M2.25 2.25a.75.75 0 000 1.5h1.386c.17 0 .318.114.362.278l2.558 9.592a3.752 3.752 0 00-2.806 3.63c0 .414.336.75.75.75h15.75a.75.75 0 000-1.5H5.378A2.25 2.25 0 017.5 15h11.218a.75.75 0 00.674-.421 60.358 60.358 0 002.96-7.228.75.75 0 00-.525-.965A60.864 60.864 0 005.68 4.509l-.232-.867A1.875 1.875 0 003.636 2.25H2.25zM3.75 20.25a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zM16.5 20.25a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z" />
+                </svg>
+              </div>
+              <div className="loginScreen-featureText">
+                <h3>Resultados Mensuráveis</h3>
+                <p>Aumento de conversão, redução de custos e melhoria na satisfação do cliente</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="loginScreen-statsSection">
+            <div className="loginScreen-stat">
+              <span className="loginScreen-statNumber">+60%</span>
+              <span className="loginScreen-statLabel">Aumento em conversões</span>
+            </div>
+            <div className="loginScreen-stat">
+              <span className="loginScreen-statNumber">-40%</span>
+              <span className="loginScreen-statLabel">Redução de custos</span>
+            </div>
+            <div className="loginScreen-stat">
+              <span className="loginScreen-statNumber">+85%</span>
+              <span className="loginScreen-statLabel">Satisfação do cliente</span>
             </div>
           </div>
         </div>
-      </Content>
-    </Layout>
+      </div>
+
+      <div className="loginScreen-content">
+        {isModalVisible && (
+          <div className="loginScreen-modal">
+            <div className="loginScreen-modalContent">
+              <h2>Sessão Expirada</h2>
+              <p>Efetue o login novamente.</p>
+              <button 
+                className="loginScreen-button loginScreen-primaryButton" 
+                onClick={handleCloseModal}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="loginScreen-formContainer">
+          <div className="loginScreen-logoContainer">
+            <img
+              src={Logo}
+              alt="LigChat Logo"
+              className="loginScreen-logo"
+            />
+          </div>
+          
+          <div className="loginScreen-welcomeText">
+            <h2>Acesso à Plataforma</h2>
+            <p>Entre com suas credenciais para acessar o sistema</p>
+          </div>
+
+          <div className="loginScreen-formWrapper">
+            <div className="loginScreen-tabs">
+              <button 
+                className={`loginScreen-tab ${activeTab === 'email' ? 'loginScreen-activeTab' : ''}`}
+                onClick={() => activeTab === 'email' && setActiveTab('email')}
+              >
+                Email
+              </button>
+              <button 
+                className={`loginScreen-tab ${activeTab === 'code' ? 'loginScreen-activeTab' : ''}`}
+                disabled={activeTab === 'email'}
+              >
+                Código de acesso
+              </button>
+            </div>
+
+            {activeTab === 'email' ? (
+              <form className="loginScreen-form" onSubmit={handleSendEmail}>
+                <div className="loginScreen-formItem">
+                  <label className="loginScreen-label">Email</label>
+                  <input
+                    className={`loginScreen-input ${!isEmailValid ? 'loginScreen-inputError' : ''}`}
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      validateEmail(e.target.value);
+                      setIsEmailValid(true);
+                    }}
+                    placeholder="Seu email corporativo"
+                    type="email"
+                  />
+                  {!isEmailValid && <p className="loginScreen-errorText">{errorMessage}</p>}
+                </div>
+                <div className="loginScreen-formItem">
+                  <button
+                    className="loginScreen-button loginScreen-primaryButton"
+                    type="submit"
+                    disabled={!isFormValid || loadingEmail}
+                  >
+                    {loadingEmail ? (
+                      <span className="loginScreen-loadingSpinner"></span>
+                    ) : (
+                      'Continuar'
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form className="loginScreen-form" onSubmit={handleSendCode}>
+                <div className="loginScreen-formItem">
+                  <label className="loginScreen-label">Código de verificação</label>
+                  <div className="loginScreen-codeInfo">
+                    <p>Enviamos um código de 6 dígitos para <strong>{email}</strong></p>
+                  </div>
+                  <input
+                    className={`loginScreen-input ${!isCodeValid ? 'loginScreen-inputError' : ''}`}
+                    value={code}
+                    onChange={(e) => {
+                      setCode(e.target.value);
+                      validateCode(e.target.value);
+                    }}
+                    placeholder="Digite o código de 6 dígitos"
+                    maxLength={6}
+                  />
+                  {!isCodeValid && <p className="loginScreen-errorText">{errorMessage}</p>}
+                </div>
+                <div className="loginScreen-formItem">
+                  <button
+                    className="loginScreen-button loginScreen-primaryButton"
+                    type="submit"
+                    disabled={!isCodeValid || loadingCode}
+                  >
+                    {loadingCode ? (
+                      <span className="loginScreen-loadingSpinner"></span>
+                    ) : (
+                      'Acessar conta'
+                    )}
+                  </button>
+                </div>
+                <div className="loginScreen-formItem loginScreen-resendContainer">
+                  {timer > 0 ? (
+                    <p className="loginScreen-timerText">Aguarde {timer} segundos para reenviar o código</p>
+                  ) : (
+                    <button
+                      type="button"
+                      className="loginScreen-linkButton"
+                      onClick={handleResendCode}
+                    >
+                      Reenviar código
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
+
+            <div className="loginScreen-links">
+              <Link to="/privacy-policy" className="loginScreen-link">Política de Privacidade</Link> |{' '}
+              <Link to="/terms-of-use" className="loginScreen-link">Termos de Uso</Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 
