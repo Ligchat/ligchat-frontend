@@ -13,7 +13,7 @@ module.exports = function(app) {
     );
 
     // Proxy para o backend principal
-    app.use(
+    app.use( 
         '/api',
         createProxyMiddleware({
             target: 'https://api.ligchat.com',
