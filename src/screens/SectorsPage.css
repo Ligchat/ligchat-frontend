@@ -24,17 +24,19 @@
     border-bottom: 1px solid #2a2a2a;
 }
 
+.header-content {
+    flex: 1;
+}
+
 .header-content h1 {
-    font-size: 1.5rem;
-    font-weight: 500;
+    font-size: 1.8rem;
     color: #00c2ff;
     margin: 0;
 }
 
 .header-description {
     color: #888;
-    font-size: 0.9rem;
-    margin: 0.5rem 0 0 0;
+    margin-top: 0.5rem;
 }
 
 .sectors-grid {
@@ -414,9 +416,17 @@ body.drawer-open {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
+    white-space: nowrap;
+    min-width: 140px;
 }
 
-.add-button:hover {
+.add-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.add-button:hover:not(:disabled) {
     background-color: #00a8e0;
     transform: translateY(-1px);
 }
@@ -495,4 +505,13 @@ body.drawer-open {
     to {
         transform: rotate(360deg);
     }
+}
+
+.no-sector-text {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 150px);
+    color: #888;
+    font-size: 1.2rem;
 } 

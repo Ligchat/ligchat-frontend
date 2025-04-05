@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getAgents, createAgent, updateAgent, deleteAgent } from '../services/AgentService';
+import SessionService from '../services/SessionService';
 import Toast from '../components/Toast';
 import './AgentsPage.css';
 
@@ -32,17 +33,22 @@ const AgentsPage: React.FC = () => {
     model: defaultModels.gpt[0],
     status: true,
     prompt: '',
-    sectorId: 1 // Você pode pegar isso do contexto ou props
+    sectorId: SessionService.getSectorId() || 0
   });
 
   useEffect(() => {
-    fetchAgents();
+    if (SessionService.getSectorId()) {
+      fetchAgents();
+    }
   }, []);
 
   const fetchAgents = async () => {
+    const sectorId = SessionService.getSectorId();
+    if (!sectorId) return;
+    
     try {
       setIsLoading(true);
-      const data = await getAgents(currentAgent.sectorId);
+      const data = await getAgents(sectorId);
       setAgents(data);
     } catch (error) {
     } finally {
@@ -86,7 +92,6 @@ const AgentsPage: React.FC = () => {
 
   const toggleAgentStatus = (agentId: number) => {
     setAgents(currentAgents => {
-      // Se estamos tentando ativar um agente, primeiro verificamos se já existe algum ativo
       const targetAgent = currentAgents.find(a => a.id === agentId);
       if (targetAgent && !targetAgent.status) {
         const hasActiveAgent = currentAgents.some(a => a.status);
@@ -114,6 +119,9 @@ const AgentsPage: React.FC = () => {
         <button 
           className="add-agent-button"
           onClick={() => {
+            const sectorId = SessionService.getSectorId();
+            if (!sectorId) return;
+            
             setCurrentAgent({
               name: '',
               type: 'gpt',
@@ -121,10 +129,11 @@ const AgentsPage: React.FC = () => {
               model: defaultModels.gpt[0],
               status: true,
               prompt: '',
-              sectorId: 1
+              sectorId
             });
             setIsDrawerOpen(true);
           }}
+          disabled={!SessionService.getSectorId()}
         >
           Novo Agente
         </button>
@@ -137,6 +146,10 @@ const AgentsPage: React.FC = () => {
               <div className="card-loading-spinner" />
               <span className="loading-text">Carregando agentes...</span>
             </div>
+          </div>
+        ) : !SessionService.getSectorId() ? (
+          <div className="no-sector-text">
+            Nenhum setor selecionado
           </div>
         ) : (
           <div className="agents-grid">

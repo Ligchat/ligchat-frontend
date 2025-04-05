@@ -172,19 +172,49 @@ const MessageSchedule: React.FC = () => {
     const fetchInitialData = async () => {
       setIsLoading(true);
       try {
-        // Simular delay de rede
-        await new Promise(resolve => setTimeout(resolve, 500));
+        const sectorId = SessionService.getSectorId();
+        setSelectedSector(sectorId);
+
+        if (!sectorId) {
+          setMessages([]);
+          setTags([]);
+          setContacts([]);
+          return;
+        }
+
+        // TODO: Substituir os dados mockados por chamadas reais à API
+        // const response = await getMessageSchedulings(sectorId);
+        // setMessages(response.data);
         
+        // const tagsResponse = await getTags(sectorId);
+        // setTags(tagsResponse.data);
+        
+        // const contactsResponse = await getContacts(sectorId);
+        // setContacts(contactsResponse.data);
+
+        // Dados mockados apenas para desenvolvimento
         setMessages(MOCK_MESSAGES);
         setTags(MOCK_TAGS);
         setContacts(MOCK_CONTACTS);
-        setSelectedSector(1); // Mock sector ID
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchInitialData();
+
+    // Listener para mudanças no setor
+    const handleSectorChange = () => {
+      fetchInitialData();
+    };
+
+    window.addEventListener('sectorChanged', handleSectorChange);
+
+    return () => {
+      window.removeEventListener('sectorChanged', handleSectorChange);
+    };
   }, []);
 
   const handleSave = async () => {
@@ -540,8 +570,8 @@ const MessageSchedule: React.FC = () => {
       </div>
 
       <div className="schedule-content">
-        {selectedSector === null ? (
-          <div className="no-sector-message">
+        {!selectedSector ? (
+          <div className="no-sector-text">
             Nenhum setor selecionado
           </div>
         ) : (

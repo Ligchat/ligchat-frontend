@@ -2,6 +2,7 @@ class SessionService {
   private static readonly TOKEN_KEY = '@ligchat/token';
   private static readonly USER_KEY = '@ligchat/user';
   private static readonly SECTOR_KEY = '@ligchat/sector';
+  private static readonly AVAILABLE_SECTORS_KEY = '@ligchat/available_sectors';
 
   // Salva um valor na sessão
   static setSession(key: string, value: any): void {
@@ -124,27 +125,66 @@ class SessionService {
     localStorage.removeItem(this.USER_KEY);
   }
 
+  static setAvailableSectors(sectors: number[]) {
+    localStorage.setItem(this.AVAILABLE_SECTORS_KEY, JSON.stringify(sectors));
+  }
+
+  static getAvailableSectors(): number[] {
+    const sectors = localStorage.getItem(this.AVAILABLE_SECTORS_KEY);
+    return sectors ? JSON.parse(sectors) : [];
+  }
+
   static setSectorId(sectorId: number) {
+    const availableSectors = this.getAvailableSectors();
+    
+    if (!availableSectors.includes(sectorId)) {
+      this.removeSectorId();
+      return;
+    }
+    
     localStorage.setItem(this.SECTOR_KEY, sectorId.toString());
   }
 
   static getSectorId(): number | null {
     const sectorId = localStorage.getItem(this.SECTOR_KEY);
-    return sectorId ? parseInt(sectorId) : null;
+    if (!sectorId) return null;
+
+    const parsedId = parseInt(sectorId);
+    const availableSectors = this.getAvailableSectors();
+
+    if (!availableSectors.includes(parsedId)) {
+      this.removeSectorId();
+      return null;
+    }
+
+    return parsedId;
   }
 
   static removeSectorId() {
     localStorage.removeItem(this.SECTOR_KEY);
   }
 
+  static validateAndCleanSectorSession(availableSectors: number[]) {
+    this.setAvailableSectors(availableSectors);
+    const currentSectorId = this.getSectorId();
+    
+    if (currentSectorId && !availableSectors.includes(currentSectorId)) {
+      this.removeSectorId();
+    }
+  }
+
   static isAuthenticated(): boolean {
-    return !!this.getToken();
+    const token = this.getToken();
+    if (!token) return false;
+
+    return !this.isTokenExpired(token);
   }
 
   static clearSession() {
     this.removeToken();
     this.removeUser();
     this.removeSectorId();
+    localStorage.removeItem(this.AVAILABLE_SECTORS_KEY);
   }
 }
 

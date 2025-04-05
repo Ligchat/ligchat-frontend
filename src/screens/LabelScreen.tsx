@@ -620,10 +620,15 @@ const LabelScreen = () => {
                 <div className="label-header">
                     <div className="header-content">
                         <h1>Etiquetas</h1>
-                        <p className="header-description">Gerencie as etiquetas do seu setor</p>
+                        <p className="header-description">Gerencie as etiquetas para organizar seus contatos</p>
                     </div>
-                    <button className="add-label-button" onClick={handleAddNew}>
-                        <FiPlus /> Nova Etiqueta
+                    <button 
+                        className="add-label-button"
+                        onClick={handleAddNew}
+                        disabled={!SessionService.getSectorId()}
+                    >
+                        <FiPlus />
+                        Nova Etiqueta
                     </button>
                 </div>
 
@@ -636,7 +641,7 @@ const LabelScreen = () => {
                         </div>
                     </div>
                     
-                    {isLoading ? (
+                    {isLoading && SessionService.getSectorId() ? (
                         <div className="labels-list">
                             <div className="loading-overlay">
                                 <div className="card-loading">
@@ -644,6 +649,10 @@ const LabelScreen = () => {
                                     <span className="loading-text">Carregando etiquetas...</span>
                                 </div>
                             </div>
+                        </div>
+                    ) : !SessionService.getSectorId() ? (
+                        <div className="no-sector-text">
+                            Nenhum setor selecionado
                         </div>
                     ) : tags.length === 0 ? (
                         <div className="empty-state">

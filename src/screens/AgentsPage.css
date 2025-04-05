@@ -44,7 +44,13 @@
   transition: all 0.2s;
 }
 
-.add-agent-button:hover {
+.add-agent-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.add-agent-button:hover:not(:disabled) {
   background-color: #33ceff;
   transform: translateY(-1px);
 }
@@ -441,4 +447,13 @@ input:checked + .slider:before {
   to {
     transform: rotate(360deg);
   }
+}
+
+.no-sector-text {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 150px);
+  color: #888;
+  font-size: 1.2rem;
 } 

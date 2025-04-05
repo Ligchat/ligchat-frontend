@@ -67,7 +67,6 @@ const SectorsPage: React.FC = () => {
       setSectors(response || []);
     } catch (error) {
       console.error('Falha ao buscar setores', error);
-      addToast('Erro ao carregar setores', 'error');
       setSectors([]);
     } finally {
       setIsLoading(false);
@@ -191,15 +190,18 @@ const SectorsPage: React.FC = () => {
       </div>
 
       <div className="sectors-content">
-        {isLoading && (
+        {isLoading ? (
           <div className="loading-overlay">
             <div className="card-loading">
               <div className="card-loading-spinner" />
               <span className="loading-text">Carregando setores...</span>
             </div>
           </div>
-        )}
-        {sectors.length === 0 && !isLoading ? (
+        ) : !SessionService.getSectorId() ? (
+          <div className="no-sector-text">
+            Nenhum setor selecionado
+          </div>
+        ) : sectors.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">
               <FiFolder size={48} />

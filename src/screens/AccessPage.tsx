@@ -111,7 +111,6 @@ const AccessPage: React.FC = () => {
       setSectors(sectorsData);
     } catch (error) {
       console.error('Erro ao buscar setor:', error);
-      addToast('Erro ao carregar setor', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -391,7 +390,11 @@ const AccessPage: React.FC = () => {
           <h1>Acessos</h1>
           <p className="header-description">Gerencie os acessos dos usuários</p>
         </div>
-        <button className="add-user-button" onClick={() => setIsDrawerOpen(true)}>
+        <button 
+          className="add-user-button" 
+          onClick={() => setIsDrawerOpen(true)}
+          disabled={!SessionService.getSectorId()}
+        >
           <FiPlus /> Novo Usuário
         </button>
       </div>
@@ -404,7 +407,11 @@ const AccessPage: React.FC = () => {
           </div>
         ) : (
           <>
-            {people.length === 0 ? (
+            {!SessionService.getSectorId() ? (
+              <div className="no-sector-text">
+                Nenhum setor selecionado
+              </div>
+            ) : people.length === 0 ? (
               <div className="empty-state">
                 <p>Nenhum usuário encontrado</p>
               </div>

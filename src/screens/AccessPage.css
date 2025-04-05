@@ -45,7 +45,13 @@
     transition: all 0.2s ease;
 }
 
-.add-user-button:hover {
+.add-user-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.add-user-button:hover:not(:disabled) {
     background-color: #00a8e0;
     transform: translateY(-1px);
 }
@@ -858,4 +864,13 @@
     outline: none;
     border-color: #00c2ff;
     background-color: #252525;
+}
+
+.no-sector-text {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 150px);
+    color: #888;
+    font-size: 1.2rem;
 } 
