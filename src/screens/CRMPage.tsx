@@ -323,7 +323,6 @@ const CRMPage: React.FC = () => {
 
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
-        addToast('Erro ao carregar dados', 'error');
       } finally {
         setIsLoading(false);
       }

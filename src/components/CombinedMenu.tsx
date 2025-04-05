@@ -29,12 +29,12 @@ const PROFILE_UPDATED_EVENT = 'profileUpdated';
 const CombinedMenu: React.FC = () => {
     const [sectors, setSectors] = useState<Sector[]>([]);
     const [collapsed, setCollapsed] = useState(false);
-    const [selectedComponent, setSelectedComponent] = useState<JSX.Element>(<DashBoard />);
+    const [selectedComponent, setSelectedComponent] = useState<JSX.Element | null>(null);
     const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768);
     const [isLoading, setIsLoading] = useState(false);
     const [name, setName] = useState('');
     const [avatar, setAvatar] = useState<string | null>(null);
-    const [selectedSector, setSelectedSector] = useState<string | null>(null);
+    const [selectedSector, setSelectedSector] = useState<string>('');
     const [selectedMenuKey, setSelectedMenuKey] = useState<string>('1');
     const [isAdmin, setIsAdmin] = useState<boolean>(false);
     const [expandedSubmenus, setExpandedSubmenus] = useState<string[]>([]);
@@ -47,63 +47,25 @@ const CombinedMenu: React.FC = () => {
     const navigationInProgressRef = useRef(false);
 
     useEffect(() => {
-        setSelectedComponent(<DashBoard />);
+        const sectorId = SessionService.getSectorId();
+        console.log('Initial load:', { sectorId, pathname: location.pathname });
+        
+        if (sectorId) {
+            setSelectedSector(sectorId.toString());
+        }
+        
+        // Força a atualização do componente inicial
+        updateComponentForCurrentRoute(sectorId?.toString() || null);
     }, []);
 
     useEffect(() => {
-        if (initialRenderRef.current) {
+        if (!initialRenderRef.current) {
+            console.log('Route changed:', location.pathname);
+            updateComponentForCurrentRoute(selectedSector);
+        } else {
             initialRenderRef.current = false;
-            
-            const currentPath = location.pathname;
-            if (currentPath === '/' || currentPath === '') {
-                navigate('/dashboard');
-                return;
-            }
-            
-            const validPaths = [
-                '/dashboard', '/chat', '/schedule', '/crm', 
-                '/profile', '/labels', '/access', '/sectors', 
-            ];
-            
-            const isValidPath = validPaths.some(path => 
-                currentPath === path || currentPath.startsWith(`${path}/`)
-            );
-            
-            if (isValidPath) {
-                updateSelectedMenuFromPath(currentPath);
-                return;
-            }
-            
-            const storedMenuKey = localStorage.getItem('selectedMenuKey');
-            if (storedMenuKey) {
-                setSelectedMenuKey(storedMenuKey);
-                const path = getPathFromKey(storedMenuKey);
-                navigate(path);
-            } else {
-                navigate('/dashboard');
-            }
         }
-    }, [navigate, location.pathname]);
-
-    const updateSelectedMenuFromPath = (path: string) => {
-        if (path.includes('/dashboard')) {
-            setSelectedMenuKey('1');
-        } else if (path.includes('/chat')) {
-            setSelectedMenuKey('2');
-        } else if (path.includes('/schedule')) {
-            setSelectedMenuKey('3');
-        } else if (path.includes('/crm')) {
-            setSelectedMenuKey('5');
-        } else if (path.includes('/profile')) {
-            setSelectedMenuKey('7');
-        } else if (path.includes('/labels')) {
-            setSelectedMenuKey('8');
-        } else if (path.includes('/access')) {
-            setSelectedMenuKey('9');
-        } else if (path.includes('/sectors')) {
-            setSelectedMenuKey('10');
-        }
-    };
+    }, [location.pathname]);
 
     useEffect(() => {
         const tokenFromSession = SessionService.getToken();
@@ -148,11 +110,24 @@ const CombinedMenu: React.FC = () => {
 
     const fetchSectors = async (token: string) => {
         try {
+            console.log('Fetching sectors...');
             const sectors = await getSectors(token);
+            console.log('Sectors fetched:', sectors);
             setSectors(sectors);
-            const sectorId = SessionService.getSectorId();
-            if (sectorId) {
-                setSelectedSector(sectorId.toString());
+            
+            // Atualiza os setores disponíveis no SessionService
+            const sectorIds = sectors.map(s => s.id);
+            SessionService.validateAndCleanSectorSession(sectorIds);
+            
+            // Verifica se o setor atual ainda é válido
+            const currentSectorId = SessionService.getSectorId();
+            if (currentSectorId) {
+                const sectorExists = sectors.some(s => s.id === currentSectorId);
+                if (!sectorExists) {
+                    console.log('Current sector not found in available sectors');
+                    SessionService.removeSectorId();
+                    setSelectedSector('');
+                }
             }
         } catch (error) {
             console.error('Erro ao buscar setores:', error);
@@ -221,38 +196,78 @@ const CombinedMenu: React.FC = () => {
         };
     }, []);
 
+    const renderComponent = (Component: React.ComponentType, sectorId: string | null, timestamp: number) => {
+        const key = `${selectedMenuKey}-${sectorId}-${timestamp}`;
+        return <Component key={key} />;
+    };
+
+    const updateComponentForCurrentRoute = (sectorId: string | null) => {
+        const timestamp = Date.now();
+        console.log('Updating component for route:', { path: location.pathname, sectorId, timestamp });
+        
+        // Atualiza o componente baseado na rota atual
+        const path = location.pathname;
+        const key = `${path}-${sectorId}-${timestamp}`;
+        
+        if (path.includes('/sectors')) {
+            setSelectedComponent(<div key={key} className="page-container"><SectorsPage /></div>);
+        } else if (path === '/' || path.includes('/dashboard')) {
+            setSelectedComponent(<DashBoard key={key} />);
+        } else if (path.includes('/chat')) {
+            setSelectedComponent(<ChatNew key={key} />);
+        } else if (path.includes('/schedule')) {
+            setSelectedComponent(<MessageSchedule key={key} />);
+        } else if (path.includes('/crm')) {
+            setSelectedComponent(<CRMPage key={key} />);
+        } else if (path.includes('/profile')) {
+            setSelectedComponent(<ProfilePage key={key} />);
+        } else if (path.includes('/labels')) {
+            setSelectedComponent(<LabelPage key={key} />);
+        } else if (path.includes('/access')) {
+            setSelectedComponent(<AccessPage key={key} />);
+        } else if (path.includes('/agents')) {
+            setSelectedComponent(<div key={key} className="page-container"><AgentsPage /></div>);
+        }
+    };
+
+    useEffect(() => {
+        const sectorId = selectedSector ? parseInt(selectedSector) : null;
+        const currentSectorId = SessionService.getSectorId();
+        
+        console.log('Sector change detected:', { selectedSector, sectorId, currentSectorId });
+        
+        if (sectorId !== currentSectorId) {
+            console.log('Updating sector in SessionService');
+            if (sectorId) {
+                SessionService.setSectorId(sectorId);
+            } else {
+                SessionService.removeSectorId();
+            }
+            
+            // Força a atualização do componente
+            const timestamp = Date.now();
+            updateComponentForCurrentRoute(selectedSector);
+        }
+    }, [selectedSector]);
+
     const handleSectorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = e.target.value;
+        console.log('Sector selection changed:', { value });
         setIsLoading(true);
-        setSelectedSector(value);
-        SessionService.setSectorId(parseInt(value));
         
-        // Atualiza o componente atual
-        const key = selectedMenuKey;
-        updateSelectedComponent(key);
-        
-        // Recarrega os dados necessários
-        const path = location.pathname;
-        if (path.includes('/sectors')) {
-            updateSelectedComponent('10');
-        } else if (path === '/' || path.includes('/dashboard')) {
-            updateSelectedComponent('1');
-        } else if (path.includes('/chat')) {
-            updateSelectedComponent('2');
-        } else if (path.includes('/schedule')) {
-            updateSelectedComponent('3');
-        } else if (path.includes('/crm')) {
-            updateSelectedComponent('5');
-        } else if (path.includes('/profile')) {
-            updateSelectedComponent('7');
-        } else if (path.includes('/labels')) {
-            updateSelectedComponent('8');
-        } else if (path.includes('/access')) {
-            updateSelectedComponent('9');
-        } else if (path.includes('/agents')) {
-            updateSelectedComponent('11');
+        // Atualiza o setor no SessionService
+        if (value) {
+            const sectorId = parseInt(value);
+            SessionService.setSectorId(sectorId);
+        } else {
+            SessionService.removeSectorId();
         }
-
+        
+        setSelectedSector(value);
+        
+        // Força uma atualização imediata do componente
+        updateComponentForCurrentRoute(value);
+        
         setTimeout(() => {
             setIsLoading(false);
         }, 500);
@@ -478,41 +493,6 @@ const CombinedMenu: React.FC = () => {
         );
     };
 
-    useEffect(() => {
-        const path = location.pathname;
-        console.log('Path mudou:', path);
-        
-        let key = '1';
-        if (path.includes('/sectors')) {
-            key = '10';
-            updateSelectedComponent('10');
-        } else if (path === '/' || path.includes('/dashboard')) {
-            key = '1';
-        } else if (path.includes('/chat')) {
-            key = '2';
-        } else if (path.includes('/schedule')) {
-            key = '3';
-        } else if (path.includes('/crm')) {
-            key = '5';
-        } else if (path.includes('/profile')) {
-            key = '7';
-        } else if (path.includes('/labels')) {
-            key = '8';
-        } else if (path.includes('/access')) {
-            key = '9';
-        } else if (path.includes('/agents')) {
-            key = '11';
-        }
-        
-        setSelectedMenuKey(key);
-        
-        if (!navigationInProgressRef.current) {
-            updateSelectedComponent(key);
-        }
-        
-        navigationInProgressRef.current = false;
-    }, [location.pathname]);
-
     return (
         <div className="menu-layout">
             <header className="menu-header">
@@ -574,7 +554,7 @@ const CombinedMenu: React.FC = () => {
                                 {renderMenuItems()}
                                 <div className="menu-sector-selector">
                                     <select 
-                                        value={selectedSector || ''} 
+                                        value={selectedSector} 
                                         onChange={handleSectorChange}
                                         className="menu-select"
                                     >
