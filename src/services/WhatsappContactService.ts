@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Contact } from '../types/chat';
 
 const WHATSAPP_API_URL = process.env.REACT_APP_WHATSAPP_API_URL;
 
@@ -9,7 +10,7 @@ export interface WhatsAppContact {
     phoneNumber: string;
     address: string;
     profilePictureUrl?: string;
-    email?: string;
+    email?: string; 
     annotations?: string;
     status: number;
     sectorId?: number;
@@ -127,5 +128,29 @@ export const deleteWhatsAppContact = async (id: number): Promise<void> => {
         await axios.delete(`${WHATSAPP_API_URL}/contact/${id}`);
     } catch (error) {
         console.error(`Failed to delete WhatsApp contact with ID ${id}:`, error);
+    }
+};
+
+export const getContactsBySector = async (sectorId: number): Promise<Contact[]> => {
+    try {
+        const response = await axios.get(`${WHATSAPP_API_URL}/contact/sector/${sectorId}`, {
+            headers: {
+                'accept': 'text/plain'
+            }
+        });
+
+        return response.data.map((contact: any) => ({
+            id: contact.id,
+            name: contact.name || 'Sem nome',
+            phoneNumber: contact.phoneNumber,
+            profilePicture: contact.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name || 'User')}&background=random`,
+            lastMessage: '',
+            lastMessageTime: contact.updatedAt || contact.createdAt,
+            unreadCount: 0,
+            isOnline: false
+        }));
+    } catch (error) {
+        console.error('Erro ao buscar contatos do setor:', error);
+        throw error;
     }
 };

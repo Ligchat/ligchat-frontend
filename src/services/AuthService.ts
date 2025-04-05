@@ -29,8 +29,9 @@ export const verifyCode = async (data: VerifyCodeRequestDTO) => {
 
     const token = response.data.token;
     if (token) {
-      SessionService.setSession('authToken', token);
+      SessionService.setToken(token);
     }
+    return response.data;
   } catch (error) {
     throw new Error(`Failed to send verification code: ${error}`);
   }

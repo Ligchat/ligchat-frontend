@@ -1,27 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  PaperClipOutlined,
-  PictureOutlined,
-  SmileOutlined,
-} from '@ant-design/icons';
-import {
-  Card,
-  Row,
-  Col,
-  Button,
-  Input,
-  DatePicker,
-  Select,
-  message as antdMessage,
-  Skeleton,
-  Collapse,
-  Space,
-  Upload,
-  Tooltip, // Importar Tooltip
-} from 'antd';
+import React, { useEffect, useState, useRef } from 'react';
 import dayjs, { Dayjs } from 'dayjs';
 import Picker from '@emoji-mart/react';
 import {
@@ -33,16 +10,71 @@ import {
 } from '../services/MessageSchedulingsService';
 import { getTags } from '../services/LabelService';
 import SessionService from '../services/SessionService';
-import LoadingOverlay from '../components/LoadingOverlay';
 import { getFlows } from '../services/FlowService';
 import { getSector } from '../services/SectorService';
+import './MessageSchedule.css';
 
-declare var gapi: any;
-declare var google: any; // Declare 'google' for the new GIS library
+declare global {
+  interface Window {
+    google: any;
+    gapi: any;
+  }
+}
 
-const { TextArea } = Input;
-const { Option } = Select;
-const { Panel } = Collapse;
+const google = window.google;
+const gapi = window.gapi;
+
+const Icons = {
+  Plus: () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  ),
+  Edit: () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+    </svg>
+  ),
+  Delete: () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 6h18"></path>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </svg>
+  ),
+  Paperclip: () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+    </svg>
+  ),
+  Picture: () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+      <polyline points="21 15 16 10 5 21"></polyline>
+    </svg>
+  ),
+  Smile: () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+      <line x1="9" y1="9" x2="9.01" y2="9"></line>
+      <line x1="15" y1="9" x2="15.01" y2="9"></line>
+    </svg>
+  ),
+};
+
+interface User {
+  id: number;
+  name: string;
+  photoUrl?: string;
+}
+
+interface Contact {
+  id: number;
+  name: string;
+}
 
 interface Message {
   id?: number;
@@ -50,15 +82,9 @@ interface Message {
   date: number | null;
   description: string;
   labels: string[];
-  flowId: any | null;
-  imageName?: string;
-  fileName?: string;
-  imageAttachment?: string;
-  fileAttachment?: string;
-  imageMimeType?: string;
-  fileMimeType?: string;
-  emojis?: string[];
-  // Removemos googleEventId e meetLink
+  contactId: number | null;
+  createdBy: User;
+  contact: Contact;
 }
 
 interface Tag {
@@ -68,7 +94,52 @@ interface Tag {
 
 const SCOPES = 'https://www.googleapis.com/auth/calendar';
 
+// Dados mock
+const MOCK_CONTACTS = [
+  { id: 1, name: "João Silva" },
+  { id: 2, name: "Maria Santos" },
+  { id: 3, name: "Pedro Oliveira" },
+];
+
+const MOCK_TAGS = [
+  { id: 1, name: "Urgente" },
+  { id: 2, name: "Follow-up" },
+  { id: 3, name: "Reunião" },
+  { id: 4, name: "Importante" },
+];
+
+const MOCK_USER = {
+  id: 1,
+  name: "Admin",
+  photoUrl: "https://ui-avatars.com/api/?name=Admin&background=random"
+};
+
+const MOCK_MESSAGES = [
+  {
+    id: 1,
+    title: "Reunião de Planejamento",
+    date: dayjs().add(1, 'day').valueOf(),
+    description: "Reunião para discutir o planejamento do próximo trimestre",
+    labels: ["1", "3"],
+    contactId: 1,
+    createdBy: MOCK_USER,
+    contact: MOCK_CONTACTS[0]
+  },
+  {
+    id: 2,
+    title: "Follow-up Cliente",
+    date: dayjs().add(2, 'day').valueOf(),
+    description: "Fazer follow-up com o cliente sobre a proposta enviada",
+    labels: ["2", "4"],
+    contactId: 2,
+    createdBy: MOCK_USER,
+    contact: MOCK_CONTACTS[1]
+  }
+];
+
 const MessageSchedule: React.FC = () => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
@@ -81,15 +152,9 @@ const MessageSchedule: React.FC = () => {
     date: null,
     description: '',
     labels: [],
-    flowId: null,
-    imageName: '',
-    fileName: '',
-    imageAttachment: '',
-    fileAttachment: '',
-    imageMimeType: '',
-    fileMimeType: '',
-    emojis: [],
-    // Removemos googleEventId e meetLink
+    contactId: null,
+    createdBy: {} as User,
+    contact: {} as Contact
   });
   const [selectedSector, setSelectedSector] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -98,221 +163,76 @@ const MessageSchedule: React.FC = () => {
   const [isGeneratingMeetLink, setIsGeneratingMeetLink] = useState(false);
   const [googleClientId, setGoogleClientId] = useState<string | null>(null);
   const [googleApiKey, setGoogleApiKey] = useState<string | null>(null);
-  const [isApiKeyValid, setIsApiKeyValid] = useState<boolean>(true); // Novo estado
+  const [isApiKeyValid, setIsApiKeyValid] = useState<boolean>(true);
+  const [dateInputValue, setDateInputValue] = useState('');
+  const [isTagsDropdownOpen, setIsTagsDropdownOpen] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
 
   useEffect(() => {
-    const fetchSectorDetails = async () => {
-      const sectorId = SessionService.getSession('selectedSector');
-      setSelectedSector(sectorId);
-      if (sectorId !== null) {
-        try {
-          const sector: any = await getSector(sectorId);
-          setGoogleClientId(sector.data.googleClientId || null);
-          setGoogleApiKey(sector.data.googleApiKey || null);
-          if (!sector.data.googleApiKey) {
-            setIsApiKeyValid(false);
-          }
-        } catch (error) {
-          console.error('Erro ao buscar detalhes do setor:', error);
-          setIsApiKeyValid(false);
-        }
+    const fetchInitialData = async () => {
+      setIsLoading(true);
+      try {
+        // Simular delay de rede
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        setMessages(MOCK_MESSAGES);
+        setTags(MOCK_TAGS);
+        setContacts(MOCK_CONTACTS);
+        setSelectedSector(1); // Mock sector ID
+      } finally {
+        setIsLoading(false);
       }
-      fetchMessages();
-      fetchTags();
-      fetchFlows();
     };
 
-    fetchSectorDetails();
+    fetchInitialData();
   }, []);
-
-  useEffect(() => {
-    if (!googleClientId || !googleApiKey) {
-      if (googleApiKey === null || googleApiKey === undefined) {
-        setIsApiKeyValid(false);
-      }
-      return;
-    }
-
-    // Load the GIS script
-    const gisScript = document.createElement('script');
-    gisScript.src = 'https://accounts.google.com/gsi/client';
-    gisScript.async = true;
-    gisScript.defer = true;
-    gisScript.onload = () => {
-      const client = google.accounts.oauth2.initTokenClient({
-        client_id: googleClientId,
-        scope: SCOPES,
-        callback: '', // Will be set later
-      });
-      setTokenClient(client);
-    };
-    document.body.appendChild(gisScript);
-
-    // Load the GAPI client library
-    const gapiScript = document.createElement('script');
-    gapiScript.src = 'https://apis.google.com/js/api.js';
-    gapiScript.onload = () => {
-      gapi.load('client', () => initGapiClient(googleApiKey));
-    };
-    document.body.appendChild(gapiScript);
-
-    // Cleanup scripts on unmount or credential change
-    return () => {
-      if (document.body.contains(gisScript)) {
-        document.body.removeChild(gisScript);
-      }
-      if (document.body.contains(gapiScript)) {
-        document.body.removeChild(gapiScript);
-      }
-    };
-  }, [googleClientId, googleApiKey]);
-
-  const initGapiClient = async (apiKey: string) => {
-    try {
-      await gapi.client.init({
-        apiKey: apiKey,
-        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
-      });
-      setIsApiKeyValid(true); // Chave válida
-    } catch (error) {
-      console.error('Erro ao inicializar o cliente GAPI:', error);
-      setIsApiKeyValid(false); // Chave inválida
-    }
-  };
-
-  const handleAuthClick = () => {
-    if (!tokenClient) {
-      console.error('Token client not initialized');
-      return;
-    }
-
-    tokenClient.callback = (resp: any) => {
-      if (resp.error !== undefined) {
-        console.error('Error during authentication:', resp.error);
-        if (resp.error === 'popup_closed_by_user') {
-        } else {
-        }
-      } else {
-        setIsAuthenticated(true);
-      }
-    };
-
-    if (gapi.client.getToken() === null) {
-      tokenClient.requestAccessToken({ prompt: 'consent' });
-    } else {
-      tokenClient.requestAccessToken({ prompt: '' });
-    }
-  };
-
-  const handleSignoutClick = () => {
-    const token = gapi.client.getToken();
-    if (token !== null) {
-      google.accounts.oauth2.revoke(token.access_token, () => {
-        gapi.client.setToken(null);
-        setIsAuthenticated(false);
-      });
-    }
-  };
-
-  const fetchFlows = async () => {
-    setIsLoading(true);
-    try {
-      const response: any = await getFlows(
-        SessionService.getSessionForSector(),
-        0,
-        SessionService.getSession('authToken')
-      );
-      setFlows(Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      console.error('Erro ao buscar fluxos:', error);
-      setFlows([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchMessages = async () => {
-    setIsLoading(true);
-    try {
-      const response: any = await getMessageSchedulings();
-      setMessages(
-        response.map((msg: any) => ({
-          id: msg.id,
-          title: msg.name,
-          date: dayjs(msg.sendDate, 'DD/MM/YYYY HH:mm').valueOf(),
-          description: msg.messageText,
-          labels: msg.tagIds ? msg.tagIds.split(',') : [],
-          flowId: msg.flowId,
-          imageName: msg.imageName,
-          fileName: msg.fileName,
-          imageAttachment: msg.imageAttachment,
-          fileAttachment: msg.fileAttachment,
-          imageMimeType: msg.imageMimeType,
-          fileMimeType: msg.fileMimeType,
-          emojis: msg.emojis || [],
-          // Removemos googleEventId e meetLink
-        }))
-      );
-    } catch (error) {
-      console.error('Erro ao buscar mensagens:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchTags = async () => {
-    setIsLoading(true);
-    try {
-      const response: any = await getTags();
-      setTags(Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      console.error('Erro ao buscar etiquetas:', error);
-      setTags([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const truncateText = (text: string, limit: number) => {
-    return text.length > limit ? text.substring(0, limit) + '...' : text;
-  };
 
   const handleSave = async () => {
     try {
-      const sectorId = SessionService.getSession('selectedSector');
+      if (!newMessage.title.trim()) {
+        alert('Por favor, preencha o título');
+        return;
+      }
 
       if (!newMessage.date) {
-        throw new Error('Data inválida');
+        alert('Por favor, selecione uma data');
+        return;
       }
 
-      const formattedDate = dayjs(newMessage.date).format('DD-MM-YYYY HH:mm:ss');
+      if (!newMessage.description.trim()) {
+        alert('Por favor, preencha a descrição');
+        return;
+      }
 
-      const messageData: CreateMessageSchedulingDTO = {
-        name: newMessage.title,
-        messageText: newMessage.description,
-        sendDate: formattedDate,
-        flowId: newMessage.flowId!,
-        sectorId: sectorId,
-        tagIds: newMessage.labels.join(','),
-        imageName: newMessage.imageName,
-        fileName: newMessage.fileName,
-        imageAttachment: newMessage.imageAttachment,
-        fileAttachment: newMessage.fileAttachment,
-        imageMimeType: newMessage.imageMimeType,
-        fileMimeType: newMessage.fileMimeType,
-        status: true,
+      if (!newMessage.contactId) {
+        alert('Por favor, selecione um contato');
+        return;
+      }
+
+      setIsLoading(true);
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simular delay
+
+      const savedMessage = {
+        ...newMessage,
+        id: currentMessageIndex !== null ? newMessage.id : Math.random(),
+        createdBy: MOCK_USER,
+        contact: MOCK_CONTACTS.find(c => c.id === newMessage.contactId) || MOCK_CONTACTS[0]
       };
 
-      if (currentMessageIndex !== null && newMessage.id) {
-        await updateMessageScheduling(newMessage.id, messageData);
+      if (currentMessageIndex !== null) {
+        setMessages(prev => prev.map(msg => 
+          msg.id === savedMessage.id ? savedMessage : msg
+        ));
       } else {
-        await createMessageScheduling(messageData);
+        setMessages(prev => [...prev, savedMessage]);
       }
 
-      fetchMessages();
       closeDrawer();
     } catch (error: any) {
       console.error('Erro ao salvar mensagem:', error);
+      alert('Erro ao salvar mensagem: ' + error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -320,13 +240,16 @@ const MessageSchedule: React.FC = () => {
     const messageId = messages[index].id;
     if (!messageId) return;
 
+    setIsLoading(true);
     try {
-      await deleteMessageScheduling(messageId);
-      fetchMessages();
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simular delay
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
     } catch (error: any) {
       console.error('Erro ao excluir mensagem:', error);
+      alert('Erro ao excluir mensagem');
     } finally {
       setConfirmDeleteIndex(null);
+      setIsLoading(false);
     }
   };
 
@@ -340,15 +263,9 @@ const MessageSchedule: React.FC = () => {
         date: message.date,
         description: message.description,
         labels: message.labels,
-        flowId: message.flowId,
-        imageName: message.imageName,
-        fileName: message.fileName,
-        imageAttachment: message.imageAttachment,
-        fileAttachment: message.fileAttachment,
-        imageMimeType: message.imageMimeType,
-        fileMimeType: message.fileMimeType,
-        emojis: message.emojis || [],
-        // Removemos googleEventId e meetLink
+        contactId: message.contactId,
+        createdBy: message.createdBy,
+        contact: message.contact,
       });
     } else {
       setNewMessage({
@@ -356,15 +273,9 @@ const MessageSchedule: React.FC = () => {
         date: null,
         description: '',
         labels: [],
-        flowId: null,
-        imageName: '',
-        fileName: '',
-        imageAttachment: '',
-        fileAttachment: '',
-        imageMimeType: '',
-        fileMimeType: '',
-        emojis: [],
-        // Removemos googleEventId e meetLink
+        contactId: null,
+        createdBy: {} as User,
+        contact: {} as Contact
       });
     }
     setIsDrawerVisible(true);
@@ -374,125 +285,15 @@ const MessageSchedule: React.FC = () => {
     setIsDrawerVisible(false);
   };
 
-  const handleDateChange = (date: Dayjs | null) => {
-    if (date && date.isValid()) {
-      setNewMessage({ ...newMessage, date: date.valueOf() });
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setDateInputValue(value);
+    const date = new Date(value);
+    if (!isNaN(date.getTime())) {
+      setNewMessage({ ...newMessage, date: date.getTime() });
     } else {
       setNewMessage({ ...newMessage, date: null });
     }
-  };
-
-  const handleLabelsChange = (selectedLabels: string[]) => {
-    setNewMessage({ ...newMessage, labels: selectedLabels });
-  };
-
-  const handleFlowChange = (flowId: number) => {
-    setNewMessage({
-      ...newMessage,
-      flowId,
-      description: '',
-      imageName: '',
-      fileName: '',
-      imageAttachment: '',
-      fileAttachment: '',
-      imageMimeType: '',
-      fileMimeType: '',
-    });
-  };
-
-  const generateGoogleMeetLink = () => {
-    if (!newMessage.date) {
-      return;
-    }
-
-    if (!isAuthenticated) {
-      handleAuthClick();
-      return;
-    }
-
-    setIsGeneratingMeetLink(true);
-
-    const event = {
-      summary: newMessage.title || 'Evento do Agendamento de Mensagem',
-      description: newMessage.description || '',
-      start: {
-        dateTime: dayjs(newMessage.date).toISOString(),
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      },
-      end: {
-        dateTime: dayjs(newMessage.date).add(1, 'hour').toISOString(),
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      },
-      conferenceData: {
-        createRequest: {
-          requestId: `meet_${Date.now()}`,
-        },
-      },
-    };
-
-    gapi.client.calendar.events
-      .insert({
-        calendarId: 'primary',
-        resource: event,
-        conferenceDataVersion: 1,
-      })
-      .then(
-        (response: any) => {
-          const event = response.result;
-          const meetLink = event.conferenceData.entryPoints[0].uri;
-          setNewMessage((prevMessage) => ({
-            ...prevMessage,
-            description: `${prevMessage.description}\n\tLink do Google Meet: ${meetLink}`,
-          }));
-          setIsGeneratingMeetLink(false);
-        },
-        (error: any) => {
-          console.error('Erro ao criar evento no Google Calendar:', error);
-          setIsGeneratingMeetLink(false);
-        }
-      );
-  };
-
-  const handleAddAttachment = (file: any) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const base64String = reader.result?.toString().split(',')[1] || '';
-
-      setNewMessage((prevMessage) => ({
-        ...prevMessage,
-        fileName: file.name,
-        fileMimeType: file.type,
-        fileAttachment: base64String,
-      }));
-    };
-
-    reader.onerror = () => {
-    };
-
-    reader.readAsDataURL(file);
-    return false;
-  };
-
-  const handleAddImage = (file: any) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const base64String = reader.result?.toString().split(',')[1] || '';
-
-      setNewMessage((prevMessage) => ({
-        ...prevMessage,
-        imageName: file.name,
-        imageMimeType: file.type,
-        imageAttachment: base64String,
-      }));
-    };
-
-    reader.onerror = () => {
-    };
-
-    reader.readAsDataURL(file);
-    return false;
   };
 
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -502,234 +303,265 @@ const MessageSchedule: React.FC = () => {
     });
   };
 
-  return (
-    <div className="relative p-8">
-      {isLoading && <LoadingOverlay />}
+  const removeTag = (tagId: string) => {
+    setNewMessage(prev => ({
+      ...prev,
+      labels: prev.labels.filter(id => id !== tagId)
+    }));
+  };
 
-      <h1 style={{color: '#1890ff'}} className="text-3xl font-bold mb-6">Agendamento de mensagem</h1>
-      {selectedSector === null && (
-        <div className="flex justify-center items-center h-64 text-lg text-gray-500">
-          Nenhum setor selecionado
-        </div>
-      )}
-      <Row gutter={[24, 24]}>
-        {isLoading ? (
-          <Col span={24}>
-            <Skeleton active />
-          </Col>
-        ) : (
-          messages.map((message, index) => (
-            <Col xs={24} sm={12} md={8} key={index} style={{ display: 'flex' }}>
-              <Card className="shadow-md border rounded-lg flex-grow">
-                {confirmDeleteIndex === index ? (
-                  <div className="flex flex-col items-center justify-center h-full bg-yellow-400 rounded-lg p-6">
-                    <h2 className="text-2xl font-bold text-center mb-4">Deseja mesmo excluir?</h2>
-                    <p className="text-white mb-4">Essa ação é irreversível.</p>
-                    <div className="flex justify-center space-x-4">
-                      <Button
-                        onClick={() => setConfirmDeleteIndex(null)}
-                        className="border-white text-white"
-                        style={{ backgroundColor: 'transparent' }}
-                      >
-                        Não
-                      </Button>
-                      <Button
-                        type="primary"
-                        onClick={() => handleDelete(index)}
-                        style={{ backgroundColor: '#FFFFFF', color: '#000000' }}
-                      >
-                        Sim
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex justify-between items-start mb-2">
-                      <h2 className="text-lg font-bold">{message.title}</h2>
-                      <div className="flex space-x-2">
-                        <EditOutlined className="text-blue-500 cursor-pointer" onClick={() => showDrawer(index)} />
-                        <DeleteOutlined
-                          className="text-red-500 cursor-pointer"
-                          onClick={() => setConfirmDeleteIndex(index)}
-                        />
-                      </div>
-                    </div>
-                    <p className="text-gray-500 mb-2">{dayjs(message.date).format('DD/MM/YYYY HH:mm')}</p>
-                    <p className="mb-4">{truncateText(message.description, 50)}</p>
-                    <div>
-                      <h3 className="text-sm font-bold">Etiquetas</h3>
-                      <Collapse
-                        className="mt-2"
-                        items={[
-                          {
-                            key: '1',
-                            label: 'Ver etiquetas',
-                            children: (
-                              <div className="flex flex-wrap gap-2">
-                                {message.labels.map((label, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="bg-blue-100 text-blue-500 text-sm px-2 py-1 rounded-lg"
-                                  >
-                                    {tags.find((tag) => tag.id === Number(label))?.name || 'Etiqueta desconhecida'}
-                                  </span>
-                                ))}
-                              </div>
-                            ),
-                          },
-                        ]}
-                      />
-                    </div>
-                  </>
-                )}
-              </Card>
-            </Col>
-          ))
-        )}
-        {selectedSector != null && (
-          <Col xs={24} sm={12} md={8} style={{ display: 'flex', alignItems: 'flex-start' }}>
-            <Card
-              className="flex items-center justify-center border rounded-lg cursor-pointer shadow-md flex-grow"
-              onClick={() => showDrawer(null)}
+  const toggleTagSelection = (tagId: string) => {
+    setNewMessage(prev => {
+      const isSelected = prev.labels.includes(tagId);
+      return {
+        ...prev,
+        labels: isSelected ? prev.labels.filter(id => id !== tagId) : [...prev.labels, tagId]
+      };
+    });
+    setIsTagsDropdownOpen(false);
+  };
+
+  const renderMessageCard = (message: Message, index: number) => {
+    if (confirmDeleteIndex === index) {
+      return (
+        <div className="confirm-delete">
+          <h3>Deseja mesmo excluir?</h3>
+          <p>Essa ação é irreversível.</p>
+          <div className="confirm-actions">
+            <button 
+              className="btn btn-secondary"
+              onClick={() => setConfirmDeleteIndex(null)}
             >
-              <PlusOutlined className="text-blue-500 text-3xl" />
-            </Card>
-          </Col>
-        )}
-      </Row>
+              Não
+            </button>
+            <button 
+              className="btn btn-danger"
+              onClick={() => handleDelete(index)}
+            >
+              Sim
+            </button>
+          </div>
+        </div>
+      );
+    }
 
-      {isDrawerVisible && (
-        <div className="fixed top-0 right-0 w-96 bg-white shadow-lg h-full p-6 z-50 rounded-lg">
-          <h2 className="text-lg font-bold mb-4">
-            {currentMessageIndex !== null ? 'Editar mensagem' : 'Adicionar nova mensagem'}
+    return (
+      <div className="message-card">
+        <div className="message-header">
+          <h3 className="message-title">{message.title}</h3>
+          <div className="message-actions">
+            <button 
+              className="action-button edit"
+              onClick={() => showDrawer(index)}
+            >
+              <Icons.Edit />
+            </button>
+            <button 
+              className="action-button delete"
+              onClick={() => setConfirmDeleteIndex(index)}
+            >
+              <Icons.Delete />
+            </button>
+          </div>
+        </div>
+        
+        <div className="message-creator">
+          <img 
+            src={message.createdBy.photoUrl || '/default-avatar.png'} 
+            alt={message.createdBy.name}
+            className="creator-avatar"
+          />
+          <span className="creator-name">{message.createdBy.name}</span>
+        </div>
+
+        <div className="message-recipient">
+          <span className="recipient-label">Para:</span>
+          <span className="recipient-name">{message.contact.name}</span>
+        </div>
+
+        <div className="message-date">
+          {dayjs(message.date).format('DD/MM/YYYY HH:mm')}
+        </div>
+        
+        <p className="message-description">
+          {message.description}
+        </p>
+        
+        <div className="labels-section">
+          <div className="labels-title">Etiquetas</div>
+          <div className="labels-container">
+            {message.labels.map((labelId) => {
+              const tag = tags.find(t => t.id === Number(labelId));
+              return tag ? (
+                <span key={labelId} className="label-tag">
+                  {tag.name}
+                </span>
+              ) : null;
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDrawer = () => {
+    if (!isDrawerVisible) return null;
+
+    return (
+      <div className="schedule-modal">
+        <div className="modal-header">
+          <h2 className="modal-title">
+            {currentMessageIndex !== null ? 'Editar mensagem' : 'Nova mensagem'}
           </h2>
-          <Input
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Título</label>
+          <input
+            type="text"
+            className="form-input"
             value={newMessage.title}
             onChange={(e) => setNewMessage({ ...newMessage, title: e.target.value })}
             placeholder="Título da mensagem"
-            className="mb-4"
           />
-          <DatePicker
-            format="DD/MM/YYYY HH:mm"
-            showTime={{ format: 'HH:mm' }}
-            value={newMessage.date ? dayjs(newMessage.date) : null}
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Data e Hora</label>
+          <input
+            type="datetime-local"
+            className="form-input"
+            value={dateInputValue}
             onChange={handleDateChange}
-            className="w-full mb-4"
           />
-          <TextArea
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Descrição</label>
+          <textarea
+            className="form-textarea"
             value={newMessage.description}
-            onChange={handleDescriptionChange}
+            onChange={(e) => setNewMessage({ ...newMessage, description: e.target.value })}
             placeholder="Descrição da mensagem"
             rows={4}
-            className="mb-4"
           />
-          <Select
-            mode="multiple"
-            value={newMessage.labels}
-            notFoundContent="Nenhuma etiqueta encontrada"
-            onChange={handleLabelsChange}
-            placeholder="Selecione as etiquetas"
-            className="w-full mb-4"
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Contato</label>
+          <select
+            className="form-select"
+            value={newMessage.contactId || ''}
+            onChange={(e) => setNewMessage({ 
+              ...newMessage, 
+              contactId: Number(e.target.value),
+              contact: contacts.find(c => c.id === Number(e.target.value)) || {} as Contact
+            })}
           >
-            {tags.map((tag) => (
-              <Option key={tag.id} value={String(tag.id)}>
-                {tag.name}
-              </Option>
+            <option value="">Selecione um contato</option>
+            {contacts.map((contact) => (
+              <option key={contact.id} value={contact.id}>
+                {contact.name}
+              </option>
             ))}
-          </Select>
-          <div className="mb-4 w-full">
-            <h3 className="text-sm font-bold mb-2">Ações adicionais</h3>
-            <Space size="middle" className="w-full flex justify-between">
-              <div className="flex items-center mb-4 w-full">
-                <div className="flex items-center space-x-4">
-                  <Upload showUploadList={false} beforeUpload={(file) => handleAddAttachment(file)}>
-                    <PaperClipOutlined className="text-2xl cursor-pointer" title="Adicionar anexo" />
-                  </Upload>
-                  <Upload showUploadList={false} beforeUpload={(file) => handleAddImage(file)}>
-                    <PictureOutlined className="text-2xl cursor-pointer" title="Adicionar imagem" />
-                  </Upload>
-                  <SmileOutlined
-                    className="text-2xl cursor-pointer"
-                    title="Adicionar emoji"
-                    onClick={() => setIsEmojiPickerVisible((prev) => !prev)}
-                  />
-                </div>
+          </select>
+        </div>
 
-                <div className="ml-4">
-                  <Select
-                    style={{ width: '200px' }}
-                    placeholder="Selecione o fluxo"
-                    value={newMessage.flowId !== null ? newMessage.flowId : undefined}
-                    onChange={(value) => handleFlowChange(value)}
+        <div className="form-group">
+          <label className="form-label">Etiquetas</label>
+          <div className="selected-tags">
+            {newMessage.labels.map((labelId) => {
+              const tag = tags.find(t => t.id === Number(labelId));
+              return tag ? (
+                <span key={labelId} className="selected-tag">
+                  {tag.name}
+                  <span 
+                    className="tag-remove"
+                    onClick={() => removeTag(labelId)}
                   >
-                    {flows.map((flow: any) => (
-                      <Option key={flow.id} value={flow.id}>
-                        {flow.name}
-                      </Option>
-                    ))}
-                  </Select>
-                </div>
-
-                <div style={{ position: 'relative' }}>
-                  {isEmojiPickerVisible && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        right: 0,
-                        marginTop: 8,
-                        zIndex: 1000,
-                      }}
-                    >
-                      <Picker
-                        onEmojiSelect={(emoji: any) => {
-                          setNewMessage((prevMessage) => ({
-                            ...prevMessage,
-                            description: `${prevMessage.description}${emoji.native}`,
-                          }));
-                          setIsEmojiPickerVisible(false);
-                        }}
-                        locale="pt"
-                        theme="light"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Space>
+                    ×
+                  </span>
+                </span>
+              ) : null;
+            })}
           </div>
-          {/* Botão "Gerar link do Google Meet" com Tooltip */}
-          {!isApiKeyValid ? (
-            <Tooltip title="Chave de api inválida ou não configurada">
-              <Button
-                type="default"
-                disabled
-                loading={isGeneratingMeetLink}
-                onClick={generateGoogleMeetLink}
-                className="mb-4"
-              >
-                Gerar link do Google Meet
-              </Button>
-            </Tooltip>
-          ) : (
-            <Button
-              type="default"
-              onClick={generateGoogleMeetLink}
-              className="mb-4"
-              loading={isGeneratingMeetLink}
+          <div className="tags-dropdown">
+            <button
+              className="form-input"
+              onClick={() => setIsTagsDropdownOpen(!isTagsDropdownOpen)}
             >
-              Gerar link do Google Meet
-            </Button>
-          )}
-
-          <div className="flex justify-end space-x-2">
-            <Button onClick={closeDrawer}>Cancelar</Button>
-            <Button type="primary" onClick={handleSave}>
-              Salvar
-            </Button>
+              Selecionar etiquetas
+            </button>
+            {isTagsDropdownOpen && (
+              <div className="tags-dropdown-content">
+                {tags.map((tag) => (
+                  <div
+                    key={tag.id}
+                    className={`tags-dropdown-item ${
+                      newMessage.labels.includes(String(tag.id)) ? 'selected' : ''
+                    }`}
+                    onClick={() => toggleTagSelection(String(tag.id))}
+                  >
+                    {tag.name}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
+
+        <div className="form-actions">
+          <button className="btn btn-secondary" onClick={closeDrawer}>
+            Cancelar
+          </button>
+          <button className="btn btn-primary" onClick={handleSave}>
+            Salvar
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="schedule-screen">
+      {isLoading && (
+        <div className="loading-overlay">
+          <div className="spinner"></div>
+        </div>
       )}
+
+      <div className="schedule-header">
+        <div className="header-content">
+          <h1>Agendamento de mensagem</h1>
+          <p className="header-description">
+            Gerencie suas mensagens agendadas
+          </p>
+        </div>
+      </div>
+
+      <div className="schedule-content">
+        {selectedSector === null ? (
+          <div className="no-sector-message">
+            Nenhum setor selecionado
+          </div>
+        ) : (
+          <div className="messages-grid">
+            {messages.map((message, index) => (
+              <div key={message.id || index}>
+                {renderMessageCard(message, index)}
+              </div>
+            ))}
+            <div 
+              className="add-message-card"
+              onClick={() => showDrawer(null)}
+            >
+              <Icons.Plus />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {renderDrawer()}
     </div>
   );
 };

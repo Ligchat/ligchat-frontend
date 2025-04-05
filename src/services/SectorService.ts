@@ -36,6 +36,18 @@ export interface UpdateSectorRequestDTO {
   oauth2TokenExpiration?: Date;
 }
 
+export interface SectorResponse {
+  message: string;
+  code: string;
+  data: Sector[];
+}
+
+export interface SingleSectorResponse {
+  message: string;
+  code: string;
+  data: Sector;
+}
+
 export const createSector = async (sectorData: CreateSectorRequestDTO) => {
   try {
     const response = await axios.post(`${API_URL}/sectors`, sectorData);
@@ -60,26 +72,23 @@ export const updateSector = async (id: number, data: UpdateSectorRequestDTO) => 
 
 export const getSector = async (id: number): Promise<Sector> => {
   try {
-    const response = await axios.get(`${API_URL}/sectors/${id}`, {
-      headers: {
-        'Accept': '*/*',
-      },
-    });
-    return response.data;
+    const response = await axios.get<SingleSectorResponse>(`${API_URL}/sectors/${id}`);
+    return response.data.data;
   } catch (error) {
-    throw new Error(`Failed to get sector with id ${id}: ${error}`);
+    console.error('Erro em getSector:', error);
+    throw error;
   }
 };
 
-export const getSectors = async (token: any): Promise<Sector[]> => {
+export const getSectors = async (token: string): Promise<Sector[]> => {
   try {
-    const response = await axios.get(`${API_URL}/sectors`, {
+    const response = await axios.get<SectorResponse>(`${API_URL}/sectors`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': '*/*',
       },
     });
-    return response.data;
+    return response.data.data;
   } catch (error) {
     throw new Error('Failed to get sectors: ' + error);
   }

@@ -16,8 +16,10 @@ import EditFlowPage from './screens/EditFlowPage';
 import VariablesPage from './screens/VariablesPage';
 import PrivacyPolicyPage from './screens/PrivacyPolicyPage';
 import TermsOfUsePage from './screens/TermsOfUsePage';
+import NotFoundPage from './screens/NotFoundPage';
 import { MenuProvider } from './contexts/MenuContext';
 import ChatNew from './screens/ChatNew';
+import AgentsPage from './screens/AgentsPage';
 
 const AppRoutes: React.FC = () => {
   return (
@@ -35,15 +37,19 @@ const AppRoutes: React.FC = () => {
           <Route path="/chat" element={<ChatNew />} />
           <Route path="/labels" element={<LabelPage/>}/>
           <Route path="/crm" element={<CRMPage/>}/>
-          <Route path="/message/schedule" element={<MessageSchedule/>}/>
+          <Route path="/schedule" element={<MessageSchedule/>}/>
           <Route path="/access" element={<AccessPage/>}/>
-          <Route path="/sector" element={<SectorsPage/>}/>
+          <Route path="/sectors" element={<SectorsPage/>}/>
+          <Route path="/agents" element={<AgentsPage/>}/>
           <Route path="/webhook" element={<WebhookPage/>}/>
           <Route path="/profile" element={<ProfilePage/>}/>
           <Route path="/flow" element={<FlowPage/>}/>
           <Route path="/flow/variable" element={<VariablesPage/>}/>
           <Route path="/flow/edit/:id" element={<EditFlowPage flowId={''} />} />
         </Route>
+
+        {/* Rota 404 para páginas não encontradas */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </MenuProvider>
   );

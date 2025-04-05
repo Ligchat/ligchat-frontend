@@ -103,12 +103,14 @@ export class OAuth2Service {
     const sectorId = SessionService.getSession('selectedSector');
     if (sectorId && this.accessToken && this.refreshToken && this.tokenExpiration) {
       try {
-        const sector: any = await getSector(sectorId);
-        if (sector && sector.data) {
-          sector.data.accessToken = this.accessToken;
-          sector.data.oauth2RefreshToken = this.refreshToken;
-          sector.data.oauth2TokenExpiration = this.tokenExpiration.toISOString();
-          await updateSector(sectorId, sector);
+        const sector = await getSector(sectorId);
+        if (sector) {
+          const updateData = {
+            oauth2AccessToken: this.accessToken,
+            oauth2RefreshToken: this.refreshToken,
+            oauth2TokenExpiration: this.tokenExpiration
+          };
+          await updateSector(sectorId, updateData);
           console.log('Sector updated with new tokens');
         } else {
           console.error('Sector data is not valid.');

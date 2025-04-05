@@ -2,21 +2,29 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Logo from '../assets/images/Logo.png';
 import DashBoard from '../screens/DashBoard';
-import ChatPage from '../screens/ChatScreen';
+import ChatNew from '../screens/ChatNew';
 import MessageSchedule from '../screens/MessageSchedule';
 import LabelPage from '../screens/LabelScreen';
 import CRMPage from '../screens/CRMPage';
 import AccessPage from '../screens/AccessPage';
 import SectorsPage from '../screens/SectorsPage';
-import WebhookPage from '../screens/WebhookPage';
 import ProfilePage from '../screens/ProfilePage';
-import VariablesPage from '../screens/VariablesPage';
 import SessionService from '../services/SessionService';
 import { getUser } from '../services/UserService';
 import { getSectors, Sector } from '../services/SectorService';
 import { useMenu } from '../contexts/MenuContext';
 import '../styles/CombinedMenu/CombinedMenu.css';
-import ChatNew from '../screens/ChatNew';
+import AgentsPage from '../screens/AgentsPage';
+
+interface ProfileUpdateEvent extends CustomEvent {
+    detail: {
+        avatarUrl: string | null;
+        name: string;
+        timestamp: number;
+    };
+}
+
+const PROFILE_UPDATED_EVENT = 'profileUpdated';
 
 const CombinedMenu: React.FC = () => {
     const [sectors, setSectors] = useState<Sector[]>([]);
@@ -55,7 +63,6 @@ const CombinedMenu: React.FC = () => {
             const validPaths = [
                 '/dashboard', '/chat', '/schedule', '/crm', 
                 '/profile', '/labels', '/access', '/sectors', 
-                '/webhook', '/variables'
             ];
             
             const isValidPath = validPaths.some(path => 
@@ -95,19 +102,24 @@ const CombinedMenu: React.FC = () => {
             setSelectedMenuKey('9');
         } else if (path.includes('/sectors')) {
             setSelectedMenuKey('10');
-        } else if (path.includes('/webhook')) {
-            setSelectedMenuKey('11');
-        } else if (path.includes('/variables')) {
-            setSelectedMenuKey('12');
         }
     };
 
     useEffect(() => {
-        const tokenFromSession = SessionService.getSession('authToken');
-        if (tokenFromSession) {
-            fetchSectors(tokenFromSession);
+        const tokenFromSession = SessionService.getToken();
+        if (!tokenFromSession) {
+            navigate('/');
+            return;
         }
-    }, []);
+
+        if (SessionService.isTokenExpired(tokenFromSession)) {
+            SessionService.clearSession();
+            navigate('/');
+            return;
+        }
+
+        fetchSectors(tokenFromSession);
+    }, [navigate]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -136,11 +148,11 @@ const CombinedMenu: React.FC = () => {
 
     const fetchSectors = async (token: string) => {
         try {
-            const response: any = await getSectors(token);
-            setSectors(Array.isArray(response.data) ? response.data : []);
-            const sectorId = SessionService.getSession('selectedSector');
+            const sectors = await getSectors(token);
+            setSectors(sectors);
+            const sectorId = SessionService.getSectorId();
             if (sectorId) {
-                setSelectedSector(sectorId);
+                setSelectedSector(sectorId.toString());
             }
         } catch (error) {
             console.error('Erro ao buscar setores:', error);
@@ -151,7 +163,7 @@ const CombinedMenu: React.FC = () => {
     useEffect(() => {
         const fetchUserData = async () => {
             try {
-                const token = SessionService.getSession('authToken');
+                const token = SessionService.getToken();
                 const decodedToken = token ? SessionService.decodeToken(token) : null;
                 const userId = decodedToken ? decodedToken.userId : null;
 
@@ -162,21 +174,85 @@ const CombinedMenu: React.FC = () => {
                 const response: any = await getUser(userId);
                 const userData = response.data;
                 setName(userData.name);
-                setAvatar(userData.avatarUrl || null);
-                setIsAdmin(userData.isAdmin);
+                
+                // Verifica se é uma URL ou base64
+                if (userData.avatarUrl) {
+                    if (userData.avatarUrl.startsWith('data:image')) {
+                        setAvatar(userData.avatarUrl);
+                    } else {
+                        setAvatar(`${userData.avatarUrl}?t=${new Date().getTime()}`);
+                    }
+                } else {
+                    setAvatar(null);
+                }
+                
+                setIsAdmin(userData.isAdmin || false);
             } catch (error) {
                 console.error('Erro ao buscar dados do usuário:', error);
             }
         };
 
         fetchUserData();
-    }, [navigate]);
+    }, []);
+
+    useEffect(() => {
+        const handleProfileUpdate = (event: Event) => {
+            const profileEvent = event as ProfileUpdateEvent;
+            if (profileEvent.detail) {
+                const newAvatarUrl = profileEvent.detail.avatarUrl;
+                // Verifica se é uma URL ou base64
+                if (newAvatarUrl) {
+                    if (newAvatarUrl.startsWith('data:image')) {
+                        setAvatar(newAvatarUrl);
+                    } else {
+                        setAvatar(`${newAvatarUrl}?t=${profileEvent.detail.timestamp}`);
+                    }
+                } else {
+                    setAvatar(null);
+                }
+                setName(profileEvent.detail.name);
+            }
+        };
+
+        window.addEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdate);
+
+        return () => {
+            window.removeEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdate);
+        };
+    }, []);
 
     const handleSectorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = e.target.value;
         setIsLoading(true);
         setSelectedSector(value);
-        SessionService.setSession('selectedSector', value);
+        SessionService.setSectorId(parseInt(value));
+        
+        // Atualiza o componente atual
+        const key = selectedMenuKey;
+        updateSelectedComponent(key);
+        
+        // Recarrega os dados necessários
+        const path = location.pathname;
+        if (path.includes('/sectors')) {
+            updateSelectedComponent('10');
+        } else if (path === '/' || path.includes('/dashboard')) {
+            updateSelectedComponent('1');
+        } else if (path.includes('/chat')) {
+            updateSelectedComponent('2');
+        } else if (path.includes('/schedule')) {
+            updateSelectedComponent('3');
+        } else if (path.includes('/crm')) {
+            updateSelectedComponent('5');
+        } else if (path.includes('/profile')) {
+            updateSelectedComponent('7');
+        } else if (path.includes('/labels')) {
+            updateSelectedComponent('8');
+        } else if (path.includes('/access')) {
+            updateSelectedComponent('9');
+        } else if (path.includes('/agents')) {
+            updateSelectedComponent('11');
+        }
+
         setTimeout(() => {
             setIsLoading(false);
         }, 500);
@@ -204,7 +280,7 @@ const CombinedMenu: React.FC = () => {
 
     const handleLogout = () => {
         SessionService.clearSession();
-        navigate('/login');
+        navigate('/');
     };
 
     const getPathFromKey = (key: string): string => {
@@ -217,14 +293,14 @@ const CombinedMenu: React.FC = () => {
             case '8': return '/labels';
             case '9': return '/access';
             case '10': return '/sectors';
-            case '11': return '/webhook';
-            case '12': return '/variables';
+            case '11': return '/agents';
+            case '12': return '/agents';
             default: return '/dashboard';
         }
     };
 
     const handleMenuClick = (key: string) => {
-        if (key === '6') {
+        if (key === '6' || key === '11') {
             toggleSubmenu(key);
             return;
         }
@@ -248,13 +324,13 @@ const CombinedMenu: React.FC = () => {
     };
 
     const handleSubmenuClick = (parentKey: string, childKey: string) => {
+        navigationInProgressRef.current = true;
         setSelectedMenuKey(childKey);
         localStorage.setItem('selectedMenuKey', childKey);
-
-        const path = getPathFromKey(childKey);
         
         updateSelectedComponent(childKey);
         
+        const path = getPathFromKey(childKey);
         navigate(path);
 
         if (isMobile) {
@@ -263,41 +339,49 @@ const CombinedMenu: React.FC = () => {
     };
 
     const updateSelectedComponent = (key: string) => {
-        const timestamp = new Date().getTime();
+        const timestamp = Date.now();
+        const sectorId = selectedSector || SessionService.getSectorId()?.toString();
+        const componentKey = `${key}-${sectorId}-${timestamp}`;
         
         switch (key) {
             case '1':
-                setSelectedComponent(<DashBoard key={`dashboard-${timestamp}`} />);
+                setSelectedComponent(<DashBoard key={componentKey} />);
                 break;
             case '2':
-                setSelectedComponent(<ChatNew key={`chat-${timestamp}`} />);
+                setSelectedComponent(<ChatNew key={componentKey} />);
                 break;
             case '3':
-                setSelectedComponent(<MessageSchedule key={`schedule-${timestamp}`} />);
+                setSelectedComponent(<MessageSchedule key={componentKey} />);
                 break;
             case '5':
-                setSelectedComponent(<CRMPage key={`crm-${timestamp}`} />);
+                setSelectedComponent(<CRMPage key={componentKey} />);
                 break;
             case '7':
-                setSelectedComponent(<ProfilePage key={`profile-${timestamp}`} />);
+                setSelectedComponent(<ProfilePage key={componentKey} />);
                 break;
             case '8':
-                setSelectedComponent(<LabelPage key={`label-${timestamp}`} />);
+                setSelectedComponent(<LabelPage key={componentKey} />);
                 break;
             case '9':
-                setSelectedComponent(<AccessPage key={`access-${timestamp}`} />);
+                setSelectedComponent(<AccessPage key={componentKey} />);
                 break;
             case '10':
-                setSelectedComponent(<SectorsPage key={`sectors-${timestamp}`} />);
+                setSelectedComponent(
+                    <div key={componentKey} className="page-container">
+                        <SectorsPage />
+                    </div>
+                );
                 break;
             case '11':
-                setSelectedComponent(<WebhookPage key={`webhook-${timestamp}`} />);
-                break;
             case '12':
-                setSelectedComponent(<VariablesPage key={`variables-${timestamp}`} />);
+                setSelectedComponent(
+                    <div key={componentKey} className="page-container">
+                        <AgentsPage />
+                    </div>
+                );
                 break;
             default:
-                setSelectedComponent(<DashBoard key={`dashboard-default-${timestamp}`} />);
+                setSelectedComponent(<DashBoard key={componentKey} />);
         }
     };
 
@@ -366,32 +450,43 @@ const CombinedMenu: React.FC = () => {
                                 <span className="submenu-dot"></span>
                                 <span className="submenu-label">Setores</span>
                             </li>
-                            <li 
-                                className={`menu-submenu-item ${selectedMenuKey === '11' ? 'active' : ''}`}
-                                onClick={() => handleSubmenuClick('6', '11')}
-                            >
-                                <span className="submenu-dot"></span>
-                                <span className="submenu-label">Webhook</span>
-                            </li>
-                            <li 
-                                className={`menu-submenu-item ${selectedMenuKey === '12' ? 'active' : ''}`}
-                                onClick={() => handleSubmenuClick('6', '12')}
-                            >
-                                <span className="submenu-dot"></span>
-                                <span className="submenu-label">Variáveis</span>
-                            </li>
                         </ul>
                     </li>
                 )}
+                <li className={`menu-item ${expandedSubmenus.includes('11') ? 'expanded' : ''}`}>
+                    <div className="menu-item-content" onClick={() => handleMenuClick('11')}>
+                        <span className="menu-icon icon-ai"></span>
+                        <span className="menu-label">Inteligência Artificial</span>
+                        <span className="menu-submenu-arrow">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18">
+                                <path fill="currentColor" d="M7 10l5 5 5-5z"/>
+                            </svg>
+                        </span>
+                        {collapsed && <div className="menu-tooltip">Inteligência Artificial</div>}
+                    </div>
+                    <ul className="menu-submenu">
+                        <li 
+                            className={`menu-submenu-item ${selectedMenuKey === '12' ? 'active' : ''}`}
+                            onClick={() => handleSubmenuClick('11', '12')}
+                        >
+                            <span className="submenu-dot"></span>
+                            <span className="submenu-label">Agentes</span>
+                        </li>
+                    </ul>
+                </li>
             </ul>
         );
     };
 
     useEffect(() => {
         const path = location.pathname;
-        let key = '1'; // Default to dashboard
+        console.log('Path mudou:', path);
         
-        if (path === '/' || path.includes('/dashboard')) {
+        let key = '1';
+        if (path.includes('/sectors')) {
+            key = '10';
+            updateSelectedComponent('10');
+        } else if (path === '/' || path.includes('/dashboard')) {
             key = '1';
         } else if (path.includes('/chat')) {
             key = '2';
@@ -405,18 +500,12 @@ const CombinedMenu: React.FC = () => {
             key = '8';
         } else if (path.includes('/access')) {
             key = '9';
-        } else if (path.includes('/sectors')) {
-            key = '10';
-        } else if (path.includes('/webhook')) {
+        } else if (path.includes('/agents')) {
             key = '11';
-        } else if (path.includes('/variables')) {
-            key = '12';
         }
         
-        // Atualize o menu selecionado
         setSelectedMenuKey(key);
         
-        // Atualize o componente apenas se a navegação não foi iniciada por um clique no menu
         if (!navigationInProgressRef.current) {
             updateSelectedComponent(key);
         }
@@ -440,7 +529,12 @@ const CombinedMenu: React.FC = () => {
                 <div className="menu-header-right">
                     <div className="menu-user-profile" onClick={toggleUserDropdown} ref={userDropdownRef}>
                         {avatar ? (
-                            <img src={avatar} alt={name} className="menu-avatar" />
+                            <img 
+                                src={avatar} 
+                                alt={name} 
+                                className="menu-avatar"
+                                key={avatar}
+                            />
                         ) : (
                             <div className="menu-avatar-placeholder">
                                 {name.charAt(0).toUpperCase()}

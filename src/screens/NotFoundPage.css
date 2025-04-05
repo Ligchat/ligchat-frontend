@@ -1,0 +1,153 @@
+.not-found-screen {
+  padding: 0;
+  min-height: 100vh;
+  background-color: #121212;
+  color: #e0e0e0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.not-found-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  background-color: #1a1a1a;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.header-content h1 {
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: #00c2ff;
+  margin: 0;
+}
+
+.header-description {
+  color: #888;
+  font-size: 0.9rem;
+  margin: 0.5rem 0 0 0;
+}
+
+.not-found-content {
+  flex: 1;
+  padding: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.not-found-card {
+  background-color: #1e1e1e;
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+  padding: 3rem;
+  max-width: 800px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.not-found-illustration {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2rem;
+}
+
+.not-found-title {
+  text-align: center;
+}
+
+.not-found-title h1 {
+  font-size: 2.5rem;
+  font-weight: 500;
+  color: #00c2ff;
+  margin: 0;
+  margin-bottom: 0.5rem;
+}
+
+.not-found-title p {
+  font-size: 1.2rem;
+  color: #888;
+  margin: 0;
+}
+
+.not-found-message {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.not-found-message h2 {
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: #e0e0e0;
+  margin: 0;
+}
+
+.not-found-message p {
+  color: #888;
+  font-size: 1rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.not-found-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  background-color: #00c2ff;
+  color: #121212;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.back-button:hover {
+  background-color: #00a8e0;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .not-found-header {
+    padding: 1rem;
+  }
+
+  .not-found-content {
+    padding: 1rem;
+  }
+
+  .not-found-card {
+    padding: 1.5rem;
+  }
+
+  .not-found-title h1 {
+    font-size: 2rem;
+  }
+
+  .not-found-title p {
+    font-size: 1rem;
+  }
+
+  .not-found-message h2 {
+    font-size: 1.25rem;
+  }
+
+  .not-found-message p {
+    font-size: 0.9rem;
+  }
+} 

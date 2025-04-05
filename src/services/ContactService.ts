@@ -1,65 +1,121 @@
 import axios from 'axios';
+import { API_URL, CONTACTS_API_URL } from '../config/api';
 
+// Interface para a resposta da API
+interface ApiResponse<T> {
+  message: string;
+  code: string;
+  data: T[];
+}
+
+// Interface para o contato
 export interface Contact {
   id: number;
   name: string;
-  phone: string;
-  messageId?: number;
-  attachmentId?: number;
-  generalInfo?: string;
+  tagId: number | null;
+  number: string;
+  avatarUrl: string | null;
+  email: string;
+  notes: string | null;
   sectorId: number;
-  responsibleId?: number; // Adicionado responsável
+  isActive: boolean;
+  priority: string;
+  contactStatus: string;
+  aiActive: number;
+  assignedTo: number | null;
+  createdAt: string;
 }
 
 export interface CreateContactRequestDTO {
   name: string;
   phone: string;
-  messageId?: number;
-  attachmentId?: number;
-  generalInfo: string;
+  email: string;
   sectorId: number;
+  status?: string;
+  notes?: string;
 }
 
 export interface UpdateContactRequestDTO {
   name: string;
-  phone: string;
-  labels: any;
-  lastContact: any;
-  messageId?: number;
-  attachmentId?: number;
-  generalInfo: string;
+  tagId: number | null;
+  phoneWhatsapp: string;
+  avatarUrl: string | null;
+  email: string;
+  notes: string | null;
   sectorId: number;
+  isActive: boolean;
+  priority: string;
+  aiActive: number;
+  assignedTo: number | null;
 }
 
 export interface UpdateResponsibleRequestDTO {
-  responsibleId: number; // DTO para atualizar o responsável
+  responsibleId: number;
 }
 
-export const createContact = async (contactData: CreateContactRequestDTO) => {
+export const getContacts = async (sectorId: number): Promise<ApiResponse<Contact>> => {
   try {
-    const response = await axios.post('/server/api/contatos', contactData);
+    const token = localStorage.getItem('token');
+    const response = await axios.get<ApiResponse<Contact>>(
+      `${API_URL}/Contact/sector/${sectorId}`,
+      {
+        headers: {
+          'Accept': '*/*',
+          'Authorization': `Bearer ${token}`
+        },
+      }
+    );
     return response.data;
   } catch (error) {
-    throw new Error(`Failed to create contact: ${error}`);
+    console.error('Error fetching contacts:', error);
+    throw new Error('Falha ao obter contatos: ' + error);
   }
 };
 
-export const updateContact = async (id: number, data: UpdateContactRequestDTO) => {
+export const getContactById = async (id: number): Promise<Contact | null> => {
   try {
-    const response = await axios.put(`/server/api/contatos/${id}`, data, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const response = await axios.get(`${CONTACTS_API_URL}/contact/${id}`);
     return response.data;
   } catch (error) {
-    throw new Error(`Failed to update contact: ${error}`);
+    console.error('Error fetching contact:', error);
+    return null;
+  }
+};
+
+export const createContact = async (contact: CreateContactRequestDTO): Promise<Contact | null> => {
+  try {
+    const response = await axios.post(`${CONTACTS_API_URL}/contact`, contact);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating contact:', error);
+    return null;
+  }
+};
+
+export const updateContact = async (id: number, contact: UpdateContactRequestDTO): Promise<Contact> => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.put<Contact>(
+      `${API_URL}/Contact/${id}`, 
+      contact,
+      {
+        headers: {
+          'Accept': '*/*',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error updating contact:', error);
+    throw new Error(`Failed to update contact with id ${id}: ${error}`);
   }
 };
 
 export const updateResponsible = async (id: number, data: UpdateResponsibleRequestDTO) => {
   try {
-    const response = await axios.put(`/job/contact/${id}/responsible`, data, {
+    const response = await axios.put(`${CONTACTS_API_URL}/contact/${id}/responsible`, data, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -72,9 +128,9 @@ export const updateResponsible = async (id: number, data: UpdateResponsibleReque
 
 export const getContact = async (id: number): Promise<Contact> => {
   try {
-    const response = await axios.get(`/server/api/contatos/${id}`, {
+    const response = await axios.get(`${CONTACTS_API_URL}/contact/${id}`, {
       headers: {
-        Accept: '*/*',
+        Accept: 'text/plain',
       },
     });
     return response.data;
@@ -83,22 +139,9 @@ export const getContact = async (id: number): Promise<Contact> => {
   }
 };
 
-export const getContacts = async (): Promise<Contact[]> => {
-  try {
-    const response = await axios.get('/server/api/contatos', {
-      headers: {
-        Accept: '*/*',
-      },
-    });
-    return response.data;
-  } catch (error) {
-    throw new Error('Failed to get contacts: ' + error);
-  }
-};
-
 export const deleteContact = async (id: number) => {
   try {
-    const response = await axios.delete(`/server/api/contatos/${id}`);
+    const response = await axios.delete(`${CONTACTS_API_URL}/contact/${id}`);
     return response.data;
   } catch (error) {
     throw new Error(`Failed to delete contact with id ${id}: ${error}`);

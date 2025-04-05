@@ -1,506 +1,385 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Card, Button, Input, Row, Col, Drawer, Modal, Skeleton,
-} from 'antd';
-import {
-  DeleteOutlined, EditOutlined, PlusOutlined,
-} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import {
-  createSector, updateSector, deleteSector, getSectors,
-} from '../services/SectorService';
+import { FiEdit2, FiTrash2, FiPlus, FiX, FiFolder } from 'react-icons/fi';
+import { createSector, updateSector, deleteSector, getSectors } from '../services/SectorService';
 import SessionService from '../services/SessionService';
-import LoadingOverlay from '../components/LoadingOverlay';
-import axios from 'axios';
+import Toast from '../components/Toast';
 import './SectorsPage.css';
 
-const { TextArea } = Input;
-
 interface Sector {
-  id?: number; 
+  id?: number;
   name: string;
   userBusinessId?: number;
   phoneNumberId: string;
   accessToken: string;
-  description: string; 
+  description: string;
   googleClientId?: string;
   googleApiKey?: string;
 }
 
+interface ToastMessage {
+  id: number;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
 const SectorsPage: React.FC = () => {
+  console.log('SectorsPage montando...'); // Debug
+
   const navigate = useNavigate();
   const [sectors, setSectors] = useState<Sector[]>([]);
-  const [newSector, setNewSector] = useState<boolean>(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [editingSector, setEditingSector] = useState<Sector | null>(null);
   const [sectorData, setSectorData] = useState<Sector>({
     name: '',
     phoneNumberId: '',
     accessToken: '',
     description: '',
-    googleClientId: '',
-    googleApiKey: '',
   });
-  const [isDrawerVisible, setIsDrawerVisible] = useState<boolean>(false);
-  const [currentSector, setCurrentSector] = useState<Sector | null>(null);
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [errors, setErrors] = useState<{ [key: string]: string | undefined }>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [isDeleting, setIsDeleting] = useState<{ [key: number]: boolean }>({});
 
   useEffect(() => {
     fetchSectors();
   }, []);
 
-  // Função auxiliar para fazer a chamada à API do Google
-  const makeGoogleApiRequest = async (googleClientId: string, googleApiKey: string) => {
-    try {
-      // Exemplo de chamada genérica à API do Google
-      const response = await axios.get('https://www.googleapis.com/someapi/v1/resource', {
-        params: {
-          key: googleApiKey,
-          client_id: googleClientId,
-          // Outros parâmetros necessários pela API específica
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao chamar a API do Google:', error);
-      throw error;
-    }
+  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Date.now();
+    setToasts(current => [...current, { id, message, type }]);
+    setTimeout(() => removeToast(id), 3000);
+  };
+
+  const removeToast = (id: number) => {
+    setToasts(current => current.filter(toast => toast.id !== id));
   };
 
   const fetchSectors = async () => {
     try {
       setIsLoading(true);
-      const token = SessionService.getSession('authToken');
-      const response: any = await getSectors(token);
-      const fetchedSectors: Sector[] = response?.data || [];
-      setSectors(fetchedSectors);
+      const token = SessionService.getToken();
+      if (!token) {
+        navigate('/');
+        return;
+      }
+      const response = await getSectors(token);
+      setSectors(response || []);
     } catch (error) {
       console.error('Falha ao buscar setores', error);
+      addToast('Erro ao carregar setores', 'error');
       setSectors([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const showDrawer = (sector: Sector) => {
-    setCurrentSector(sector);
-    setSectorData({
-      id: sector.id,
-      name: sector.name,
-      phoneNumberId: sector.phoneNumberId,
-      accessToken: sector.accessToken,
-      description: sector.description,
-      googleClientId: sector.googleClientId || '',
-      googleApiKey: sector.googleApiKey || '',
-    });
-    setNewSector(false);
-    setIsDrawerVisible(true);
-  };
+  const validateForm = () => {
+    const newErrors: { [key: string]: string | undefined } = {};
+    
+    if (!sectorData.name) {
+      newErrors.name = 'O nome do setor é obrigatório';
+    }
+    if (!sectorData.phoneNumberId) {
+      newErrors.phoneNumberId = 'A identificação do telefone é obrigatória';
+    }
+    if (!sectorData.accessToken) {
+      newErrors.accessToken = 'O token de acesso é obrigatório';
+    }
+    if (!sectorData.description) {
+      newErrors.description = 'A descrição é obrigatória';
+    }
 
-  const closeDrawer = () => {
-    setIsDrawerVisible(false);
-    setCurrentSector(null);
-    setSectorData({
-      name: '',
-      phoneNumberId: '',
-      accessToken: '',
-      description: '',
-      googleClientId: '',
-      googleApiKey: '',
-    });
-    setErrors({});
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSave = async () => {
-    let validationErrors: { [key: string]: string } = {};
-  
-    if (!sectorData.name) {
-      validationErrors.name = 'O nome do setor é obrigatório.';
-    }
-    if (!sectorData.phoneNumberId) {
-      validationErrors.phoneNumberId = 'A identificação do telefone é obrigatória.';
-    }
-    if (!sectorData.accessToken) {
-      validationErrors.accessToken = 'O token de acesso é obrigatório.';
-    }
-    if (!sectorData.description) {
-      validationErrors.description = 'A descrição é obrigatória.';
-    }
-  
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      return;
-    } else {
-      setErrors({});
-    }
-  
+    if (!validateForm()) return;
+
     try {
       setIsLoading(true);
-      const token = SessionService.getSession('authToken');
-      
+      const token = SessionService.getToken();
       if (!token) {
-        console.error('Token de autenticação não encontrado');
+        addToast('Erro de autenticação', 'error');
         return;
       }
-
       const decodedToken = SessionService.decodeToken(token);
-      console.log('Token decodificado:', decodedToken); // Debug
-
-      if (!decodedToken) {
-        console.error('Falha ao decodificar o token');
-        return;
-      }
-
-      const userBusinessId = decodedToken.userId;
-      console.log('userBusinessId:', userBusinessId); // Debug
+      const userBusinessId = decodedToken?.userId;
 
       if (!userBusinessId) {
-        console.error('userId não encontrado no token decodificado');
+        addToast('Erro de autenticação', 'error');
         return;
       }
 
-      const updatedSectorData: Sector = {
+      const updatedSectorData = {
         ...sectorData,
         userBusinessId,
       };
-  
-      if (newSector) {
+
+      if (editingSector?.id) {
+        await updateSector(editingSector.id, updatedSectorData);
+        addToast('Setor atualizado com sucesso', 'success');
+      } else {
         await createSector(updatedSectorData);
-      } else if (updatedSectorData.id) {
-        await updateSector(updatedSectorData.id, updatedSectorData);
+        addToast('Setor criado com sucesso', 'success');
       }
-  
+
       await fetchSectors();
-      setNewSector(false);
-      closeDrawer();
+      handleCloseDrawer();
     } catch (error) {
       console.error('Erro ao salvar setor:', error);
+      addToast('Erro ao salvar setor', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDeleteClick = async (id?: number) => {
-    if (!id) return;
-    Modal.confirm({
-      title: 'Tem certeza que deseja excluir este setor?',
-      content: 'Esta ação não pode ser desfeita.',
-      onOk: async () => {
-        try {
-          setIsLoading(true);
-          await deleteSector(id);
-          setSectors((prevSectors) => prevSectors.filter((sector) => sector.id !== id));
-        } catch (error) {
-          console.error('Falha ao excluir setor:', error);
-        } finally {
-          setIsLoading(false);
-        }
-      },
-      onCancel() {
-        console.log('Cancelado');
-      },
-    });
+  const handleDelete = async (id: number) => {
+    try {
+      setIsLoading(true);
+      await deleteSector(id);
+      setSectors(sectors.filter(sector => sector.id !== id));
+      addToast('Setor excluído com sucesso', 'success');
+    } catch (error) {
+      console.error('Erro ao excluir setor:', error);
+      addToast('Erro ao excluir setor', 'error');
+    } finally {
+      setIsLoading(false);
+      setIsDeleting({ ...isDeleting, [id]: false });
+    }
   };
 
-  const handleAddSector = () => {
-    setNewSector(true);
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false);
+    setEditingSector(null);
     setSectorData({
       name: '',
       phoneNumberId: '',
       accessToken: '',
       description: '',
-      googleClientId: '',
-      googleApiKey: '',
     });
     setErrors({});
+    document.body.classList.remove('drawer-open');
   };
 
-  const handleEditSector = (sector: Sector) => {
-    showDrawer(sector);
+  const handleOpenDrawer = () => {
+    setIsDrawerOpen(true);
+    document.body.classList.add('drawer-open');
   };
 
-  const truncateText = (text: string, maxLength: number) => {
-    if (text.length > maxLength) {
-      return text.substring(0, maxLength) + '...';
-    } else {
-      return text;
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      handleCloseDrawer();
     }
   };
 
   return (
-    <div className="p-8">
-      {isLoading && <LoadingOverlay />}
+    <div className="sectors-screen">
+      <div className="sectors-header">
+        <div className="header-content">
+          <h1>Gerenciar Setores</h1>
+          <p className="header-description">Gerencie os setores da sua empresa</p>
+        </div>
+        <button 
+          className="add-button"
+          onClick={handleOpenDrawer}
+        >
+          <FiPlus />
+          Novo Setor
+        </button>
+      </div>
 
-      <h1 className="text-3xl font-bold mb-6" style={{ color: '#1890ff' }}>Gerenciar Setores</h1>
-      <Row gutter={[16, 16]}>
-        {sectors.map((sector) => (
-          <Col xs={24} sm={12} md={8} key={sector.id}>
-            <Card
-              title={sector.name}
-              extra={(
-                <div className="flex space-x-2">
-                  <EditOutlined className="text-blue-500 cursor-pointer" onClick={() => handleEditSector(sector)} />
-                  <DeleteOutlined className="text-red-500 cursor-pointer" onClick={() => handleDeleteClick(sector.id)} />
+      <div className="sectors-content">
+        {isLoading && (
+          <div className="loading-overlay">
+            <div className="card-loading">
+              <div className="card-loading-spinner" />
+              <span className="loading-text">Carregando setores...</span>
+            </div>
+          </div>
+        )}
+        {sectors.length === 0 && !isLoading ? (
+          <div className="empty-state">
+            <div className="empty-icon">
+              <FiFolder size={48} />
+            </div>
+            <h3>Nenhum setor cadastrado</h3>
+            <p>Clique no botão "Novo Setor" para começar</p>
+          </div>
+        ) : (
+          <div className="sectors-grid">
+            {sectors.map((sector) => (
+              <div key={sector.id} className="sector-card">
+                <div className="sector-card-header">
+                  <h3>{sector.name}</h3>
+                  <div className="sector-actions">
+                    <button
+                      className="action-button edit"
+                      onClick={() => {
+                        setEditingSector(sector);
+                        setSectorData(sector);
+                        handleOpenDrawer();
+                      }}
+                    >
+                      <FiEdit2 />
+                    </button>
+                    <button
+                      className="action-button delete"
+                      onClick={() => setIsDeleting({ ...isDeleting, [sector.id!]: true })}
+                    >
+                      <FiTrash2 />
+                    </button>
+                  </div>
                 </div>
-              )}
-            >
-              <Skeleton active loading={isLoading}>
-                <p><strong>Descrição:</strong> {truncateText(sector.description, 50)}</p>
-                <h4 style={{ color: '#1890ff', marginTop: '10px' }}>Configuração da Meta</h4>
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  <p><strong>Identificação do Telefone:</strong> {sector.phoneNumberId}</p>
-                  <p><strong>Token de Acesso:</strong> {truncateText(sector.accessToken, 50)}</p>
+
+                <div className="sector-card-content">
+                  <div className="sector-info-section">
+                    <p className="info-row">
+                      <strong>Descrição:</strong>
+                      <p>{sector.description}</p>
+                    </p>
+                  </div>
+
+                  <div className="sector-info-section">
+                    <h4>Configuração da Meta</h4>
+                    <p className="info-row">
+                      <strong>ID do Telefone:</strong>
+                      <p>{sector.phoneNumberId}</p>
+                    </p>
+                    <p className="info-row">
+                      <strong>Token de Acesso:</strong>
+                      <p>{sector.accessToken}</p>
+                    </p>
+                  </div>
                 </div>
-                <h4 style={{ color: '#1890ff', marginTop: '10px' }}>Configuração do Google</h4>
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  <p><strong>Google Client ID:</strong> {sector.googleClientId ? sector.googleClientId : 'Não definido'}</p>
-                  <p><strong>Google API Key:</strong> {sector.googleApiKey ? sector.googleApiKey : 'Não definido'}</p>
+
+                {isDeleting[sector.id!] && (
+                  <div className="delete-confirmation">
+                    <div className="delete-message-container">
+                      <h4 className="delete-title">Confirmar Exclusão</h4>
+                      <p className="delete-message">
+                        Tem certeza que deseja excluir o setor "{sector.name}"?
+                        <br />
+                        Esta ação não poderá ser desfeita.
+                      </p>
+                    </div>
+                    <div className="confirmation-actions">
+                      <button 
+                        className="cancel-button"
+                        onClick={() => setIsDeleting({ ...isDeleting, [sector.id!]: false })}
+                      >
+                        <FiX /> Cancelar
+                      </button>
+                      <button 
+                        className="confirm-button"
+                        onClick={() => handleDelete(sector.id!)}
+                      >
+                        Confirmar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {isDrawerOpen && (
+        <div className="drawer-overlay" onClick={handleOverlayClick}>
+          <div className="sector-drawer">
+            <div className="drawer-header">
+              <h2>{editingSector ? 'Editar Setor' : 'Novo Setor'}</h2>
+              <button className="close-button" onClick={handleCloseDrawer}>
+                <FiX />
+              </button>
+            </div>
+
+            <div className="drawer-content">
+              <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+                <div className="form-group">
+                  <label>Nome do Setor <span className="required">*</span></label>
+                  <input
+                    type="text"
+                    className={`form-input ${errors.name ? 'error' : ''}`}
+                    value={sectorData.name}
+                    placeholder="Ex: Vendas, Suporte, Marketing..."
+                    onChange={(e) => {
+                      setSectorData({ ...sectorData, name: e.target.value });
+                      if (errors.name) setErrors({ ...errors, name: '' });
+                    }}
+                  />
+                  {errors.name && <span className="error-message">{errors.name}</span>}
                 </div>
-              </Skeleton>
-            </Card>
-          </Col>
+
+                <div className="form-group">
+                  <label>Descrição <span className="required">*</span></label>
+                  <textarea
+                    className={`form-input form-textarea ${errors.description ? 'error' : ''}`}
+                    value={sectorData.description}
+                    placeholder="Descreva o propósito ou função deste setor..."
+                    onChange={(e) => {
+                      setSectorData({ ...sectorData, description: e.target.value });
+                      if (errors.description) setErrors({ ...errors, description: '' });
+                    }}
+                  />
+                  {errors.description && <span className="error-message">{errors.description}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label>ID do Telefone <span className="required">*</span></label>
+                  <input
+                    type="text"
+                    className={`form-input ${errors.phoneNumberId ? 'error' : ''}`}
+                    value={sectorData.phoneNumberId}
+                    placeholder="ID do número do WhatsApp Business"
+                    onChange={(e) => {
+                      setSectorData({ ...sectorData, phoneNumberId: e.target.value });
+                      if (errors.phoneNumberId) setErrors({ ...errors, phoneNumberId: '' });
+                    }}
+                  />
+                  {errors.phoneNumberId && <span className="error-message">{errors.phoneNumberId}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label>Token de Acesso <span className="required">*</span></label>
+                  <textarea
+                    className={`form-input form-textarea ${errors.accessToken ? 'error' : ''}`}
+                    value={sectorData.accessToken}
+                    placeholder="Token de acesso da API do WhatsApp Business"
+                    onChange={(e) => {
+                      setSectorData({ ...sectorData, accessToken: e.target.value });
+                      if (errors.accessToken) setErrors({ ...errors, accessToken: '' });
+                    }}
+                  />
+                  {errors.accessToken && <span className="error-message">{errors.accessToken}</span>}
+                </div>
+
+                <div className="drawer-footer">
+                  <button type="button" className="btn btn-secondary" onClick={handleCloseDrawer}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    {editingSector ? 'Salvar' : 'Criar'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="toast-container">
+        {toasts.map(toast => (
+          <Toast
+            key={toast.id}
+            message={toast.message}
+            type={toast.type}
+            onClose={() => removeToast(toast.id)}
+          />
         ))}
-        {!newSector && (
-          <Col xs={24} sm={12} md={8}>
-            <Card
-              className="flex items-center justify-center cursor-pointer shadow-md rounded-lg"
-              onClick={handleAddSector}
-            >
-              <PlusOutlined className="text-blue-500 text-3xl" />
-            </Card>
-          </Col>
-        )}
-        {newSector && (
-          <Col xs={24} sm={12} md={8}>
-            <Card>
-              <h3 style={{color: '#1890ff'}} className="text-lg font-semibold">Nome do Setor</h3>
-              <label style={{ marginBottom: '5px', marginTop: '50px' }}>Nome do setor</label>
-              <Input
-                placeholder="Nome do setor"
-                value={sectorData.name}
-                onChange={(e) => setSectorData({ ...sectorData, name: e.target.value })}
-                style={{
-                  marginBottom: '10px',
-                  borderColor: errors.name ? 'red' : undefined,
-                  maxWidth: '100%',
-                }}
-                disabled={isLoading}
-              />
-              {errors.name && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.name}</p>}
-
-              <label style={{ marginBottom: '5px', marginTop: '10px' }}>Descrição</label>
-              <TextArea
-                rows={2}
-                placeholder="Descrição"
-                value={sectorData.description}
-                onChange={(e) => setSectorData({ ...sectorData, description: e.target.value })}
-                style={{
-                  marginBottom: '10px',
-                  resize: 'none',
-                  borderColor: errors.description ? 'red' : undefined,
-                  maxWidth: '100%',
-                  overflow: 'hidden',
-                }}
-                disabled={isLoading}
-              />
-              {errors.description && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.description}</p>}
-
-              <h3 className="text-lg font-semibold mb-2" style={{ color: '#1890ff', marginTop: '10px' }}>Configuração da Meta</h3>
-              <label style={{ marginBottom: '5px', marginTop: '10px' }}>Identificação do telefone</label>
-              <Input
-                placeholder="Identificação do telefone"
-                value={sectorData.phoneNumberId}
-                onChange={(e) => setSectorData({ ...sectorData, phoneNumberId: e.target.value })}
-                style={{
-                  marginBottom: '10px',
-                  borderColor: errors.phoneNumberId ? 'red' : undefined,
-                  maxWidth: '100%',
-                }}
-                disabled={isLoading}
-              />
-              {errors.phoneNumberId && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.phoneNumberId}</p>}
-
-              <label style={{ marginBottom: '5px', marginTop: '10px' }}>Token de acesso</label>
-              <TextArea
-                rows={2}
-                placeholder="Token de acesso"
-                value={sectorData.accessToken}
-                onChange={(e) => setSectorData({ ...sectorData, accessToken: e.target.value })}
-                style={{
-                  marginBottom: '10px',
-                  borderColor: errors.accessToken ? 'red' : undefined,
-                  maxWidth: '100%',
-                  overflow: 'hidden',
-                  whiteSpace: 'normal',
-                }}
-                disabled={isLoading}
-              />
-              {errors.accessToken && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.accessToken}</p>}
-
-              <h3 className="text-lg font-semibold mb-2" style={{ color: '#1890ff', marginTop: '10px' }}>Configuração do Google</h3>
-              <label style={{ marginBottom: '5px', marginTop: '10px' }}>Google Client ID</label>
-              <Input
-                placeholder="Google Client ID"
-                value={sectorData.googleClientId}
-                onChange={(e) => setSectorData({ ...sectorData, googleClientId: e.target.value })}
-                style={{
-                  marginBottom: '10px',
-                  borderColor: errors.googleClientId ? 'red' : undefined,
-                  maxWidth: '100%',
-                }}
-                disabled={isLoading}
-              />
-              {errors.googleClientId && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.googleClientId}</p>}
-
-              <label style={{ marginBottom: '5px', marginTop: '10px' }}>Google API Key</label>
-              <Input
-                placeholder="Google API Key"
-                value={sectorData.googleApiKey}
-                onChange={(e) => setSectorData({ ...sectorData, googleApiKey: e.target.value })}
-                style={{
-                  marginBottom: '10px',
-                  borderColor: errors.googleApiKey ? 'red' : undefined,
-                  maxWidth: '100%',
-                }}
-                disabled={isLoading}
-              />
-              {errors.googleApiKey && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.googleApiKey}</p>}
-
-              <Button className="mt-4" type="primary" onClick={handleSave} disabled={isLoading}>
-                Salvar
-              </Button>
-              <Button className="mt-4 ml-2" onClick={() => setNewSector(false)} disabled={isLoading}>
-                Cancelar
-              </Button>
-            </Card>
-          </Col>
-        )}
-      </Row>
-
-      <Drawer
-        title={<div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1890ff' }}>{currentSector?.name}</div>}
-        placement="right"
-        onClose={closeDrawer}
-        visible={isDrawerVisible}
-        width={400}
-        bodyStyle={{ margin: '20px', backgroundColor: '#f9f9f9' }} // Cor de fundo mais suave
-        mask={false}
-      >
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ marginBottom: '5px', display: 'block' }}>Nome do setor</label>
-          <Input
-            placeholder="Nome do setor"
-            value={sectorData.name}
-            onChange={(e) => setSectorData({ ...sectorData, name: e.target.value })}
-            style={{
-              marginBottom: '10px',
-              borderColor: errors.name ? 'red' : undefined,
-              borderRadius: '4px', // Bordas arredondadas
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)', // Sombra leve
-            }}
-            disabled={isLoading}
-          />
-          {errors.name && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.name}</p>}
-        </div>
-
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ marginBottom: '5px', display: 'block' }}>Descrição</label>
-          <TextArea
-            rows={2}
-            placeholder="Descrição"
-            value={sectorData.description}
-            onChange={(e) => setSectorData({ ...sectorData, description: e.target.value })}
-            style={{
-              marginBottom: '10px',
-              resize: 'none',
-              borderColor: errors.description ? 'red' : undefined,
-              borderRadius: '4px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            }}
-            disabled={isLoading}
-          />
-          {errors.description && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.description}</p>}
-        </div>
-
-        <h3 className="text-lg font-semibold mb-2" style={{ color: '#1890ff', marginTop: '10px' }}>Configuração da Meta</h3>
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ marginBottom: '5px', display: 'block' }}>Identificação do telefone</label>
-          <Input
-            placeholder="Identificação do telefone"
-            value={sectorData.phoneNumberId}
-            onChange={(e) => setSectorData({ ...sectorData, phoneNumberId: e.target.value })}
-            style={{
-              marginBottom: '10px',
-              borderColor: errors.phoneNumberId ? 'red' : undefined,
-              borderRadius: '4px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            }}
-            disabled={isLoading}
-          />
-          {errors.phoneNumberId && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.phoneNumberId}</p>}
-        </div>
-
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ marginBottom: '5px', display: 'block' }}>Token de acesso</label>
-          <TextArea
-            rows={2}
-            placeholder="Token de acesso"
-            value={sectorData.accessToken}
-            onChange={(e) => setSectorData({ ...sectorData, accessToken: e.target.value })}
-            style={{
-              marginBottom: '10px',
-              borderColor: errors.accessToken ? 'red' : undefined,
-              borderRadius: '4px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            }}
-            disabled={isLoading}
-          />
-          {errors.accessToken && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.accessToken}</p>}
-        </div>
-
-        <h3 className="text-lg font-semibold mb-2" style={{ color: '#1890ff', marginTop: '10px' }}>Configuração do Google</h3>
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ marginBottom: '5px', display: 'block' }}>Google Client ID</label>
-          <Input
-            placeholder="Google Client ID"
-            value={sectorData.googleClientId}
-            onChange={(e) => setSectorData({ ...sectorData, googleClientId: e.target.value })}
-            style={{
-              marginBottom: '10px',
-              borderColor: errors.googleClientId ? 'red' : undefined,
-              borderRadius: '4px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            }}
-            disabled={isLoading}
-          />
-          {errors.googleClientId && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.googleClientId}</p>}
-        </div>
-
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ marginBottom: '5px', display: 'block' }}>Google API Key</label>
-          <Input
-            placeholder="Google API Key"
-            value={sectorData.googleApiKey}
-            onChange={(e) => setSectorData({ ...sectorData, googleApiKey: e.target.value })}
-            style={{
-              marginBottom: '10px',
-              borderColor: errors.googleApiKey ? 'red' : undefined,
-              borderRadius: '4px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            }}
-            disabled={isLoading}
-          />
-          {errors.googleApiKey && <p style={{ color: 'red', marginBottom: '10px' }}>{errors.googleApiKey}</p>}
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button className="mt-4" type="primary" onClick={handleSave} disabled={isLoading}>
-            Salvar
-          </Button>
-          <Button className="mt-4 ml-2" onClick={closeDrawer} disabled={isLoading}>
-            Cancelar
-          </Button>
-        </div>
-      </Drawer>
+      </div>
     </div>
   );
 };

@@ -76,76 +76,52 @@
 .chat-new-contact {
   display: flex;
   padding: 12px;
-  border-radius: 8px;
-  margin-bottom: 6px;
+  border-bottom: 1px solid #2a2a2a;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s ease;
   position: relative;
-  overflow: hidden;
 }
 
 .chat-new-contact:hover {
-  background-color: #252525;
+  background-color: #2a2a2a;
 }
 
 .chat-new-contact.selected {
-  background-color: #1e3a8a;
-  border-left: 3px solid #3b82f6;
+  background-color: #333;
 }
 
 .chat-new-contact-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  margin-right: 12px;
   position: relative;
+  margin-right: 12px;
   flex-shrink: 0;
 }
 
 .chat-new-contact-avatar img {
-  width: 100%;
-  height: 100%;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   object-fit: cover;
+  border: 2px solid #2a2a2a;
 }
 
-/* Borda colorida para a tag */
-.chat-new-contact-avatar.has-tag {
-  box-shadow: 0 0 0 2px var(--tag-color);
-}
-
-/* Tag abaixo da foto */
-.chat-new-contact-tag-label {
+.chat-new-contact-assignee {
   position: absolute;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: var(--tag-color);
-  color: white;
-  font-size: 9px;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 8px;
-  white-space: nowrap;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.status-indicator {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 12px;
-  height: 12px;
+  bottom: -4px;
+  right: -4px;
+  background: #1a1a1a;
+  border: 2px solid #2a2a2a;
   border-radius: 50%;
-  border: 2px solid #1a1a1a;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.status-indicator.online {
-  background-color: #10b981;
-}
-
-.status-indicator.offline {
-  background-color: #94a3b8;
+.assignee-initials {
+  font-size: 10px;
+  font-weight: 600;
+  color: #00c2ff;
 }
 
 .chat-new-contact-info {
@@ -153,36 +129,20 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  min-height: 56px;
-  padding-right: 8px;
+  gap: 4px;
 }
 
 .chat-new-contact-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 4px;
-  width: 100%;
-}
-
-.chat-new-contact-name-container {
-  flex: 1;
-  min-width: 0;
-  padding-right: 8px;
-}
-
-.chat-new-contact-tags {
-  position: absolute;
-  top: 0;
-  right: 0;
-  display: flex;
-  align-items: flex-start;
+  gap: 8px;
 }
 
 .chat-new-contact-name {
-  font-weight: 600;
-  font-size: 15px;
+  font-weight: 500;
+  color: #e0e0e0;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -190,61 +150,112 @@
 
 .chat-new-contact-time {
   font-size: 12px;
-  color: #94a3b8;
+  color: #888;
   white-space: nowrap;
 }
 
 .chat-new-contact-message {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chat-new-contact-details {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.chat-new-contact-email,
+.chat-new-contact-phone {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-new-contact-email svg,
+.chat-new-contact-phone svg {
+  flex-shrink: 0;
+  color: #666;
 }
 
 .chat-new-message-preview {
   font-size: 13px;
-  color: #94a3b8;
+  color: #888;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
-  padding-right: 8px;
 }
 
 .chat-new-unread-badge {
-  background-color: #3b82f6;
-  color: white;
+  background-color: #00c2ff;
+  color: #1a1a1a;
   font-size: 12px;
   font-weight: 600;
-  min-width: 20px;
-  height: 20px;
+  padding: 2px 6px;
   border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 6px;
-}
-
-.chat-new-no-contacts {
-  padding: 16px;
+  min-width: 20px;
   text-align: center;
-  color: #94a3b8;
 }
 
+/* Estados de carregamento e erro */
+.chat-new-loading,
+.chat-new-error,
+.chat-new-no-contacts,
 .chat-new-no-sector {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
   padding: 24px;
   text-align: center;
-  color: #94a3b8;
+  height: 100%;
+  color: #888;
 }
 
+.chat-new-loading-spinner {
+  border: 2px solid #2a2a2a;
+  border-top-color: #00c2ff;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.chat-new-error-icon,
+.chat-new-no-contacts-icon,
 .chat-new-no-sector-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  opacity: 0.5;
+  font-size: 24px;
+  margin-bottom: 12px;
+}
+
+.chat-new-error button {
+  margin-top: 12px;
+  padding: 8px 16px;
+  background-color: #2a2a2a;
+  border: none;
+  border-radius: 4px;
+  color: #e0e0e0;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.chat-new-error button:hover {
+  background-color: #333;
 }
 
 /* Área principal do chat */
@@ -456,8 +467,16 @@
 }
 
 .chat-new-message-status {
-  display: flex;
-  align-items: center;
+  margin-left: 4px;
+  font-size: 12px;
+}
+
+.chat-new-message-status.sending {
+  color: #888;
+}
+
+.chat-new-message-status.error {
+  color: #ff4444;
 }
 
 .chat-new-message-image {

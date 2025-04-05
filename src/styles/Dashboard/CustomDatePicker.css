@@ -1,0 +1,243 @@
+.custom-datepicker-wrapper {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.date-input-group {
+  position: relative;
+  flex: 1;
+}
+
+.date-input-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #a0a0a0;
+  font-size: 14px;
+}
+
+.date-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.calendar-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #a0a0a0;
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.date-input-container:hover .calendar-icon {
+  color: #3699FF;
+}
+
+.react-datepicker-wrapper {
+  width: 100%;
+}
+
+.react-datepicker {
+  font-family: inherit;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background-color: #2a2a2a;
+  padding: 16px;
+}
+
+.react-datepicker__header {
+  background-color: #2a2a2a;
+  border-bottom: 1px solid #404040;
+  padding: 12px;
+}
+
+.react-datepicker__current-month {
+  color: #ffffff;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.react-datepicker__day-name {
+  color: #a0a0a0;
+  width: 36px;
+  line-height: 36px;
+  margin: 2px;
+}
+
+.react-datepicker__day {
+  color: #ffffff;
+  width: 36px;
+  line-height: 36px;
+  margin: 2px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.react-datepicker__day:hover {
+  background-color: #404040;
+}
+
+.react-datepicker__day--selected {
+  background-color: #3699FF !important;
+  color: white !important;
+}
+
+.react-datepicker__day--keyboard-selected {
+  background-color: #3699FF;
+  color: white;
+}
+
+.react-datepicker__day--in-range {
+  background-color: rgba(54, 153, 255, 0.2);
+  color: white;
+}
+
+.react-datepicker__day--in-selecting-range {
+  background-color: rgba(54, 153, 255, 0.2);
+  color: white;
+}
+
+.react-datepicker__day--disabled {
+  color: #505050;
+  cursor: not-allowed;
+}
+
+.react-datepicker__navigation {
+  top: 16px;
+  cursor: pointer;
+}
+
+.react-datepicker__navigation-icon {
+  color: #a0a0a0;
+  transition: color 0.2s ease;
+}
+
+.react-datepicker__navigation:hover .react-datepicker__navigation-icon {
+  color: #3699FF;
+}
+
+.custom-input {
+  width: 100%;
+  padding: 10px 16px;
+  padding-right: 40px;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  background-color: #2a2a2a;
+  color: #ffffff;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.custom-input::placeholder {
+  color: #666666;
+  opacity: 1;
+}
+
+.custom-input:hover {
+  border-color: #3699FF;
+}
+
+.custom-input:focus {
+  outline: none;
+  border-color: #3699FF;
+  box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.2);
+}
+
+.custom-input:disabled {
+  background-color: #363636;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Estilo para o container dos botões de navegação do mês */
+.react-datepicker__month-container {
+  float: none;
+}
+
+.react-datepicker__navigation--previous,
+.react-datepicker__navigation--next {
+  border: none;
+  background: none;
+  padding: 8px;
+  cursor: pointer;
+  position: absolute;
+  top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.react-datepicker__navigation--previous:hover,
+.react-datepicker__navigation--next:hover {
+  background-color: #404040;
+}
+
+.react-datepicker__navigation--previous {
+  left: 16px;
+}
+
+.react-datepicker__navigation--next {
+  right: 16px;
+}
+
+/* Estilo para os dias da semana */
+.react-datepicker__day-names {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 8px;
+}
+
+/* Estilo para as semanas */
+.react-datepicker__week {
+  display: flex;
+  justify-content: space-around;
+}
+
+/* Estilo para o container do mês */
+.react-datepicker__month {
+  margin: 0;
+  padding: 8px 0;
+}
+
+/* Estilo para os botões de período */
+.dashboard-period-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.dashboard-period-button {
+  padding: 8px 16px;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  background-color: #2a2a2a;
+  color: #a0a0a0;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.dashboard-period-button:hover:not(:disabled) {
+  border-color: #3699FF;
+  color: #ffffff;
+}
+
+.dashboard-period-button.active {
+  background-color: #3699FF;
+  border-color: #3699FF;
+  color: #ffffff;
+}
+
+.dashboard-period-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+} 

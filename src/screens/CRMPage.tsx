@@ -14,6 +14,7 @@ import {
   DropAnimation,
   rectIntersection,
   pointerWithin,
+  useDroppable,
 } from '@dnd-kit/core';
 import { 
   arrayMove,
@@ -25,140 +26,158 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import './CRMPage.css';
-import Modal from '../components/Modal';
-// Importando ícones
 import { 
   FiPhone, 
-  FiMail, 
   FiUser, 
-  FiCalendar, 
-  FiClock, 
-  FiTag, 
-  FiEdit, 
   FiPlus, 
-  FiMessageSquare,
-  FiInfo,
-  FiCheckSquare,
-  FiFileText, 
-  FiSend,
   FiGrid,
   FiList,
-  FiSettings,
   FiFilter,
   FiSearch,
-  FiChevronRight
+  FiChevronRight,
+  FiX,
+  FiTrash2,
+  FiMail
 } from 'react-icons/fi';
 import CardSidebar from '../components/CardSidebar';
 import FilterPanel from '../components/FilterPanel';
-
-interface Card {
-  id: string;
-  title: string;
-  content: string;
-  labels?: string[];
-  email?: string;
-  phone?: string;
-  status?: string;
-  assignedTo?: string;
-  assigneeAvatar?: string;
-  createdAt?: string;
-  lastContact?: string;
-  notes?: string[];
-  priority?: 'high' | 'medium' | 'low';
-}
+import { getColumns, createColumn, moveColumn, updateColumn, deleteColumn } from '../services/ColumnService';
+import { createCard, updateCard, moveCard, Card, getCards } from '../services/CardService';
+import SessionService from '../services/SessionService';
+import { getTags } from '../services/LabelService';
+import Toast from '../components/Toast';
+import { getAllUsers, User } from '../services/UserService';
+import { getContacts, updateContact, UpdateContactRequestDTO } from '../services/ContactService';
 
 interface Column {
   id: string;
   title: string;
-  cards: Card[];
+  cards: UICard[];
 }
 
+interface UICard {
+  id: string;
+  title: string;
+  content: string;
+  email?: string;
+  phone?: string;
+  status?: string;
+  createdAt?: string;
+  lastContact?: string;
+  priority?: 'high' | 'medium' | 'low';
+  labels?: string[];
+  contactId: number;
+  columnId: number;
+  sectorId: number;
+  position: number;
+  tagId?: number;
+  assignedTo?: string;
+}
+
+interface ToastMessage {
+  id: number;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
+// Primeiro, vamos definir a interface da Tag
+interface Tag {
+  id: number;
+  name: string;
+  color: string;
+  description?: string;
+  sectorId: number;
+}
+
+interface Contact {
+  id: number;
+  name: string;
+  notes?: string;
+  email?: string;
+  number?: string;
+  isActive: boolean;
+  priority?: string;
+  tagId?: number;
+  assignedTo?: number;
+}
+
+interface ContactResponse {
+  data: Contact;
+}
+
+// Componente Modal aprimorado
+const EnhancedModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}> = ({ visible, onClose, title, children }) => {
+  if (!visible) return null;
+  
+  // Impedir que o clique dentro do modal feche o modal
+  const handleModalClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+  
+  return (
+    <div className="enhanced-modal-overlay" onClick={onClose}>
+      <div className="enhanced-modal" onClick={handleModalClick}>
+        <div className="enhanced-modal-header">
+          <h3>{title}</h3>
+          <button className="enhanced-modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="enhanced-modal-content">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Crie um componente separado para a lixeira
+const TrashBin = () => {
+  const { setNodeRef } = useDroppable({
+    id: 'trash-bin',
+  });
+
+  return (
+    <div 
+      ref={setNodeRef}
+      id="trash-bin"
+      className="trash-bin"
+      style={{
+        position: 'fixed',
+        bottom: '20px',
+        right: '20px',
+        zIndex: 9999,
+        padding: '15px',
+        borderRadius: '50%',
+        background: 'rgba(255, 255, 255, 0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backdropFilter: 'blur(5px)',
+        border: '2px dashed rgba(255, 255, 255, 0.3)',
+        transition: 'all 0.3s ease'
+      }}
+    >
+      <FiTrash2 size={24} color="#fff" />
+    </div>
+  );
+};
+
 const CRMPage: React.FC = () => {
-  const [columns, setColumns] = useState<Column[]>([
-    { 
-      id: 'col1', 
-      title: 'Novos Leads', 
-      cards: [
-        { 
-          id: 'card1', 
-          title: 'João Silva', 
-          content: 'Interessado em produto A',
-          email: 'joao.silva@email.com',
-          phone: '(11) 98765-4321',
-          status: 'Novo',
-          assignedTo: 'Carlos Vendas',
-          assigneeAvatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-          createdAt: '2023-05-15',
-          lastContact: '2023-05-20',
-          notes: ['Cliente encontrado na feira de negócios', 'Demonstrou interesse no plano premium'],
-          priority: 'medium'
-        }, 
-        { 
-          id: 'card2', 
-          title: 'Maria Santos', 
-          content: 'Solicitou orçamento para implementação do sistema em 3 filiais. Precisa de resposta até o final da semana.',
-          email: 'maria.santos@email.com',
-          phone: '(11) 91234-5678',
-          status: 'Orçamento',
-          assignedTo: 'Ana Vendas',
-          assigneeAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-          createdAt: '2023-05-18',
-          lastContact: '2023-05-19',
-          priority: 'high'
-        }
-      ] 
-    },
-    { 
-      id: 'col2', 
-      title: 'Em Contato', 
-      cards: [
-        { 
-          id: 'card3', 
-          title: 'Pedro Lima', 
-          content: 'Aguardando retorno sobre proposta enviada. Fazer follow-up na próxima semana.',
-          email: 'pedro.lima@email.com',
-          phone: '(11) 99876-5432',
-          status: 'Em análise',
-          assignedTo: 'Carlos Vendas',
-          assigneeAvatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-          createdAt: '2023-05-10',
-          lastContact: '2023-05-17',
-          priority: 'low'
-        }
-      ] 
-    },
-    { 
-      id: 'col3', 
-      title: 'Negociação', 
-      cards: [
-        { 
-          id: 'card4', 
-          title: 'Ana Costa', 
-          content: 'Proposta enviada, cliente solicitou desconto adicional. Agendar reunião para discutir termos.',
-          email: 'ana.costa@email.com',
-          phone: '(11) 97654-3210',
-          status: 'Proposta',
-          assignedTo: 'Ana Vendas',
-          assigneeAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-          createdAt: '2023-05-05',
-          lastContact: '2023-05-15',
-          labels: ['Prioridade Alta'],
-          priority: 'high'
-        }
-      ] 
-    },
-  ]);
+  const [columns, setColumns] = useState<Column[]>([]);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [contactsMap, setContactsMap] = useState<Map<number, any>>(new Map());
+  const [isLoading, setIsLoading] = useState(true);
   
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<'column' | 'card' | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
-  const [showNewColumnModal, setShowNewColumnModal] = useState(false);
-  const [newColumnTitle, setNewColumnTitle] = useState('');
+  const [selectedCard, setSelectedCard] = useState<UICard | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
-  const [isCreatingNewCard, setIsCreatingNewCard] = useState(false);
-  const [newCardColumnId, setNewCardColumnId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -170,6 +189,16 @@ const CRMPage: React.FC = () => {
       to: ''
     }
   });
+  const [showDirectModal, setShowDirectModal] = useState(false);
+  const [directModalTitle, setDirectModalTitle] = useState('');
+  const [directModalError, setDirectModalError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingColumn, setEditingColumn] = useState<Column | null>(null);
+  const [showTrashBin, setShowTrashBin] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [columnToDelete, setColumnToDelete] = useState<Column | null>(null);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
 
   // Configuração melhorada dos sensores para movimentação mais suave
   const sensors = useSensors(
@@ -195,17 +224,214 @@ const CRMPage: React.FC = () => {
     }),
   };
 
+  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Date.now();
+    setToasts(current => [...current, { id, message, type }]);
+    setTimeout(() => removeToast(id), 3000);
+  };
+
+  const removeToast = (id: number) => {
+    setToasts(current => current.filter(toast => toast.id !== id));
+  };
+
+  const convertPriority = (priority: string | undefined): 'high' | 'medium' | 'low' | undefined => {
+    if (!priority) return undefined;
+    switch (priority.toLowerCase()) {
+      case 'high':
+      case 'alta':
+        return 'high';
+      case 'medium':
+      case 'média':
+      case 'media':
+        return 'medium';
+      default:
+        return 'low';
+    }
+  };
+
+  // Carregar dados iniciais
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        const sectorId = SessionService.getSectorId();
+        if (!sectorId) {
+          console.error('Setor não selecionado');
+          setIsLoading(false);
+          return;
+        }
+        
+        // Buscar colunas, cards, contatos, tags e usuários
+        const [columnsData, cardsData, contactsResponse, tagsResponse, usersData] = await Promise.all([
+          getColumns(),
+          getCards(sectorId),
+          getContacts(sectorId),
+          getTags(sectorId),
+          getAllUsers()
+        ]);
+
+        // Criar mapa de contatos para acesso rápido
+        const newContactsMap = new Map(
+          contactsResponse.data.map(contact => [contact.id, contact])
+        );
+        setContactsMap(newContactsMap);
+
+        // Mapear as colunas com os cards
+        const mappedColumns = columnsData.map((column) => ({
+          id: column.id.toString(),
+          title: column.name,
+          cards: cardsData
+            .filter(card => card.columnId.toString() === column.id.toString())
+            .map(card => {
+              const contact = newContactsMap.get(card.contactId);
+              return {
+                id: card.id.toString(),
+                title: contact?.name || 'Sem nome',
+                content: contact?.notes || '',
+                email: contact?.email || '',
+                phone: contact?.number || '',
+                status: contact?.isActive ? 'active' : 'inactive',
+                priority: convertPriority(contact?.priority),
+                contactId: card.contactId,
+                columnId: card.columnId,
+                sectorId: card.sectorId,
+                position: card.position,
+                tagId: contact?.tagId || undefined,
+                createdAt: card.createdAt,
+                assignedTo: contact?.assignedTo ? contact.assignedTo.toString() : undefined
+              };
+            })
+            .sort((a, b) => a.position - b.position)
+        }));
+
+        setColumns(mappedColumns);
+        
+        // Configurar tags
+        if (tagsResponse.data) {
+          const formattedTags = tagsResponse.data.map(tag => ({
+            id: Number(tag.id),
+            name: tag.name,
+            color: tag.color,
+            description: tag.description,
+            sectorId: tag.sectorId
+          }));
+          setTags(formattedTags);
+        }
+
+        // Configurar usuários
+        setUsers(usersData);
+
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+        addToast('Erro ao carregar dados', 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Função para validar o título da coluna
+  const validateColumnTitle = (title: string): boolean => {
+    if (!title.trim()) {
+      setDirectModalError('O título da coluna é obrigatório');
+      return false;
+    }
+    
+    if (title.trim().length < 3) {
+      setDirectModalError('O título deve ter pelo menos 3 caracteres');
+      return false;
+    }
+    
+    if (title.trim().length > 30) {
+      setDirectModalError('O título deve ter no máximo 30 caracteres');
+      return false;
+    }
+    
+    // Verificar se já existe uma coluna com esse título
+    const columnExists = columns.some(col => 
+      col.title.toLowerCase() === title.trim().toLowerCase()
+    );
+    
+    if (columnExists) {
+      setDirectModalError('Já existe uma coluna com esse título');
+      return false;
+    }
+    
+    setDirectModalError('');
+    return true;
+  };
+
+  // Função para adicionar ou atualizar coluna com validação
+  const handleSaveColumn = async () => {
+    if (!validateColumnTitle(directModalTitle)) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      const sectorId = SessionService.getSectorId();
+      if (!sectorId) {
+        console.error('Setor não selecionado');
+        addToast('Selecione um setor para continuar', 'error');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (editingColumn) {
+        // Atualizar coluna existente
+        const updatedColumn = await updateColumn(editingColumn.id, {
+          name: directModalTitle.trim(),
+        });
+        
+        setColumns(prevColumns => prevColumns.map(col => 
+          col.id === updatedColumn.id ? { ...col, title: updatedColumn.name } : col
+        ));
+        
+        addToast('Coluna atualizada com sucesso', 'success');
+      } else {
+      // Criar nova coluna
+      const newColumn = await createColumn({
+        name: directModalTitle.trim(),
+        sectorId: sectorId,
+        position: columns.length + 1
+      });
+      
+      setColumns(prevColumns => [...prevColumns, {
+        id: newColumn.id.toString(),
+        title: newColumn.name,
+        cards: []
+      }]);
+      
+      addToast('Coluna adicionada com sucesso', 'success');
+      }
+      
+      setShowDirectModal(false);
+      setDirectModalTitle('');
+      setDirectModalError('');
+    } catch (error) {
+      console.error('Erro ao salvar coluna:', error);
+      addToast('Erro ao salvar coluna', 'error');
+    } finally {
+      setIsSubmitting(false);
+      setEditingColumn(null);
+    }
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     setActiveId(active.id as string);
     
-    // Determina se estamos arrastando uma coluna ou um card
+    // Adiciona classe no body quando começar a arrastar
+    document.body.classList.add('dragging');
+    
     if (columns.some(col => col.id === active.id)) {
       setActiveType('column');
-      document.body.classList.add('dragging-column');
+      setShowTrashBin(true);
     } else {
       setActiveType('card');
-      document.body.classList.add('dragging-card');
     }
   };
 
@@ -213,130 +439,97 @@ const CRMPage: React.FC = () => {
     // Podemos adicionar lógica aqui para melhorar a experiência durante o arrasto
   }, []);
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     
-    // Remove classes do body
-    document.body.classList.remove('dragging-column', 'dragging-card');
+    // Remove classe do body quando terminar de arrastar
+    document.body.classList.remove('dragging');
+    setShowTrashBin(false);
     
-    if (!over) {
-      setActiveId(null);
-      setActiveType(null);
+    if (!over) return;
+    
+    if (over.id === 'trash-bin' && activeType === 'column') {
+      const column = columns.find(col => col.id === active.id);
+      if (!column) return;
+
+      if (column.cards.length > 0) {
+        addToast('Não é possível excluir uma coluna com cards', 'error');
+        return;
+      }
+
+      setColumnToDelete(column);
+      setShowDeleteModal(true);
       return;
     }
     
-    if (active.id !== over.id) {
-      if (activeType === 'column') {
-        // Reordenar colunas com uma abordagem mais robusta
-        setColumns(columns => {
-          const oldIndex = columns.findIndex(col => col.id === active.id);
-          const newIndex = columns.findIndex(col => col.id === over.id);
-          
-          // Usa arrayMove para garantir uma reordenação correta
-          return arrayMove(columns, oldIndex, newIndex);
-        });
-      } else if (activeType === 'card') {
-        // Extrair IDs da coluna e do card
-        const activeIdParts = (active.id as string).split(':');
-        const overIdParts = (over.id as string).split(':');
+    if (activeType === 'column') {
+      const oldIndex = columns.findIndex(col => col.id === active.id);
+      const newIndex = columns.findIndex(col => col.id === over.id);
+      
+      if (oldIndex === newIndex) return;
+
+      try {
+        // Atualiza imediatamente a UI
+        const newColumns = arrayMove(columns, oldIndex, newIndex);
+        setColumns(newColumns);
         
-        const activeColumnId = activeIdParts[0];
-        const activeCardId = activeIdParts[1];
+        // Tenta atualizar no backend
+        await moveColumn(active.id.toString(), newIndex + 1);
+        addToast('Coluna movida com sucesso', 'success');
+      } catch (error) {
+        console.error('Erro ao mover coluna:', error);
+        // Reverte a mudança em caso de erro
+        setColumns(columns);
+        addToast('Erro ao mover coluna', 'error');
+      }
+    } else if (activeType === 'card') {
+      const [sourceColumnId, cardId] = active.id.toString().split(':');
+      const [targetColumnId, targetPosition] = over.id.toString().split(':');
+      
+      // Verifica se é o mesmo card
+      if (cardId === targetPosition) return;
+
+      try {
+        const sourceColumn = columns.find(col => col.id === sourceColumnId);
+        const targetColumn = columns.find(col => col.id === targetColumnId);
         
-        let overColumnId = overIdParts[0];
-        let overCardId = overIdParts[1];
-        
-        // Verifica se estamos sobre uma coluna ou um card
-        const isOverColumn = !overCardId;
-        if (isOverColumn) {
-          overColumnId = over.id as string;
+        if (!sourceColumn || !targetColumn) return;
+
+        const cardToMove = sourceColumn.cards.find(card => card.id === cardId);
+        if (!cardToMove) return;
+
+        // Calcula a nova posição do card
+        let newPosition;
+        if (sourceColumnId === targetColumnId) {
+          // Se for na mesma coluna, usa o índice do card alvo
+          const targetCard = targetColumn.cards.find(card => card.id === targetPosition);
+          const targetIndex = targetColumn.cards.indexOf(targetCard!);
+          newPosition = targetIndex + 1;
+        } else {
+          // Se for em coluna diferente, usa a posição passada ou o final da coluna
+          newPosition = parseInt(targetPosition) || targetColumn.cards.length + 1;
         }
+
+        // Atualiza imediatamente a UI
+        const newColumns = columns.map(col => ({...col, cards: [...col.cards]}));
         
-        setColumns(columns => {
-          // Encontrar colunas de origem e destino
-          const sourceColumn = columns.find(col => col.id === activeColumnId);
-          const destColumn = columns.find(col => col.id === overColumnId);
-          
-          if (!sourceColumn || !destColumn) return columns;
-          
-          // Copiar o array de colunas
-          const newColumns = [...columns];
-          
-          // Encontrar índices
-          const sourceColumnIndex = columns.findIndex(col => col.id === activeColumnId);
-          const destColumnIndex = columns.findIndex(col => col.id === overColumnId);
-          
-          // Se estamos na mesma coluna
-          if (sourceColumnIndex === destColumnIndex) {
-            const sourceCardIndex = sourceColumn.cards.findIndex(card => card.id === activeCardId);
-            let destCardIndex;
-            
-            if (isOverColumn) {
-              // Se estamos sobre a coluna, adiciona no final
-              destCardIndex = sourceColumn.cards.length;
-            } else {
-              // Se estamos sobre um card específico
-              destCardIndex = sourceColumn.cards.findIndex(card => card.id === overCardId);
-            }
-            
-            // Cria uma cópia dos cards
-            const newCards = [...sourceColumn.cards];
-            
-            // Remove o card da posição original
-            const [movedCard] = newCards.splice(sourceCardIndex, 1);
-            
-            // Insere o card na nova posição
-            newCards.splice(destCardIndex, 0, movedCard);
-            
-            // Atualiza a coluna
-            newColumns[sourceColumnIndex] = {
-              ...sourceColumn,
-              cards: newCards
-            };
-          } else {
-            // Movendo entre colunas diferentes
-            const sourceCardIndex = sourceColumn.cards.findIndex(card => card.id === activeCardId);
-            
-            // Cria cópias dos arrays de cards
-            const newSourceCards = [...sourceColumn.cards];
-            const newDestCards = [...destColumn.cards];
-            
-            // Remove o card da coluna de origem
-            const [movedCard] = newSourceCards.splice(sourceCardIndex, 1);
-            
-            // Determina a posição de destino
-            let destCardIndex;
-            
-            if (isOverColumn) {
-              // Se estamos sobre a coluna, adiciona no final
-              destCardIndex = newDestCards.length;
-            } else {
-              // Se estamos sobre um card específico
-              destCardIndex = newDestCards.findIndex(card => card.id === overCardId);
-              
-              if (destCardIndex === -1) {
-                // Fallback para o final da lista se não encontrar
-                destCardIndex = newDestCards.length;
-              }
-            }
-            
-            // Insere o card na nova posição
-            newDestCards.splice(destCardIndex, 0, movedCard);
-            
-            // Atualiza as colunas
-            newColumns[sourceColumnIndex] = {
-              ...sourceColumn,
-              cards: newSourceCards
-            };
-            
-            newColumns[destColumnIndex] = {
-              ...destColumn,
-              cards: newDestCards
-            };
-        }
+        // Remove o card da coluna de origem
+        const sourceColIndex = newColumns.findIndex(col => col.id === sourceColumnId);
+        newColumns[sourceColIndex].cards = newColumns[sourceColIndex].cards.filter(card => card.id !== cardId);
         
-        return newColumns;
-      });
+        // Adiciona o card na coluna de destino na posição correta
+        const destColIndex = newColumns.findIndex(col => col.id === targetColumnId);
+        newColumns[destColIndex].cards.splice(newPosition - 1, 0, cardToMove);
+        
+        setColumns(newColumns);
+
+        // Atualiza no backend
+        await moveCard(cardId, parseInt(targetColumnId), newPosition);
+        addToast('Card movido com sucesso', 'success');
+      } catch (error) {
+        console.error('Erro ao mover card:', error);
+        setColumns(columns);
+        addToast('Erro ao mover card', 'error');
       }
     }
     
@@ -344,18 +537,44 @@ const CRMPage: React.FC = () => {
     setActiveType(null);
   };
 
+  // Adicione esta função para detectar quando está sobre a lixeira
+  const handleDragOver = (event: DragMoveEvent) => {
+    const { over } = event;
+    const trashBin = document.getElementById('trash-bin');
+    
+    if (trashBin && over?.id === 'trash-bin') {
+      trashBin.classList.add('drag-over');
+    } else if (trashBin) {
+      trashBin.classList.remove('drag-over');
+    }
+  };
+
   // Função personalizada para detecção de colisão
   const customCollisionDetection = useCallback((args: any) => {
-    // Para colunas, usamos uma detecção mais precisa
+    // Para colunas, incluímos a detecção da lixeira
     if (activeType === 'column') {
-      // Primeiro tentamos com pointerWithin que é mais preciso para movimento horizontal
       const pointerCollisions = pointerWithin(args);
+      
+      // Verifica se há colisão com a lixeira
+      const trashBin = document.getElementById('trash-bin');
+      if (trashBin) {
+        const trashBinRect = trashBin.getBoundingClientRect();
+        const { x, y } = args.pointerCoordinates;
+        
+        if (
+          x >= trashBinRect.left &&
+          x <= trashBinRect.right &&
+          y >= trashBinRect.top &&
+          y <= trashBinRect.bottom
+        ) {
+          return [{ id: 'trash-bin' }];
+        }
+      }
       
       if (pointerCollisions.length > 0) {
         return pointerCollisions;
       }
       
-      // Se não encontrar colisões, usamos rectIntersection como fallback
       return rectIntersection(args);
     }
     
@@ -375,76 +594,100 @@ const CRMPage: React.FC = () => {
     }
   };
 
-  // Função para salvar as alterações do card
-  const saveCardChanges = (updatedCard: Card) => {
-    setColumns(columns => {
-      const newColumns = [...columns];
-      const columnIndex = newColumns.findIndex(col => 
-        col.cards.some(card => card.id === updatedCard.id)
-      );
-      
-      if (columnIndex !== -1) {
-        const cardIndex = newColumns[columnIndex].cards.findIndex(
-          card => card.id === updatedCard.id
-        );
-        
-        if (cardIndex !== -1) {
-          newColumns[columnIndex].cards[cardIndex] = {...updatedCard};
-        }
+  // Primeiro, vamos garantir que a função convertToCard mantenha todos os campos
+  const convertToCard = (uiCard: UICard) => {
+    return {
+      id: uiCard.id,
+      title: uiCard.title,
+      content: uiCard.content,
+      email: uiCard.email,
+      phone: uiCard.phone,
+      status: uiCard.status,
+      createdAt: uiCard.createdAt ? new Date(uiCard.createdAt) : undefined,
+      lastContact: uiCard.lastContact ? new Date(uiCard.lastContact) : undefined,
+      priority: uiCard.priority,
+      contactId: uiCard.contactId,
+      tagId: uiCard.tagId,
+      columnId: uiCard.columnId,
+      sectorId: uiCard.sectorId,
+      position: uiCard.position
+    };
+  };
+
+  // Agora vamos ajustar o saveCardChanges
+  const saveCardChanges = async (updatedCard: UICard) => {
+    try {
+      const sectorId = SessionService.getSectorId();
+      if (!sectorId) {
+        addToast('Selecione um setor para continuar', 'error');
+        return;
       }
-      
-      return newColumns;
-    });
-    
-    setSelectedCard(updatedCard);
-  };
 
-  // Função para adicionar nova coluna
-  const handleAddColumn = () => {
-    if (newColumnTitle.trim()) {
-      const newColumn: Column = {
-        id: `col${columns.length + 1}`,
-        title: newColumnTitle.trim(),
-        cards: []
+      const contact = contactsMap.get(updatedCard.contactId);
+      if (!contact) {
+        addToast('Contato não encontrado', 'error');
+        return;
+      }
+
+      // Atualiza o contato
+      const contactData: UpdateContactRequestDTO = {
+        name: updatedCard.title,
+        tagId: updatedCard.tagId || null,
+        phoneWhatsapp: updatedCard.phone || '',
+        avatarUrl: null,
+        email: updatedCard.email || '',
+        notes: updatedCard.content || null,
+        sectorId: updatedCard.sectorId,
+        isActive: updatedCard.status === 'active',
+        priority: updatedCard.priority || 'normal',
+        aiActive: 1,
+        assignedTo: updatedCard.assignedTo ? Number(updatedCard.assignedTo) : null
       };
+
+      const contactResponse = (await updateContact(updatedCard.contactId, contactData)) as unknown as ContactResponse;
       
-      setColumns([...columns, newColumn]);
-      setNewColumnTitle('');
-      setShowNewColumnModal(false);
-    }
-  };
+      // Atualiza o mapa de contatos
+      setContactsMap(new Map(contactsMap.set(updatedCard.contactId, contactResponse.data)));
 
-  // Adicione a função para criar um novo card
-  const handleAddCard = (columnId: string) => {
-    setNewCardColumnId(columnId);
-    setIsCreatingNewCard(true);
-    setSidebarOpen(true);
-  };
+      // Criar um novo objeto com os dados atualizados usando o retorno da API
+      const updatedCardData: UICard = {
+        ...updatedCard,
+        title: contactResponse.data.name,
+        content: contactResponse.data.notes || '',
+        email: contactResponse.data.email || '',
+        phone: contactResponse.data.number || '',
+        status: contactResponse.data.isActive ? 'active' : 'inactive',
+        priority: convertPriority(contactResponse.data.priority),
+        tagId: contactResponse.data.tagId || undefined,
+        assignedTo: contactResponse.data.assignedTo ? contactResponse.data.assignedTo.toString() : undefined
+      };
 
-  // Adicione esta função para salvar um novo card
-  const saveNewCard = (newCard: Card) => {
-    if (newCardColumnId) {
-      setColumns(columns => {
-        const newColumns = [...columns];
-        const columnIndex = newColumns.findIndex(col => col.id === newCardColumnId);
-        
-        if (columnIndex !== -1) {
-          newColumns[columnIndex] = {
-            ...newColumns[columnIndex],
-            cards: [...newColumns[columnIndex].cards, newCard]
-          };
-        }
-        
+      // Atualiza o estado das colunas imediatamente
+      setColumns(prevColumns => {
+        const newColumns = prevColumns.map(column => ({
+          ...column,
+          cards: column.cards.map(card => 
+            card.id === updatedCard.id ? updatedCardData : card
+          )
+        }));
         return newColumns;
       });
-      
-      setIsCreatingNewCard(false);
-      setNewCardColumnId(null);
+
+      // Atualiza o card selecionado e fecha o sidebar
+      setSelectedCard(updatedCardData);
+      setTimeout(() => {
+        setSidebarOpen(false);
+      }, 100);
+
+      addToast('Lead atualizado com sucesso', 'success');
+    } catch (error) {
+      console.error('Erro ao atualizar lead:', error);
+      addToast('Erro ao atualizar lead', 'error');
     }
   };
 
   // Função para filtrar os cards com base nos critérios
-  const filterCards = useCallback((cards: Card[], columnId: string) => {
+  const filterCards = useCallback((cards: UICard[], columnId: string) => {
     return cards.filter(card => {
       // Filtro por termo de busca (nome, conteúdo, telefone, email)
       const searchMatch = !searchTerm || 
@@ -464,8 +707,12 @@ const CRMPage: React.FC = () => {
       if (!priorityMatch) return false;
       
       // Filtro por responsável
-      const assigneeMatch = !filters.assignedTo || 
-        (card.assignedTo && card.assignedTo.toLowerCase().includes(filters.assignedTo.toLowerCase()));
+      const assigneeMatch = !filters.assignedTo || (() => {
+        const contact = contactsMap.get(card.contactId);
+        if (!contact?.assignedTo) return false;
+        const user = users.find(u => u.id === Number(contact.assignedTo));
+        return user?.name.toLowerCase().includes(filters.assignedTo.toLowerCase()) || false;
+      })();
       if (!assigneeMatch) return false;
       
       // Filtro por data de criação
@@ -484,7 +731,7 @@ const CRMPage: React.FC = () => {
       
       return true;
     });
-  }, [searchTerm, filters]);
+  }, [searchTerm, filters, users]);
 
   // Crie uma versão filtrada das colunas
   const filteredColumns = useMemo(() => {
@@ -589,7 +836,9 @@ const CRMPage: React.FC = () => {
                 columnId={column.id} 
                 card={card} 
                 index={cardIndex}
-                onCardClick={openCardDetails}
+                handleCardClick={openCardDetails}
+                tags={tags}
+                users={users}
               />
             ))}
           </SortableContext>
@@ -603,12 +852,16 @@ const CRMPage: React.FC = () => {
     columnId, 
     card, 
     index, 
-    onCardClick 
+    handleCardClick,
+    tags,
+    users
   }: { 
     columnId: string, 
-    card: Card, 
+    card: UICard, 
     index: number,
-    onCardClick: (columnId: string, cardId: string) => void
+    handleCardClick: (columnId: string, cardId: string) => void,
+    tags: Tag[],
+    users: User[]
   }) => {
     const { 
       attributes, 
@@ -629,68 +882,78 @@ const CRMPage: React.FC = () => {
     const style = {
       transform: CSS.Transform.toString(transform),
       transition,
-      opacity: isDragging ? 0.5 : 1,
+      opacity: isDragging ? 0.8 : 1,
       zIndex: isDragging ? 999 : 1,
+      cursor: isDragging ? 'grabbing' : 'grab',
     };
     
-    const handleClick = (e: React.MouseEvent) => {
-      // Evita abrir o modal durante o arrasto
-      if (!isDragging) {
-        onCardClick(columnId, card.id);
+    // Encontrar a tag correspondente uma única vez
+    const cardTag = useMemo(() => {
+      if (!card.tagId || !tags?.length) return null;
+      return tags.find(tag => tag.id === Number(card.tagId));
+    }, [card.tagId, tags]);
+
+    // Função para obter as iniciais do responsável
+    const getAssigneeInitials = () => {
+      const contact = contactsMap.get(card.contactId);
+      if (!contact?.assignedTo) return null;
+      const user = users.find(u => u.id === Number(contact.assignedTo));
+      if (!user?.name) return null;
+      
+      const nameParts = user.name.split(' ');
+      if (nameParts.length >= 2) {
+        return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
       }
+      return nameParts[0].substring(0, 2).toUpperCase();
     };
-    
+
     return (
       <div 
         ref={setNodeRef} 
         style={style} 
-        className={`contact-card-wrapper ${isDragging ? 'is-dragging' : ''}`}
-        {...attributes}
+        className={`contact-card ${card.priority ? `priority-${card.priority}` : ''}`}
+        {...attributes} 
         {...listeners}
+        onClick={() => handleCardClick(columnId, card.id)}
       >
-        <div className="contact-card" onClick={handleClick}>
-          <h3>{card.title}</h3>
-          <p>{card.content}</p>
-          
-          {/* Labels */}
-          {(card.labels && card.labels.length > 0) || card.priority ? (
-            <div className="labels">
-              {card.priority && (
-                <span className={`label ${card.priority}`}>
-                  {card.priority === 'high' ? 'Alta Prioridade' : 
-                   card.priority === 'medium' ? 'Média Prioridade' : 'Baixa Prioridade'}
-                </span>
-              )}
-              {card.labels && card.labels.map((label, i) => (
-                <span key={i} className="label">{label}</span>
-              ))}
-            </div>
-          ) : null}
-          
-          {/* Detalhes do card */}
-          <div className="card-details">
-            {card.phone && (
-              <div className="card-detail-item">
-                <FiPhone />
-                <span>{card.phone}</span>
-              </div>
-            )}
-          </div>
-          
-          {/* Responsável */}
-          {card.assignedTo && (
+        <div className="card-header-info">
+          {cardTag && (
+            <span 
+              className="card-tag"
+              style={{
+                backgroundColor: `${cardTag.color}1A`,
+                color: cardTag.color,
+                border: `1px solid ${cardTag.color}40`
+              }}
+            >
+              {cardTag.name}
+            </span>
+          )}
+          {getAssigneeInitials() && (
             <div className="card-assignee">
-              <div className="assignee-avatar">
-                {card.assigneeAvatar ? (
-                  <img src={card.assigneeAvatar} alt={card.assignedTo} />
-                ) : (
-                  <FiUser />
-                )}
-              </div>
-              <span className="assignee-name">{card.assignedTo}</span>
+              <span className="assignee-initials">{getAssigneeInitials()}</span>
             </div>
           )}
         </div>
+        <span className="card-title">{card.title}</span>
+        {card.content && <span className="card-content">{card.content}</span>}
+        
+        {(card.phone || card.email) && (
+          <div className="card-details">
+            {card.phone && (
+              <div className="card-detail-item">
+                <FiPhone size={12} />
+                <span>{card.phone}</span>
+              </div>
+            )}
+            {card.email && (
+              <div className="card-detail-item">
+                <FiMail size={12} />
+                <span>{card.email}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -705,55 +968,13 @@ const CRMPage: React.FC = () => {
       
       return (
         <div className="column is-dragging">
-          <div className="column-header" data-count={column.cards.length}>
+          <div className="column-header">
             <h2>{column.title}</h2>
           </div>
           <div className="cards-container">
             {column.cards.map(card => (
-              <div key={card.id} className="contact-card-wrapper">
-                <div className="contact-card">
-                  <h3>{card.title}</h3>
-                  <p>{card.content}</p>
-                  
-                  {/* Labels */}
-                  {(card.labels && card.labels.length > 0) || card.priority ? (
-                    <div className="labels">
-                      {card.priority && (
-                        <span className={`label ${card.priority}`}>
-                          {card.priority === 'high' ? 'Alta Prioridade' : 
-                           card.priority === 'medium' ? 'Média Prioridade' : 'Baixa Prioridade'}
-                        </span>
-                      )}
-                      {card.labels && card.labels.map((label, i) => (
-                        <span key={i} className="label">{label}</span>
-                      ))}
-                    </div>
-                  ) : null}
-                  
-                  {/* Detalhes do card */}
-                  <div className="card-details">
-                    {card.phone && (
-                      <div className="card-detail-item">
-                        <FiPhone />
-                        <span>{card.phone}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Responsável */}
-                  {card.assignedTo && (
-                    <div className="card-assignee">
-                      <div className="assignee-avatar">
-                        {card.assigneeAvatar ? (
-                          <img src={card.assigneeAvatar} alt={card.assignedTo} />
-                        ) : (
-                          <FiUser />
-                        )}
-                      </div>
-                      <span className="assignee-name">{card.assignedTo}</span>
-                    </div>
-                  )}
-                </div>
+              <div key={card.id} className="contact-card-preview">
+                <span className="card-title">{card.title}</span>
               </div>
             ))}
           </div>
@@ -771,51 +992,63 @@ const CRMPage: React.FC = () => {
       const card = column.cards.find(c => c.id === cardId);
       if (!card) return null;
       
+      // Encontrar a tag para o card
+      const cardTag = tags.find(tag => tag.id === card.tagId);
+      
+      // Obter iniciais do responsável
+      const getAssigneeInitials = () => {
+        const contact = contactsMap.get(card.contactId);
+        if (!contact?.assignedTo) return null;
+        const user = users.find(u => u.id === Number(contact.assignedTo));
+        if (!user?.name) return null;
+        
+        const nameParts = user.name.split(' ');
+        if (nameParts.length >= 2) {
+          return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+        }
+        return nameParts[0].substring(0, 2).toUpperCase();
+      };
+      
       return (
-        <div className="contact-card-wrapper is-dragging">
-          <div className="contact-card">
-            <h3>{card.title}</h3>
-            <p>{card.content}</p>
-            
-            {/* Labels */}
-            {(card.labels && card.labels.length > 0) || card.priority ? (
-              <div className="labels">
-                {card.priority && (
-                  <span className={`label ${card.priority}`}>
-                    {card.priority === 'high' ? 'Alta Prioridade' : 
-                     card.priority === 'medium' ? 'Média Prioridade' : 'Baixa Prioridade'}
-                  </span>
-                )}
-                {card.labels && card.labels.map((label, i) => (
-                  <span key={i} className="label">{label}</span>
-                ))}
-              </div>
-            ) : null}
-            
-            {/* Detalhes do card */}
-            <div className="card-details">
-              {card.phone && (
-                <div className="card-detail-item">
-                  <FiPhone />
-                  <span>{card.phone}</span>
-                </div>
-              )}
-            </div>
-            
-            {/* Responsável */}
-            {card.assignedTo && (
+        <div className={`contact-card ${card.priority ? `priority-${card.priority}` : ''}`}>
+          <div className="card-header-info">
+            {cardTag && (
+              <span 
+                className="card-tag"
+                style={{
+                  backgroundColor: `${cardTag.color}1A`,
+                  color: cardTag.color,
+                  border: `1px solid ${cardTag.color}40`
+                }}
+              >
+                {cardTag.name}
+              </span>
+            )}
+            {getAssigneeInitials() && (
               <div className="card-assignee">
-                <div className="assignee-avatar">
-                  {card.assigneeAvatar ? (
-                    <img src={card.assigneeAvatar} alt={card.assignedTo} />
-                  ) : (
-                    <FiUser />
-                  )}
-                </div>
-                <span className="assignee-name">{card.assignedTo}</span>
+                <span className="assignee-initials">{getAssigneeInitials()}</span>
               </div>
             )}
           </div>
+          <span className="card-title">{card.title}</span>
+          {card.content && <span className="card-content">{card.content}</span>}
+          
+          {(card.phone || card.email) && (
+            <div className="card-details">
+              {card.phone && (
+                <div className="card-detail-item">
+                  <FiPhone size={12} />
+                  <span>{card.phone}</span>
+                </div>
+              )}
+              {card.email && (
+                <div className="card-detail-item">
+                  <FiMail size={12} />
+                  <span>{card.email}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       );
     }
@@ -837,237 +1070,342 @@ const CRMPage: React.FC = () => {
     return window.innerWidth <= 768;
   };
 
-  return (
-    <div className={`crm-container ${isInitialLoad ? 'initial-load' : ''}`}>
-      <div className="crm-toolbar">
-        <div className="view-selector">
-          <button 
-            className={`view-button ${viewMode === 'kanban' ? 'active' : ''}`}
-            onClick={() => setViewMode('kanban')}
-            title="Visualização Kanban"
-          >
-            <FiGrid />
-            <span>Kanban</span>
-          </button>
-          <button 
-            className={`view-button ${viewMode === 'list' ? 'active' : ''}`}
-            onClick={() => setViewMode('list')}
-            title="Visualização em Lista"
-          >
-            <FiList />
-            <span>Lista</span>
-          </button>
-        </div>
-        
-        <div className="search-filter">
-          <div className="search-box">
-            <FiSearch className="search-icon" />
-            <input 
-              type="text" 
-              placeholder="Buscar leads..." 
-              className="search-input"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+  // Componente do Modal de Confirmação
+  const DeleteConfirmationModal: React.FC<{
+    visible: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    columnName: string;
+  }> = ({ visible, onClose, onConfirm, columnName }) => {
+    if (!visible) return null;
+
+    return (
+      <div className="enhanced-modal-overlay" onClick={onClose}>
+        <div className="enhanced-modal delete-modal" onClick={e => e.stopPropagation()}>
+          <div className="enhanced-modal-header">
+            <h3>Confirmar Exclusão</h3>
+            <button className="enhanced-modal-close" onClick={onClose}>×</button>
           </div>
-          <div className="filter-container">
-            <button 
-              className="filter-button"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <FiFilter />
-              <span>Filtrar</span>
-              {(filters.status || filters.priority || filters.assignedTo || 
-                filters.dateRange.from || filters.dateRange.to) && (
-                <span className="filter-indicator"></span>
-              )}
-            </button>
+          <div className="enhanced-modal-content">
+            <p>Tem certeza que deseja excluir a etapa <strong>{columnName}</strong>?</p>
+            <p className="delete-warning">Esta ação não pode ser desfeita.</p>
             
-            {showFilters && (
-              <FilterPanel 
-                filters={filters}
-                updateFilter={updateFilter}
-                updateDateRange={updateDateRange}
-                clearFilters={clearFilters}
-                onClose={() => setShowFilters(false)}
-                isOpen={showFilters}
-              />
-            )}
-          </div>
-        </div>
-        
-        <button 
-          className="add-column-button"
-          onClick={() => setShowNewColumnModal(true)}
-        >
-          <FiPlus /> Nova Etapa
-        </button>
-      </div>
-      
-      {viewMode === 'kanban' ? (
-        <>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={customCollisionDetection}
-            onDragStart={handleDragStart}
-            onDragMove={handleDragMove}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="columns-container">
-              <SortableContext 
-                items={filteredColumns.map(col => col.id)} 
-                strategy={horizontalListSortingStrategy}
-              >
-                {filteredColumns.map((column, index) => (
-                  <div key={column.id} className="column-wrapper">
-                    <SortableColumn column={column} index={index} />
-                    <button 
-                      className="add-card-button"
-                      onClick={() => handleAddCard(column.id)}
-                    >
-                      <FiPlus /> Adicionar Lead
-                    </button>
-                  </div>
-                ))}
-              </SortableContext>
-            </div>
-            
-            <DragOverlay dropAnimation={dropAnimation}>
-              {renderActiveItem()}
-            </DragOverlay>
-          </DndContext>
-          
-          {isMobile() && (
-            <div className="scroll-indicator">
-              <span>Deslize para ver mais</span>
-              <FiChevronRight />
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <div className="list-view">
-            <table className="leads-table">
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Etapa</th>
-                  <th>Responsável</th>
-                  <th>Telefone</th>
-                  <th>Status</th>
-                  <th>Prioridade</th>
-                  <th>Último Contato</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredColumns.flatMap(column => 
-                  column.cards.map(card => (
-                    <tr key={`${column.id}:${card.id}`} onClick={() => openCardDetails(column.id, card.id)}>
-                      <td>{card.title}</td>
-                      <td>{column.title}</td>
-                      <td>
-                        <div className="table-user">
-                          {card.assigneeAvatar && (
-                            <div className="assignee-avatar-small">
-                              <img src={card.assigneeAvatar} alt={card.assignedTo} />
-                            </div>
-                          )}
-                          {card.assignedTo}
-                        </div>
-                      </td>
-                      <td>{card.phone}</td>
-                      <td>{card.status}</td>
-                      <td>
-                        {card.priority && (
-                          <span className={`priority-tag ${card.priority}`}>
-                            {card.priority === 'high' ? 'Alta' : 
-                             card.priority === 'medium' ? 'Média' : 'Baixa'}
-                          </span>
-                        )}
-                      </td>
-                      <td>{card.lastContact}</td>
-                      <td>
-                        <button className="table-action-button" onClick={(e) => {
-                          e.stopPropagation();
-                          openCardDetails(column.id, card.id);
-                        }}>
-                          Detalhes
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          
-          {isMobile() && (
-            <div className="scroll-indicator">
-              <span>Deslize para ver mais</span>
-              <FiChevronRight />
-            </div>
-          )}
-        </>
-      )}
-      
-      {/* Modal para adicionar nova coluna */}
-      {showNewColumnModal && (
-        <Modal 
-          title="Adicionar Nova Etapa"
-          onClose={() => setShowNewColumnModal(false)}
-          visible={showNewColumnModal}
-        >
-          <div className="new-column-modal">
-            <div className="form-group">
-              <label htmlFor="column-title">Título da Etapa</label>
-              <input
-                id="column-title"
-                type="text"
-                value={newColumnTitle}
-                onChange={(e) => setNewColumnTitle(e.target.value)}
-                placeholder="Ex: Qualificação, Proposta, Fechamento..."
-              />
-            </div>
-            
-            <div className="modal-actions">
+            <div className="form-actions">
               <button 
-                className="modal-button secondary"
-                onClick={() => setShowNewColumnModal(false)}
+                className="form-button secondary"
+                onClick={onClose}
               >
                 Cancelar
               </button>
               <button 
-                className="modal-button primary"
-                onClick={handleAddColumn}
-                disabled={!newColumnTitle.trim()}
+                className="form-button danger"
+                onClick={onConfirm}
               >
-                <FiPlus /> Adicionar
+                <FiTrash2 /> Excluir
               </button>
             </div>
           </div>
-        </Modal>
-      )}
-      
-      {/* Overlay para quando o sidebar estiver aberto */}
-      <div 
-        className={`sidebar-overlay ${sidebarOpen ? 'active' : ''}`} 
-        onClick={() => setSidebarOpen(false)}
-      />
-      
-      {/* Painel lateral para detalhes do card */}
-      <CardSidebar 
-        card={isCreatingNewCard ? null : selectedCard}
-        isOpen={sidebarOpen}
-        onClose={() => {
-          setSidebarOpen(false);
-          setIsCreatingNewCard(false);
-          setNewCardColumnId(null);
-        }}
-        onSave={isCreatingNewCard ? saveNewCard : saveCardChanges}
-        isNewCard={isCreatingNewCard}
-        columnId={newCardColumnId || undefined}
-      />
+        </div>
+      </div>
+    );
+  };
+
+  // Adicione a função para confirmar a deleção
+  const handleConfirmDelete = () => {
+    if (!columnToDelete) return;
+
+    // Atualiza a UI imediatamente
+    setColumns(prevColumns => prevColumns.filter(col => col.id !== columnToDelete.id));
+    
+    // Tenta deletar no backend
+    deleteColumn(columnToDelete.id.toString()).catch(error => {
+      console.error('Erro ao excluir coluna:', error);
+      // Reverte a mudança em caso de erro
+      setColumns(prevColumns => [...prevColumns, columnToDelete]);
+      addToast('Erro ao excluir coluna', 'error');
+    });
+    
+    addToast('Coluna excluída com sucesso', 'success');
+    setShowDeleteModal(false);
+    setColumnToDelete(null);
+  };
+
+  return (
+    <div className={`crm-container ${isInitialLoad ? 'initial-load' : ''}`}>
+      <div className="crm-container">
+        <div className="crm-toolbar">
+          <div className="view-selector">
+            <button 
+              className={`view-button ${viewMode === 'kanban' ? 'active' : ''}`}
+              onClick={() => setViewMode('kanban')}
+              title="Visualização Kanban"
+            >
+              <FiGrid />
+              <span>Kanban</span>
+            </button>
+            <button 
+              className={`view-button ${viewMode === 'list' ? 'active' : ''}`}
+              onClick={() => setViewMode('list')}
+              title="Visualização em Lista"
+            >
+              <FiList />
+              <span>Lista</span>
+            </button>
+          </div>
+          
+          <div className="search-filter">
+            <div className="search-box">
+              <FiSearch className="search-icon" />
+              <input 
+                type="text" 
+                placeholder="Buscar leads..." 
+                className="search-input"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="filter-container">
+              <button 
+                className="filter-button"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <FiFilter />
+                <span>Filtrar</span>
+                {(filters.status || filters.priority || filters.assignedTo || 
+                  filters.dateRange.from || filters.dateRange.to) && (
+                  <span className="filter-indicator"></span>
+                )}
+              </button>
+              
+              {showFilters && (
+                <FilterPanel 
+                  filters={filters}
+                  updateFilter={updateFilter}
+                  updateDateRange={updateDateRange}
+                  clearFilters={clearFilters}
+                  onClose={() => setShowFilters(false)}
+                  isOpen={showFilters}
+                />
+              )}
+            </div>
+          </div>
+          
+          <button 
+            className="add-column-button"
+            onClick={() => {
+              setEditingColumn(null);
+              setDirectModalTitle('');
+              setShowDirectModal(true);
+            }}
+            disabled={!SessionService.getSectorId()}
+          >
+            <FiPlus /> Nova Coluna
+          </button>
+        </div>
+
+        <div className="crm-content">
+          {isLoading ? (
+            <div className="crm-loading">
+              <div className="loading-spinner" />
+              <div className="loading-text">Carregando CRM...</div>
+            </div>
+          ) : !SessionService.getSectorId() ? (
+            <div className="crm-loading">
+              <div className="loading-text">Nenhum dado encontrado ou setor não selecionado</div>
+            </div>
+          ) : (
+            <>
+              {viewMode === 'kanban' ? (
+                <>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCorners}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <div className="columns-container">
+                      <SortableContext 
+                        items={filteredColumns.map(col => col.id)} 
+                        strategy={horizontalListSortingStrategy}
+                      >
+                        {filteredColumns.map((column, index) => (
+                          <div key={column.id} className="column-wrapper">
+                            <SortableColumn column={column} index={index} />
+                          </div>
+                        ))}
+                      </SortableContext>
+                    </div>
+                    
+                    <DragOverlay dropAnimation={dropAnimation}>
+                      {renderActiveItem()}
+                    </DragOverlay>
+                    
+                    {showTrashBin && <TrashBin />}
+                  </DndContext>
+                  
+                  {isMobile() && (
+                    <div className="scroll-indicator">
+                      <span>Deslize para ver mais</span>
+                      <FiChevronRight />
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="list-view">
+                    <table className="leads-table">
+                      <thead>
+                        <tr>
+                          <th>Nome</th>
+                          <th>Etapa</th>
+                          <th>Telefone</th>
+                          <th>Status</th>
+                          <th>Prioridade</th>
+                          <th>Último Contato</th>
+                          <th>Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredColumns.flatMap(column => 
+                          column.cards.map(card => (
+                            <tr key={`${column.id}:${card.id}`} onClick={() => openCardDetails(column.id, card.id)}>
+                              <td>{card.title}</td>
+                              <td>{column.title}</td>
+                              <td>{card.phone}</td>
+                              <td>{card.status}</td>
+                              <td>
+                                {card.priority && (
+                                  <span className={`priority-tag ${card.priority}`}>
+                                    {card.priority === 'high' ? 'Alta' : 
+                                     card.priority === 'medium' ? 'Média' : 'Baixa'}
+                                  </span>
+                                )}
+                              </td>
+                              <td>{card.lastContact}</td>
+                              <td>
+                                <button className="table-action-button" onClick={(e) => {
+                                  e.stopPropagation();
+                                  openCardDetails(column.id, card.id);
+                                }}>
+                                  Detalhes
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  {isMobile() && (
+                    <div className="scroll-indicator">
+                      <span>Deslize para ver mais</span>
+                      <FiChevronRight />
+                    </div>
+                  )}
+                </>
+              )}
+              
+              {/* Overlay para quando o sidebar estiver aberto */}
+              <div 
+                className={`sidebar-overlay ${sidebarOpen ? 'active' : ''}`} 
+                onClick={() => setSidebarOpen(false)}
+              />
+              
+              {/* Painel lateral para detalhes do card */}
+              <CardSidebar 
+                isOpen={sidebarOpen}
+                onClose={() => {
+                  setSidebarOpen(false);
+                }}
+                onSave={saveCardChanges}
+                selectedCard={selectedCard}
+                addToast={addToast}
+              />
+              
+              <EnhancedModal 
+                visible={showDirectModal}
+                onClose={() => {
+                  setShowDirectModal(false);
+                  setDirectModalTitle('');
+                  setDirectModalError('');
+                }}
+                title="Adicionar Nova Etapa"
+              >
+                <div className="enhanced-modal-form">
+                  <div className="form-group">
+                    <label htmlFor="column-title-direct">Título da Etapa</label>
+                    <input
+                      id="column-title-direct"
+                      type="text"
+                      value={directModalTitle}
+                      onChange={(e) => {
+                        setDirectModalTitle(e.target.value);
+                        if (directModalError) validateColumnTitle(e.target.value);
+                      }}
+                      placeholder="Ex: Qualificação, Proposta, Fechamento..."
+                      className={directModalError ? 'input-error' : ''}
+                      autoFocus
+                    />
+                    {directModalError && (
+                      <div className="error-message">{directModalError}</div>
+                    )}
+                  </div>
+                  
+                  <div className="form-actions">
+                    <button 
+                      className="form-button secondary"
+                      onClick={() => {
+                        setShowDirectModal(false);
+                        setDirectModalTitle('');
+                        setDirectModalError('');
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      className="form-button primary"
+                      onClick={handleSaveColumn}
+                      disabled={isSubmitting || !directModalTitle.trim()}
+                    >
+                      {isSubmitting ? (
+                        <span className="button-spinner"></span>
+                      ) : (
+                        <>
+                          <FiPlus /> {editingColumn ? 'Atualizar' : 'Adicionar'}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </EnhancedModal>
+              
+              {/* Modal de confirmação de deleção */}
+              <DeleteConfirmationModal
+                visible={showDeleteModal}
+                onClose={() => {
+                  setShowDeleteModal(false);
+                  setColumnToDelete(null);
+                }}
+                onConfirm={handleConfirmDelete}
+                columnName={columnToDelete?.title || ''}
+              />
+            </>
+          )}
+        </div>
+        
+        <div className="toast-container">
+          {toasts.map(toast => (
+            <Toast
+              key={toast.id}
+              message={toast.message}
+              type={toast.type}
+              onClose={() => removeToast(toast.id)}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 };

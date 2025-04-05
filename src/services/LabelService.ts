@@ -8,18 +8,26 @@ export interface Tag {
   name: string;
   description: string;
   sectorId: number;
+  color: string;
 }
 
 export interface CreateTagRequestDTO {
   name: string;
   description: string;
   sectorId: number;
+  color: string;
 }
 
 export interface UpdateTagRequestDTO {
   name: string;
   description: string;
   sectorId: number;
+}
+
+interface ApiResponse<T> {
+    message: string;
+    code: string;
+    data: T;
 }
 
 export const createTag = async (tagData: CreateTagRequestDTO) => {
@@ -57,16 +65,14 @@ export const getTag = async (id: number): Promise<Tag> => {
   }
 };
 
-export const getTags = async (): Promise<Tag[]> => {
-  const sectorIdFromSession: number | null = SessionService.getSessionForSector();
-  
-  // Verifique se sectorId está disponível
-  if (!sectorIdFromSession) {
+export const getTags = async (sectorId: number): Promise<ApiResponse<Tag[]>> => {
+
+  if (!sectorId) {
     throw new Error('Sector ID is not available in session');
   }
 
   try {
-    const response = await axios.get(`${API_URL}/tags?sectorId=${sectorIdFromSession}`, { // Passando o sectorId na URL
+    const response = await axios.get(`${API_URL}/tags?sectorId=${sectorId}`, { // Passando o sectorId na URL
       headers: {
         'Accept': '*/*',
       },

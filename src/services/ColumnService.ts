@@ -1,99 +1,109 @@
 import axios from 'axios';
 import SessionService from './SessionService';
+import { Card } from './CardService';
 
-const API_URL = process.env.REACT_APP_API_URL; // Adicionando a variável de ambiente
+const API_URL = process.env.REACT_APP_API_URL;
 
 export interface Column {
-  id: number;
+  id: string;
   name: string;
   sectorId: number;
+  position: number;
 }
 
 interface CreateColumnRequestDTO {
   name: string;
   sectorId: number;
-  position: number; // Nova propriedade
+  position: number;
 }
 
 interface UpdateColumnRequestDTO {
   name?: string;
-  position?: number; // Nova propriedade opcional
+  position?: number;
 }
 
-
-// Função para criar uma nova coluna
-export const createColumn = async (columnData: CreateColumnRequestDTO) => {
+export const createColumn = async (columnData: CreateColumnRequestDTO): Promise<Column> => {
   try {
-    const response = await axios.post(`${API_URL}/colunas`, columnData); // Atualizando o endpoint
-    return response.data;
+    const response = await axios.post<Column>(`${API_URL}/colunas`, columnData);
+    return {
+      ...response.data,
+      id: response.data.id.toString()
+    };
   } catch (error) {
     throw new Error(`Falha ao criar coluna: ${error}`);
   }
 };
 
-
-// Função para atualizar uma coluna existente
-export const updateColumn = async (id: number, data: UpdateColumnRequestDTO) => {
+export const updateColumn = async (id: string, data: UpdateColumnRequestDTO): Promise<Column> => {
   try {
-    const response = await axios.put(`${API_URL}/colunas/${id}`, data, {
+    const response = await axios.put<Column>(`${API_URL}/colunas/${id}`, data, {
       headers: {
         'Content-Type': 'application/json',
       },
     });
-    return response.data;
+    return {
+      ...response.data,
+      id: response.data.id.toString()
+    };
   } catch (error) {
     throw new Error(`Falha ao atualizar coluna com id ${id}: ${error}`);
   }
 };
 
-// Função para obter uma coluna específica pelo ID
-export const getColumn = async (id: number): Promise<Column> => {
+export const getColumn = async (id: string): Promise<Column> => {
   try {
-    const response = await axios.get(`${API_URL}/colunas/${id}`, {
+    const response = await axios.get<Column>(`${API_URL}/colunas/${parseInt(id)}`, {
       headers: {
         'Accept': '*/*',
       },
     });
-    return response.data;
+    return {
+      ...response.data,
+      id: response.data.id.toString()
+    };
   } catch (error) {
     throw new Error(`Falha ao obter coluna com id ${id}: ${error}`);
   }
 };
 
-// Função para obter todas as colunas
-export const getColumns = async (): Promise<any> => {
+export const getColumns = async (): Promise<Column[]> => {
   try {
-    const sectorId = SessionService.getSession('selectedSector')
-    const response = await axios.get(`${API_URL}/colunas?sectorId=${sectorId}`, {
+    const sectorId = SessionService.getSectorId();
+    if (!sectorId) {
+      throw new Error('Setor não selecionado');
+    }
+    
+    const response = await axios.get<Column[]>(`${API_URL}/colunas`, {
+      params: { sectorId: sectorId },
       headers: {
         'Accept': '*/*',
       },
     });
-    return response.data;
+    
+    return response.data.map(column => ({
+      ...column,
+      id: column.id.toString()
+    }));
   } catch (error) {
     throw new Error('Falha ao obter colunas: ' + error);
   }
 };
 
-// Função para deletar uma coluna pelo ID
-export const deleteColumn = async (id: number) => {
+export const deleteColumn = async (id: string): Promise<void> => {
   try {
-    const response = await axios.delete(`${API_URL}/colunas/${id}`); // Atualizando o endpoint
-    return response.data;
+    await axios.delete(`${API_URL}/colunas/${id}`);
   } catch (error) {
     throw new Error(`Falha ao excluir coluna com id ${id}: ${error}`);
   }
 };
 
-
-export const moveColumn = async (id: number, newPosition: number) => {
+export const moveColumn = async (id: string, newPosition: number): Promise<void> => {
   try {
-    const response = await axios.put(`${API_URL}/colunas/${id}/move`, { newPosition: newPosition }, {
+    await axios.put(`${API_URL}/colunas/${id}/move`, { newPosition }, {
       headers: {
         'Content-Type': 'application/json',
       },
     });
-    return response.data;
   } catch (error) {
     throw new Error(`Falha ao mover a coluna com id ${id} para a posição ${newPosition}: ${error}`);
   }

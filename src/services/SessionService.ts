@@ -1,7 +1,11 @@
 class SessionService {
+  private static readonly TOKEN_KEY = '@ligchat/token';
+  private static readonly USER_KEY = '@ligchat/user';
+  private static readonly SECTOR_KEY = '@ligchat/sector';
+
   // Salva um valor na sessão
   static setSession(key: string, value: any): void {
-      sessionStorage.setItem(key, JSON.stringify(value));
+      localStorage.setItem(key, JSON.stringify(value));
   }
 
   // Decodifica um token JWT
@@ -34,14 +38,9 @@ class SessionService {
     return decodedToken.exp < currentTimeInSeconds;
 }
 
-  // Limpa toda a sessão armazenada
-  static clearSession(): void {
-      sessionStorage.clear();
-  }
-
   // Recupera um item da sessão para o setor
   static getSessionForSector(): any | null {
-      const sessionData = sessionStorage.getItem("selectedSector");
+      const sessionData = localStorage.getItem("selectedSector");
       if (!sessionData) {
           return null;
       }
@@ -56,7 +55,7 @@ class SessionService {
 
   // Recupera um item específico da sessão
   static getSession(key: string): any | null {
-      const sessionData = sessionStorage.getItem(key);
+      const sessionData = localStorage.getItem(key);
       if (!sessionData) {
           return null;
       }
@@ -69,17 +68,17 @@ class SessionService {
 
   // Remove um item específico da sessão
   static removeSession(key: string): void {
-      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
   }
 
   // Limpa toda a sessão armazenada
   static clearAllSessions(): void {
-      sessionStorage.clear();
+      localStorage.clear();
   }
 
   // Verifica se uma sessão específica está expirada
   static isSessionExpired(key: string): boolean {
-      const sessionData = sessionStorage.getItem(key);
+      const sessionData = localStorage.getItem(key);
       if (!sessionData) {
           return true;
       }
@@ -98,6 +97,54 @@ class SessionService {
 
       const currentTimeInSeconds = Math.floor(new Date().getTime() / 1000);
       return decodedToken.exp < currentTimeInSeconds;
+  }
+
+  static setToken(token: string) {
+    localStorage.setItem(this.TOKEN_KEY, token);
+  }
+
+  static getToken(): string | null {
+    return localStorage.getItem(this.TOKEN_KEY);
+  }
+
+  static removeToken() {
+    localStorage.removeItem(this.TOKEN_KEY);
+  }
+
+  static setUser(user: any) {
+    localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+  }
+
+  static getUser(): any {
+    const user = localStorage.getItem(this.USER_KEY);
+    return user ? JSON.parse(user) : null;
+  }
+
+  static removeUser() {
+    localStorage.removeItem(this.USER_KEY);
+  }
+
+  static setSectorId(sectorId: number) {
+    localStorage.setItem(this.SECTOR_KEY, sectorId.toString());
+  }
+
+  static getSectorId(): number | null {
+    const sectorId = localStorage.getItem(this.SECTOR_KEY);
+    return sectorId ? parseInt(sectorId) : null;
+  }
+
+  static removeSectorId() {
+    localStorage.removeItem(this.SECTOR_KEY);
+  }
+
+  static isAuthenticated(): boolean {
+    return !!this.getToken();
+  }
+
+  static clearSession() {
+    this.removeToken();
+    this.removeUser();
+    this.removeSectorId();
   }
 }
 
