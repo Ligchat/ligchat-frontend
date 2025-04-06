@@ -143,6 +143,12 @@ class SessionService {
     }
     
     localStorage.setItem(this.SECTOR_KEY, sectorId.toString());
+    
+    // Dispara um evento custom para notificar sobre a mudança do setor
+    const event = new CustomEvent('sectorChanged', { 
+      detail: { sectorId } 
+    });
+    window.dispatchEvent(event);
   }
 
   static getSectorId(): number | null {
@@ -162,6 +168,12 @@ class SessionService {
 
   static removeSectorId() {
     localStorage.removeItem(this.SECTOR_KEY);
+    
+    // Dispara um evento custom para notificar sobre a remoção do setor
+    const event = new CustomEvent('sectorChanged', { 
+      detail: { sectorId: null } 
+    });
+    window.dispatchEvent(event);
   }
 
   static validateAndCleanSectorSession(availableSectors: number[]) {

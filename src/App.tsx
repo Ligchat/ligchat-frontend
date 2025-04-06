@@ -5,14 +5,19 @@ import AppRoutes from './Routes'; // Importa as rotas
 import './styles/tailwind.css'; // Importa Tailwind
 import 'antd/dist/reset.css'; // Reseta o CSS do Ant Design
 import './index.css';
-
+import { WebSocketProvider } from './contexts/WebSocketContext';
+import { MenuProvider } from './contexts/MenuContext';
 
 const App: React.FC = () => {
   return (
     <Router>
-      <Layout>
+      <WebSocketProvider>
+        <MenuProvider>
+          <Layout>
             <AppRoutes /> {/* Renderiza o componente de rotas */}
-      </Layout>
+          </Layout>
+        </MenuProvider>
+      </WebSocketProvider>
     </Router>
   );
 };

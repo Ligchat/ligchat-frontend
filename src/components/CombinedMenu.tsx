@@ -13,6 +13,7 @@ import SessionService from '../services/SessionService';
 import { getUser } from '../services/UserService';
 import { getSectors, Sector } from '../services/SectorService';
 import { useMenu } from '../contexts/MenuContext';
+import { WebSocketService } from '../services/WebSocketService';
 import '../styles/CombinedMenu/CombinedMenu.css';
 import AgentsPage from '../screens/AgentsPage';
 
@@ -43,6 +44,7 @@ const CombinedMenu: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { drawerVisible, setDrawerVisible } = useMenu();
+    const webSocketRef = useRef<WebSocketService | null>(null);
     const initialRenderRef = useRef(true);
     const navigationInProgressRef = useRef(false);
 
@@ -52,10 +54,85 @@ const CombinedMenu: React.FC = () => {
         
         if (sectorId) {
             setSelectedSector(sectorId.toString());
+            
+            // Inicializa o WebSocket para o setor atual
+            if (!webSocketRef.current) {
+                webSocketRef.current = new WebSocketService();
+                webSocketRef.current.connect(sectorId.toString());
+            }
         }
         
         // Força a atualização do componente inicial
         updateComponentForCurrentRoute(sectorId?.toString() || null);
+    }, []);
+
+    // Inicializar WebSocket
+    useEffect(() => {
+        const sectorId = SessionService.getSectorId();
+        if (!sectorId) return;
+
+        console.log('CombinedMenu: Inicializando WebSocket para o setor:', sectorId);
+        
+        // Criar ou reutilizar instância do WebSocket
+        if (!webSocketRef.current) {
+            webSocketRef.current = new WebSocketService();
+        }
+        
+        // Conectar ao WebSocket
+        webSocketRef.current.connect(sectorId.toString());
+
+        // Registrar handler
+        webSocketRef.current.addMessageHandler((message) => {
+            console.log('CombinedMenu: Mensagem recebida via WebSocket:', message);
+            // Notificações removidas conforme solicitado
+        });
+
+        // Cleanup
+        return () => {
+            if (webSocketRef.current) {
+                // Limpar handlers ao desmontar
+                webSocketRef.current.removeMessageHandler(() => {});
+            }
+        };
+    }, []);
+
+    // Desconectar WebSocket quando o componente for desmontado
+    useEffect(() => {
+        return () => {
+            console.log('CombinedMenu: Desconectando WebSocket');
+            if (webSocketRef.current) {
+                webSocketRef.current.disconnect();
+                webSocketRef.current = null;
+            }
+        };
+    }, []);
+
+    // Reconectar WebSocket quando o setor muda
+    useEffect(() => {
+        const handleSectorChange = () => {
+            const sectorId = SessionService.getSectorId();
+            if (!sectorId) {
+                if (webSocketRef.current) {
+                    webSocketRef.current.disconnect();
+                }
+                return;
+            }
+            
+            console.log('CombinedMenu: Setor alterado, reconectando WebSocket:', sectorId);
+            
+            if (!webSocketRef.current) {
+                webSocketRef.current = new WebSocketService();
+            }
+            
+            webSocketRef.current.disconnect();
+            webSocketRef.current.connect(sectorId.toString());
+        };
+        
+        window.addEventListener('sectorChanged', handleSectorChange);
+        
+        return () => {
+            window.removeEventListener('sectorChanged', handleSectorChange);
+        };
     }, []);
 
     useEffect(() => {

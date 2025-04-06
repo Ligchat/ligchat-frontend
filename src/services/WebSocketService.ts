@@ -1,7 +1,5 @@
 import { MessageType } from './MessageService';
 
-const API_URL = process.env.REACT_APP_API_URL; // Adicionando a variável de ambiente
-
 export class WebSocketService {
   private ws: WebSocket | null = null;
   private messageHandlers: ((message: MessageType) => void)[] = [];
@@ -11,10 +9,11 @@ export class WebSocketService {
   private currentSectorId: string | null = null;
   private isIntentionalClose = false;
 
-  constructor(private baseUrl: string = 'wss://whatsapp.ligchat.site') {}
+  constructor(private baseUrl: string = 'wss://whatsapp.ligchat.com') {}
 
   connect(sectorId: string) {
     if (this.ws?.readyState === WebSocket.OPEN) {
+      console.log('WebSocket já está conectado');
       return;
     }
 
@@ -34,6 +33,8 @@ export class WebSocketService {
   }
 
   private normalizeMessage(message: any): MessageType {
+    console.log('Normalizando mensagem:', message);
+    
     // Função auxiliar para pegar propriedade independente do case
     const getProp = (obj: any, prop: string) => {
       // Tenta com a propriedade exatamente como está
@@ -151,16 +152,6 @@ export class WebSocketService {
 
   removeMessageHandler(handler: (message: MessageType) => void) {
     this.messageHandlers = this.messageHandlers.filter(h => h !== handler);
-  }
-
-  private adjustMediaUrl(url: string): string {
-    if (!url) return url;
-    
-    if (url.includes('s3.amazonaws.com')) {
-        return url;
-    }
-    
-    return url;
   }
 
   disconnect() {

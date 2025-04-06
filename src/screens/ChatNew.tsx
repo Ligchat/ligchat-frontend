@@ -10,6 +10,8 @@ import { getMessagesByContactId, MessageResponse } from '../services/MessageServ
 import { AudioMessage } from '../components/AudioMessage';
 import { FiMail, FiPhone } from 'react-icons/fi';
 import { getAllUsers, User } from '../services/UserService';
+import { WebSocketService } from '../services/WebSocketService';
+import { MessageType } from '../services/MessageService';
 
 // Componente de ícone para anexos
 const AttachmentIcon = () => (
@@ -168,6 +170,11 @@ interface Contact {
 interface Message extends MessageResponse {
   status?: 'sending' | 'sent' | 'error';
   mediaUrl: string | null;
+  attachment?: {
+    url: string;
+    type: string;
+    name: string;
+  };
 }
 
 // Adicionar função de formatação de telefone antes do componente ChatNew
@@ -215,6 +222,8 @@ const ChatNew: React.FC = () => {
 
   // Define the state for selectedSector
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
+
+  const webSocketRef = useRef<WebSocketService | null>(null);
 
   // Função para reproduzir/pausar áudio
   const toggleAudioPlayback = (messageId: number) => {
@@ -772,9 +781,6 @@ const ChatNew: React.FC = () => {
               <span className="chat-new-message-preview">
                 {contact.lastMessage || 'Nenhuma mensagem'}
               </span>
-              {contact.unreadCount && contact.unreadCount > 0 && (
-                <span className="chat-new-unread-badge">{contact.unreadCount}</span>
-              )}
             </div>
             <div className="chat-new-contact-details">
               {contact.email && (
@@ -954,6 +960,167 @@ const ChatNew: React.FC = () => {
       </div>
     );
   };
+
+  // Inicializar WebSocket
+  useEffect(() => {
+    const sectorId = SessionService.getSectorId();
+    if (!sectorId) return;
+
+    console.log('Inicializando WebSocket para o setor:', sectorId);
+    
+    // Criar instância do WebSocket
+    const ws = new WebSocketService();
+    webSocketRef.current = ws;
+    
+    // Conectar ao WebSocket
+    ws.connect(sectorId.toString());
+    
+    // Registrar handler para mensagens
+    const handleMessage = (message: any) => {
+      console.log('Mensagem recebida no ChatNew:', message);
+      
+      // Normalizar mensagem do WebSocket
+      if (message.type === 'message') {
+        // Mensagem sem WebSocket
+        const normalizedMessage: Message = {
+          id: Date.now(), // Gerar ID temporário
+          content: message.content,
+          mediaType: 'text',
+          mediaUrl: null,
+          fileName: null,
+          mimeType: null,
+          sectorId: message.sectorId,
+          contactID: message.contactId,
+          sentAt: message.sentAt,
+          isSent: message.isAgent || false,
+          isRead: false,
+          status: 'sent'
+        };
+        
+        // Se temos um contato selecionado e a mensagem é para ele, atualizar mensagens
+        if (selectedContact && message.contactId === selectedContact.id) {
+          setMessages(prev => [...prev, normalizedMessage]);
+        }
+      } else {
+        // Mensagem com WebSocket
+        const normalizedMessage: Message = {
+          id: message.id,
+          content: message.content || '',
+          mediaType: message.mediaType || 'text',
+          mediaUrl: message.mediaUrl || null,
+          fileName: message.fileName || null,
+          mimeType: message.mimeType || null,
+          sectorId: message.sectorId,
+          contactID: message.contactID,
+          sentAt: message.sentAt,
+          isSent: message.isSent || false,
+          isRead: message.isRead || false,
+          status: 'sent',
+          attachment: message.attachment ? {
+            url: message.attachment.url,
+            type: message.attachment.type,
+            name: message.attachment.name
+          } : undefined
+        };
+
+        // Se temos um contato selecionado e a mensagem é para ele, atualizar mensagens
+        if (selectedContact && message.contactID === selectedContact.id) {
+          setMessages(prev => [...prev, normalizedMessage]);
+        }
+      }
+      
+      // Atualizar lista de contatos
+      const updateContacts = async () => {
+        try {
+          // Não mostrar indicador de loading durante atualizações do WebSocket
+          const sectorId = SessionService.getSectorId();
+          if (sectorId) {
+            const contactsResponse = await getContacts(sectorId);
+            if (contactsResponse && contactsResponse.data) {
+              // Criar um mapa dos contatos atuais para preservar seus dados
+              const currentContactsMap = new Map();
+              contacts.forEach(contact => {
+                currentContactsMap.set(contact.id, contact);
+              });
+              
+              // Determinar mensagem de preview para o contato que recebeu a mensagem
+              let messagePreview = '';
+              let contactId = message.type === 'message' ? message.contactId : message.contactID;
+              
+              // Formatar a mensagem de preview com base no tipo da mensagem
+              if (message.type === 'message') {
+                messagePreview = message.content || 'Nova mensagem';
+              } else {
+                switch (message.mediaType?.toLowerCase()) {
+                  case 'image':
+                    messagePreview = message.isSent ? '📷 Imagem enviada' : '📷 Imagem recebida';
+                    break;
+                  case 'document':
+                    messagePreview = message.isSent ? '📎 Anexo enviado' : '📎 Anexo recebido';
+                    break;
+                  case 'audio':
+                  case 'voice':
+                    messagePreview = message.isSent ? '🎤 Áudio enviado' : '🎤 Áudio recebido';
+                    break;
+                  default:
+                    messagePreview = message.content || 'Nova mensagem';
+                }
+              }
+              
+              // Formatar contatos preservando os dados existentes
+              const formattedContacts = contactsResponse.data.map(contact => {
+                const existingContact = currentContactsMap.get(contact.id);
+                
+                // Se é o contato que recebeu a nova mensagem, atualizar a preview
+                if (contact.id === contactId) {
+                  return {
+                    ...contact,
+                    profilePicture: contact.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=random`,
+                    lastMessage: messagePreview,
+                    lastMessageTime: new Date().toISOString()
+                  };
+                }
+                
+                // Para os outros contatos, preservar os dados existentes
+                return {
+                  ...contact,
+                  profilePicture: contact.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=random`,
+                  lastMessage: existingContact?.lastMessage || 'Nenhuma mensagem',
+                  lastMessageTime: existingContact?.lastMessageTime || contact.createdAt
+                };
+              });
+              
+              // Ordenar contatos por data da última mensagem (mais recentes primeiro)
+              const sortedContacts = formattedContacts.sort((a: Contact, b: Contact) => {
+                const dateA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+                const dateB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+                return dateB - dateA;
+              });
+              
+              setContacts(sortedContacts);
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao buscar contatos:', error);
+        }
+      };
+      
+      updateContacts();
+    };
+    
+    // Adicionar handler
+    ws.addMessageHandler(handleMessage);
+    
+    // Cleanup
+    return () => {
+      console.log('Desconectando WebSocket');
+      if (webSocketRef.current) {
+        webSocketRef.current.removeMessageHandler(handleMessage);
+        webSocketRef.current.disconnect();
+        webSocketRef.current = null;
+      }
+    };
+  }, []); // Executar apenas na montagem do componente
 
   return (
     <div className="chat-new-container dark-mode">
