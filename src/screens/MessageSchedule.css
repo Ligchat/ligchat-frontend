@@ -179,6 +179,7 @@
 
 .form-group {
     margin-bottom: 1.5rem;
+    position: relative;
 }
 
 .form-label {
@@ -186,6 +187,63 @@
     color: #888;
     margin-bottom: 0.5rem;
     font-size: 0.9rem;
+}
+
+.date-input-container {
+    position: relative;
+    width: 100%;
+}
+
+.date-input-container svg {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    color: #888;
+    pointer-events: none;
+}
+
+input[type="datetime-local"] {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background-color: #252525;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    background: transparent;
+    color: transparent;
+    cursor: pointer;
+    height: 20px;
+    left: auto;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+}
+
+input[type="datetime-local"]:focus {
+    outline: none;
+    border-color: #00c2ff;
+    box-shadow: 0 0 0 2px rgba(0, 194, 255, 0.1);
+}
+
+input[type="datetime-local"].error {
+    border-color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.05);
+}
+
+input[type="datetime-local"].error:focus {
+    box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.1);
 }
 
 .form-input {
@@ -575,4 +633,88 @@
 .recipient-name {
     color: #00c2ff;
     font-size: 0.9rem;
+}
+
+.form-input.error,
+.form-textarea.error,
+.form-select.error {
+    border-color: #dc3545;
+}
+
+.error-message {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.required {
+    color: #dc3545;
+    margin-left: 0.25rem;
+}
+
+.toast-container {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 9999999;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    pointer-events: none;
+}
+
+.toast-container > * {
+    pointer-events: auto;
+}
+
+.toast {
+    position: relative;
+    min-width: 300px;
+    max-width: 500px;
+    animation: slideIn 0.3s ease-in-out;
+}
+
+.toast-success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.toast-error {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.toast-info {
+    background-color: #cce5ff;
+    border: 1px solid #b8daff;
+    color: #004085;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 1.25rem;
+    padding: 0;
+    margin-left: 1rem;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.toast-close:hover {
+    opacity: 1;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
 } 

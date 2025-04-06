@@ -117,18 +117,49 @@ const SectorsPage: React.FC = () => {
       };
 
       if (editingSector?.id) {
-        await updateSector(editingSector.id, updatedSectorData);
-        addToast('Setor atualizado com sucesso', 'success');
+        try {
+          await updateSector(editingSector.id, updatedSectorData);
+          addToast('Setor atualizado com sucesso', 'success');
+          await fetchSectors();
+          handleCloseDrawer();
+        } catch (error: any) {
+          console.error('Erro ao atualizar setor:', error);
+          
+          const errorMessage = error?.response?.data?.message;
+          if (errorMessage === 'Invalid request: Phone number ID is already in use.') {
+            setErrors(prev => ({
+              ...prev,
+              phoneNumberId: 'Este ID de telefone já está sendo usado'
+            }));
+            addToast('ID do telefone já está sendo usado', 'error');
+          } else {
+            addToast(errorMessage || 'Erro ao atualizar setor', 'error');
+          }
+        }
       } else {
-        await createSector(updatedSectorData);
-        addToast('Setor criado com sucesso', 'success');
+        try {
+          await createSector(updatedSectorData);
+          addToast('Setor criado com sucesso', 'success');
+          await fetchSectors();
+          handleCloseDrawer();
+        } catch (error: any) {
+          console.error('Erro ao criar setor:', error);
+          
+          const errorMessage = error?.response?.data?.message;
+          if (errorMessage === 'Invalid request: Phone number ID is already in use.') {
+            setErrors(prev => ({
+              ...prev,
+              phoneNumberId: 'Este ID de telefone já está sendo usado'
+            }));
+            addToast('ID do telefone já está sendo usado', 'error');
+          } else {
+            addToast(errorMessage || 'Erro ao criar setor', 'error');
+          }
+        }
       }
-
-      await fetchSectors();
-      handleCloseDrawer();
     } catch (error) {
-      console.error('Erro ao salvar setor:', error);
-      addToast('Erro ao salvar setor', 'error');
+      console.error('Erro geral:', error);
+      addToast('Erro ao processar operação', 'error');
     } finally {
       setIsLoading(false);
     }

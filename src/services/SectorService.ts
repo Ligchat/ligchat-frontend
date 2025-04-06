@@ -53,7 +53,7 @@ export const createSector = async (sectorData: CreateSectorRequestDTO) => {
     const response = await axios.post(`${API_URL}/sectors`, sectorData);
     return response.data;
   } catch (error) {
-    throw new Error(`Failed to create sector: ${error}`);
+    throw error;
   }
 };
 
@@ -66,7 +66,7 @@ export const updateSector = async (id: number, data: UpdateSectorRequestDTO) => 
     });
     return response.data;
   } catch (error) {
-    throw new Error(`Failed to update sector with id ${id}: ${error}`);
+    throw error;
   }
 };
 
@@ -75,7 +75,6 @@ export const getSector = async (id: number): Promise<Sector> => {
     const response = await axios.get<SingleSectorResponse>(`${API_URL}/sectors/${id}`);
     return response.data.data;
   } catch (error) {
-    console.error('Erro em getSector:', error);
     throw error;
   }
 };
@@ -90,7 +89,7 @@ export const getSectors = async (token: string): Promise<Sector[]> => {
     });
     return response.data.data;
   } catch (error) {
-    throw new Error('Failed to get sectors: ' + error);
+    throw error;
   }
 };
 
@@ -99,6 +98,6 @@ export const deleteSector = async (id: number) => {
     const response = await axios.delete(`${API_URL}/sectors/${id}`);
     return response.data;
   } catch (error) {
-    throw new Error(`Failed to delete sector with id ${id}: ${error}`);
+    throw error;
   }
 };

@@ -8,11 +8,13 @@ import {
   getMessageSchedulings,
   updateMessageScheduling,
 } from '../services/MessageSchedulingsService';
-import { getTags } from '../services/LabelService';
+import { getTags, Tag } from '../services/LabelService';
+import { getContacts, Contact } from '../services/ContactService';
 import SessionService from '../services/SessionService';
 import { getFlows } from '../services/FlowService';
 import { getSector } from '../services/SectorService';
 import './MessageSchedule.css';
+import Toast from '../components/Toast';
 
 declare global {
   interface Window {
@@ -29,6 +31,14 @@ const Icons = {
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <line x1="12" y1="5" x2="12" y2="19"></line>
       <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  ),
+  Calendar: () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+      <line x1="16" y1="2" x2="16" y2="6"></line>
+      <line x1="8" y1="2" x2="8" y2="6"></line>
+      <line x1="3" y1="10" x2="21" y2="10"></line>
     </svg>
   ),
   Edit: () => (
@@ -71,11 +81,6 @@ interface User {
   photoUrl?: string;
 }
 
-interface Contact {
-  id: number;
-  name: string;
-}
-
 interface Message {
   id?: number;
   title: string;
@@ -87,55 +92,13 @@ interface Message {
   contact: Contact;
 }
 
-interface Tag {
-  id: number;
-  name: string;
-}
-
 const SCOPES = 'https://www.googleapis.com/auth/calendar';
-
-// Dados mock
-const MOCK_CONTACTS = [
-  { id: 1, name: "João Silva" },
-  { id: 2, name: "Maria Santos" },
-  { id: 3, name: "Pedro Oliveira" },
-];
-
-const MOCK_TAGS = [
-  { id: 1, name: "Urgente" },
-  { id: 2, name: "Follow-up" },
-  { id: 3, name: "Reunião" },
-  { id: 4, name: "Importante" },
-];
 
 const MOCK_USER = {
   id: 1,
   name: "Admin",
   photoUrl: "https://ui-avatars.com/api/?name=Admin&background=random"
 };
-
-const MOCK_MESSAGES = [
-  {
-    id: 1,
-    title: "Reunião de Planejamento",
-    date: dayjs().add(1, 'day').valueOf(),
-    description: "Reunião para discutir o planejamento do próximo trimestre",
-    labels: ["1", "3"],
-    contactId: 1,
-    createdBy: MOCK_USER,
-    contact: MOCK_CONTACTS[0]
-  },
-  {
-    id: 2,
-    title: "Follow-up Cliente",
-    date: dayjs().add(2, 'day').valueOf(),
-    description: "Fazer follow-up com o cliente sobre a proposta enviada",
-    labels: ["2", "4"],
-    contactId: 2,
-    createdBy: MOCK_USER,
-    contact: MOCK_CONTACTS[1]
-  }
-];
 
 const MessageSchedule: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -167,45 +130,77 @@ const MessageSchedule: React.FC = () => {
   const [dateInputValue, setDateInputValue] = useState('');
   const [isTagsDropdownOpen, setIsTagsDropdownOpen] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [errors, setErrors] = useState<{ [key: string]: string | null }>({});
+  const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'error' | 'info' }[]>([]);
+
+  const fetchInitialData = async () => {
+    setIsLoading(true);
+    try {
+      const sectorId = SessionService.getSectorId();
+      setSelectedSector(sectorId);
+
+      if (!sectorId) {
+        setMessages([]);
+        setTags([]);
+        setContacts([]);
+        return;
+      }
+
+      // Buscar tags e contatos primeiro
+      const [tagsResponse, contactsResponse] = await Promise.all([
+        getTags(sectorId),
+        getContacts(sectorId)
+      ]);
+
+      // Definir tags e contatos
+      setTags(tagsResponse.data || []);
+      setContacts(contactsResponse.data || []);
+
+      // Buscar mensagens agendadas
+      try {
+        const messagesResponse = await getMessageSchedulings();
+        // Se tiver mensagens, mapear para o formato do componente
+        const formattedMessages = messagesResponse.map(msg => {
+          // Por enquanto, vamos usar o primeiro contato como padrão
+          // TODO: Implementar a relação correta entre mensagem e contato quando disponível
+          const defaultContact = contactsResponse.data[0];
+          
+          return {
+            id: msg.id,
+            title: msg.name,
+            date: new Date(msg.sendDate).getTime(),
+            description: msg.messageText,
+            labels: msg.tagIds ? msg.tagIds.split(',') : [],
+            contactId: defaultContact?.id || null,
+            createdBy: MOCK_USER,
+            contact: defaultContact
+          };
+        });
+
+        setMessages(formattedMessages);
+      } catch (error: any) {
+        // Se for 404, significa que não há mensagens ainda
+        if (error?.response?.status === 404) {
+          setMessages([]);
+        } else {
+          // Se for outro erro, logar e mostrar array vazio
+          console.error('Erro ao buscar mensagens:', error);
+          setMessages([]);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      setMessages([]);
+      setTags([]);
+      setContacts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchInitialData = async () => {
-      setIsLoading(true);
-      try {
-        const sectorId = SessionService.getSectorId();
-        setSelectedSector(sectorId);
-
-        if (!sectorId) {
-          setMessages([]);
-          setTags([]);
-          setContacts([]);
-          return;
-        }
-
-        // TODO: Substituir os dados mockados por chamadas reais à API
-        // const response = await getMessageSchedulings(sectorId);
-        // setMessages(response.data);
-        
-        // const tagsResponse = await getTags(sectorId);
-        // setTags(tagsResponse.data);
-        
-        // const contactsResponse = await getContacts(sectorId);
-        // setContacts(contactsResponse.data);
-
-        // Dados mockados apenas para desenvolvimento
-        setMessages(MOCK_MESSAGES);
-        setTags(MOCK_TAGS);
-        setContacts(MOCK_CONTACTS);
-      } catch (error) {
-        console.error('Erro ao carregar dados:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchInitialData();
 
-    // Listener para mudanças no setor
     const handleSectorChange = () => {
       fetchInitialData();
     };
@@ -217,50 +212,85 @@ const MessageSchedule: React.FC = () => {
     };
   }, []);
 
+  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Date.now();
+    setToasts(current => [...current, { id, message, type }]);
+    setTimeout(() => removeToast(id), 3000);
+  };
+
+  const removeToast = (id: number) => {
+    setToasts(current => current.filter(toast => toast.id !== id));
+  };
+
+  const validateForm = () => {
+    const newErrors: { [key: string]: string | null } = {};
+    
+    if (!newMessage.title.trim()) {
+      newErrors.title = null;
+    }
+    
+    if (!newMessage.date) {
+      newErrors.date = null;
+    } else {
+      const selectedDate = new Date(newMessage.date);
+      const now = new Date();
+      if (selectedDate <= now) {
+        newErrors.date = null;
+      }
+    }
+    
+    if (!newMessage.description.trim()) {
+      newErrors.description = null;
+    }
+    
+    if (!newMessage.contactId) {
+      newErrors.contactId = null;
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSave = async () => {
+    if (!validateForm()) {
+      addToast('Por favor, preencha todos os campos obrigatórios', 'error');
+      return;
+    }
+
     try {
-      if (!newMessage.title.trim()) {
-        alert('Por favor, preencha o título');
-        return;
-      }
-
-      if (!newMessage.date) {
-        alert('Por favor, selecione uma data');
-        return;
-      }
-
-      if (!newMessage.description.trim()) {
-        alert('Por favor, preencha a descrição');
-        return;
-      }
-
-      if (!newMessage.contactId) {
-        alert('Por favor, selecione um contato');
-        return;
-      }
-
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simular delay
+      const sectorId = SessionService.getSectorId();
+      
+      if (!sectorId) {
+        addToast('Nenhum setor selecionado', 'error');
+        return;
+      }
 
-      const savedMessage = {
-        ...newMessage,
-        id: currentMessageIndex !== null ? newMessage.id : Math.random(),
-        createdBy: MOCK_USER,
-        contact: MOCK_CONTACTS.find(c => c.id === newMessage.contactId) || MOCK_CONTACTS[0]
+      const messageData: CreateMessageSchedulingDTO = {
+        name: newMessage.title,
+        messageText: newMessage.description,
+        sendDate: new Date(newMessage.date!).toISOString(),
+        contactId: newMessage.contactId!,
+        sectorId: sectorId,
+        status: true,
+        tagIds: newMessage.labels.length > 0 ? newMessage.labels.join(',') : ''
       };
 
-      if (currentMessageIndex !== null) {
-        setMessages(prev => prev.map(msg => 
-          msg.id === savedMessage.id ? savedMessage : msg
-        ));
+      if (currentMessageIndex !== null && newMessage.id) {
+        // Atualizar mensagem existente
+        await updateMessageScheduling(newMessage.id, messageData);
+        addToast('Mensagem atualizada com sucesso', 'success');
       } else {
-        setMessages(prev => [...prev, savedMessage]);
+        // Criar nova mensagem
+        await createMessageScheduling(messageData);
+        addToast('Mensagem agendada com sucesso', 'success');
       }
 
+      await fetchInitialData();
       closeDrawer();
     } catch (error: any) {
       console.error('Erro ao salvar mensagem:', error);
-      alert('Erro ao salvar mensagem: ' + error.message);
+      addToast(error.response?.data?.message || 'Erro ao salvar mensagem', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -272,11 +302,12 @@ const MessageSchedule: React.FC = () => {
 
     setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simular delay
-      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+      await deleteMessageScheduling(messageId);
+      addToast('Mensagem excluída com sucesso', 'success');
+      await fetchInitialData();
     } catch (error: any) {
       console.error('Erro ao excluir mensagem:', error);
-      alert('Erro ao excluir mensagem');
+      addToast(error.response?.data?.message || 'Erro ao excluir mensagem', 'error');
     } finally {
       setConfirmDeleteIndex(null);
       setIsLoading(false);
@@ -318,9 +349,15 @@ const MessageSchedule: React.FC = () => {
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setDateInputValue(value);
-    const date = new Date(value);
-    if (!isNaN(date.getTime())) {
-      setNewMessage({ ...newMessage, date: date.getTime() });
+    
+    if (value) {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        setNewMessage({ ...newMessage, date: date.getTime() });
+        if (errors.date !== undefined) {
+          setErrors({ ...errors, date: null });
+        }
+      }
     } else {
       setNewMessage({ ...newMessage, date: null });
     }
@@ -446,52 +483,72 @@ const MessageSchedule: React.FC = () => {
         </div>
 
         <div className="form-group">
-          <label className="form-label">Título</label>
+          <label className="form-label">Título <span className="required">*</span></label>
           <input
             type="text"
-            className="form-input"
+            className={`form-input ${errors.title !== undefined ? 'error' : ''}`}
             value={newMessage.title}
-            onChange={(e) => setNewMessage({ ...newMessage, title: e.target.value })}
+            onChange={(e) => {
+              setNewMessage({ ...newMessage, title: e.target.value });
+              if (errors.title !== undefined) {
+                setErrors({ ...errors, title: null });
+              }
+            }}
             placeholder="Título da mensagem"
           />
         </div>
 
         <div className="form-group">
-          <label className="form-label">Data e Hora</label>
-          <input
-            type="datetime-local"
-            className="form-input"
-            value={dateInputValue}
-            onChange={handleDateChange}
-          />
+          <label className="form-label">Data e Hora <span className="required">*</span></label>
+          <div className="date-input-container">
+            <input
+              type="datetime-local"
+              className={`${errors.date !== undefined ? 'error' : ''}`}
+              value={dateInputValue}
+              onChange={handleDateChange}
+              min={new Date().toISOString().slice(0, 16)}
+            />
+            <Icons.Calendar />
+          </div>
         </div>
 
         <div className="form-group">
-          <label className="form-label">Descrição</label>
+          <label className="form-label">Mensagem <span className="required">*</span></label>
           <textarea
-            className="form-textarea"
+            className={`form-textarea ${errors.description !== undefined ? 'error' : ''}`}
             value={newMessage.description}
-            onChange={(e) => setNewMessage({ ...newMessage, description: e.target.value })}
-            placeholder="Descrição da mensagem"
+            onChange={(e) => {
+              handleDescriptionChange(e);
+              if (errors.description !== undefined) {
+                setErrors({ ...errors, description: null });
+              }
+            }}
+            placeholder="Digite sua mensagem aqui..."
             rows={4}
           />
         </div>
 
         <div className="form-group">
-          <label className="form-label">Contato</label>
+          <label className="form-label">Contato <span className="required">*</span></label>
           <select
-            className="form-select"
+            className={`form-select ${errors.contactId !== undefined ? 'error' : ''}`}
             value={newMessage.contactId || ''}
-            onChange={(e) => setNewMessage({ 
-              ...newMessage, 
-              contactId: Number(e.target.value),
-              contact: contacts.find(c => c.id === Number(e.target.value)) || {} as Contact
-            })}
+            onChange={(e) => {
+              const selectedContact = contacts.find(c => c.id === Number(e.target.value));
+              setNewMessage({ 
+                ...newMessage, 
+                contactId: Number(e.target.value),
+                contact: selectedContact || {} as Contact
+              });
+              if (errors.contactId !== undefined) {
+                setErrors({ ...errors, contactId: null });
+              }
+            }}
           >
             <option value="">Selecione um contato</option>
             {contacts.map((contact) => (
               <option key={contact.id} value={contact.id}>
-                {contact.name}
+                {contact.name} ({contact.number})
               </option>
             ))}
           </select>
@@ -503,11 +560,15 @@ const MessageSchedule: React.FC = () => {
             {newMessage.labels.map((labelId) => {
               const tag = tags.find(t => t.id === Number(labelId));
               return tag ? (
-                <span key={labelId} className="selected-tag">
+                <span 
+                  key={labelId} 
+                  className="selected-tag"
+                  style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: `${tag.color}40` }}
+                >
                   {tag.name}
                   <span 
                     className="tag-remove"
-                    onClick={() => removeTag(labelId)}
+                    onClick={() => removeTag(String(tag.id))}
                   >
                     ×
                   </span>
@@ -531,6 +592,10 @@ const MessageSchedule: React.FC = () => {
                       newMessage.labels.includes(String(tag.id)) ? 'selected' : ''
                     }`}
                     onClick={() => toggleTagSelection(String(tag.id))}
+                    style={{ 
+                      backgroundColor: newMessage.labels.includes(String(tag.id)) ? `${tag.color}20` : 'transparent',
+                      color: tag.color
+                    }}
                   >
                     {tag.name}
                   </div>
@@ -592,6 +657,17 @@ const MessageSchedule: React.FC = () => {
       </div>
 
       {renderDrawer()}
+
+      <div className="toast-container">
+        {toasts.map(toast => (
+          <Toast
+            key={toast.id}
+            message={toast.message}
+            type={toast.type}
+            onClose={() => removeToast(toast.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 };

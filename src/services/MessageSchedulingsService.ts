@@ -33,49 +33,52 @@ export interface CreateMessageSchedulingDTO {
   name: string;
   messageText: string;
   sendDate: string; // ISO string
-  flowId: number;
+  contactId: number;
   sectorId: number;
+  status?: boolean;
   tagIds: string;
-  status: true;
-  imageName?: string;
-  fileName?: string;
-  imageAttachment?: string;
-  fileAttachment?: string;
-  imageMimeType?: string;
-  fileMimeType?: string;
-  attachments?: Attachment[];
 }
 
 // DTO para atualizar um MessageScheduling
 export interface UpdateMessageSchedulingDTO {
   name?: string;
   messageText?: string;
-  sendDate?: string; // ISO string
-  flowId?: number;
+  sendDate?: string;
+  contactId?: number;
   sectorId?: number;
-  tagIds?: string;
-  imageName?: string;
-  fileName?: string;
-  imageAttachment?: string;
-  fileAttachment?: string;
-  imageMimeType?: string;
-  fileMimeType?: string;
-  attachments?: Attachment[];
+  status?: boolean;
+  tagIds: string;
 }
 
 // Função para obter todos os MessageSchedulings
 export const getMessageSchedulings = async (): Promise<MessageScheduling[]> => {
-  const sectorId = SessionService.getSession('selectedSector');
+  const sectorId = SessionService.getSectorId();
+  if (!sectorId) {
+    throw new Error('No sector selected');
+  }
+  
   try {
-    const response = await axios.get(`${API_URL}/message-schedulings?sectorId=${sectorId}`, {
+    const response = await axios.get(`${API_URL}/message-schedulings`, {
+      params: {
+        sectorId: sectorId
+      },
       headers: {
         'Accept': 'application/json',
       },
     });
-    // Considerando que a resposta possui a estrutura { message, code, data }
-    return response.data.data;
+
+    // Se a resposta for 404 com a mensagem específica, retornar array vazio
+    if (response.data.code === '404' && response.data.message === 'No message schedulings found.') {
+      return [];
+    }
+
+    return response.data.data || [];
   } catch (error: any) {
-    throw new Error(`Failed to get message schedulings: ${error.response?.data?.message || error.message}`);
+    // Se for erro 404, retornar array vazio
+    if (error.response?.status === 404) {
+      return [];
+    }
+    throw error;
   }
 };
 

@@ -514,4 +514,65 @@ body.drawer-open {
     min-height: calc(100vh - 150px);
     color: #888;
     font-size: 1.2rem;
-} 
+}
+
+.form-input.error {
+    border-color: #ff4c4c !important;
+    background-color: rgba(255, 76, 76, 0.05) !important;
+}
+
+.form-input.error:focus {
+    box-shadow: 0 0 0 2px rgba(255, 76, 76, 0.1) !important;
+}
+
+.error-message {
+    color: #ff4c4c;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: rgba(255, 76, 76, 0.1);
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 76, 76, 0.2);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+    position: relative;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #e0e0e0;
+    font-size: 0.9rem;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background-color: #252525;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #00c2ff;
+    box-shadow: 0 0 0 2px rgba(0, 194, 255, 0.1);
+}
+
+.form-textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.required {
+    color: #ff4c4c;
+    margin-left: 4px;
+}
