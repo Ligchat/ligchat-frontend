@@ -33,41 +33,38 @@ export class WebSocketService {
   }
 
   private normalizeMessage(message: any): MessageType {
-    console.log('Normalizando mensagem:', message);
+    console.log('Normalizando mensagem no WebSocketService:', message);
     
     // Função auxiliar para pegar propriedade independente do case
     const getProp = (obj: any, prop: string) => {
-      // Tenta com a propriedade exatamente como está
-      if (obj[prop] !== undefined) return obj[prop];
+      const props = [prop, prop.toLowerCase(), prop.toUpperCase(), 
+        prop.charAt(0).toUpperCase() + prop.slice(1),
+        prop.charAt(0).toLowerCase() + prop.slice(1)
+      ];
       
-      // Tenta com primeira letra maiúscula
-      const upperCase = prop.charAt(0).toUpperCase() + prop.slice(1);
-      if (obj[upperCase] !== undefined) return obj[upperCase];
-      
-      // Tenta com primeira letra minúscula
-      const lowerCase = prop.charAt(0).toLowerCase() + prop.slice(1);
-      if (obj[lowerCase] !== undefined) return obj[lowerCase];
-      
+      for (const p of props) {
+        if (obj[p] !== undefined) return obj[p];
+      }
       return undefined;
     };
 
-    return {
-      id: getProp(message, 'id'),
-      content: getProp(message, 'content'),
+    const normalized = {
+      id: getProp(message, 'id') || Date.now(),
+      content: getProp(message, 'content') || '',
       isSent: getProp(message, 'isSent') ?? false,
-      mediaType: getProp(message, 'mediaType'),
-      mediaUrl: getProp(message, 'mediaUrl'),
-      fileName: getProp(message, 'fileName'),
+      mediaType: getProp(message, 'mediaType') || 'text',
+      mediaUrl: getProp(message, 'mediaUrl') || null,
+      fileName: getProp(message, 'fileName') || null,
+      mimeType: getProp(message, 'mimeType') || null,
       sectorId: getProp(message, 'sectorId'),
-      contactID: getProp(message, 'contactID'), // Note que esta propriedade é 'contactID' e não 'contactId'
+      contactID: getProp(message, 'contactID') || getProp(message, 'contactId'),
       isRead: getProp(message, 'isRead') ?? false,
       sentAt: getProp(message, 'sentAt') || new Date().toISOString(),
-      attachment: getProp(message, 'mediaUrl') ? {
-        url: getProp(message, 'mediaUrl'),
-        type: getProp(message, 'mediaType') || 'unknown',
-        name: getProp(message, 'fileName') || 'download'
-      } : undefined
+      type: getProp(message, 'type') || undefined
     };
+
+    console.log('Mensagem normalizada no WebSocketService:', normalized);
+    return normalized;
   }
 
   private setupWebSocketHandlers() {
@@ -80,36 +77,35 @@ export class WebSocketService {
 
     this.ws.onmessage = (event) => {
       try {
-        console.log('Mensagem recebida:', event.data);
+        console.log('Mensagem WebSocket recebida (raw):', event.data);
         
-        // Primeiro parse
-        let parsedMessage = JSON.parse(event.data);
-        
-        // Verifica se é uma string JSON (caso de mensagem enviada)
-        if (typeof parsedMessage === 'string' && parsedMessage.startsWith('{')) {
-          try {
+        let parsedMessage;
+        try {
+          // Primeiro parse
+          parsedMessage = JSON.parse(event.data);
+          
+          // Se for string JSON, tenta segundo parse
+          if (typeof parsedMessage === 'string' && parsedMessage.startsWith('{')) {
             parsedMessage = JSON.parse(parsedMessage);
-          } catch (e) {
-            // Se falhar o segundo parse, mantém o resultado do primeiro
-            console.log('Mensagem já está no formato correto após primeiro parse');
           }
+        } catch (e) {
+          console.error('Erro ao fazer parse da mensagem:', e);
+          return;
         }
         
         console.log('Mensagem após parse:', parsedMessage);
-        const message = this.normalizeMessage(parsedMessage);
+        const normalizedMessage = this.normalizeMessage(parsedMessage);
         
-        console.log('Mensagem normalizada:', message);
-        
+        console.log('Notificando handlers com mensagem normalizada:', normalizedMessage);
         this.messageHandlers.forEach(handler => {
           try {
-            handler(message);
+            handler(normalizedMessage);
           } catch (error) {
             console.error('Erro no handler da mensagem:', error);
           }
         });
       } catch (error) {
         console.error('Erro ao processar mensagem do WebSocket:', error);
-        console.error('Dados recebidos:', event.data);
       }
     };
 
