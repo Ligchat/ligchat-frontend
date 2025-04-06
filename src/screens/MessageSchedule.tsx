@@ -231,12 +231,6 @@ const MessageSchedule: React.FC = () => {
     
     if (!newMessage.date) {
       newErrors.date = null;
-    } else {
-      const selectedDate = new Date(newMessage.date);
-      const now = new Date();
-      if (selectedDate <= now) {
-        newErrors.date = null;
-      }
     }
     
     if (!newMessage.description.trim()) {
@@ -506,7 +500,6 @@ const MessageSchedule: React.FC = () => {
               className={`${errors.date !== undefined ? 'error' : ''}`}
               value={dateInputValue}
               onChange={handleDateChange}
-              min={new Date().toISOString().slice(0, 16)}
             />
             <Icons.Calendar />
           </div>
