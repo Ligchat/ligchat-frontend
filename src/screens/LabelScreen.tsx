@@ -79,62 +79,25 @@ const Modal: React.FC<ModalProps> = ({
   
   return ReactDOM.createPortal(
     <div 
-      className="modal-overlay" 
-      style={{ 
-        display: 'flex', 
-        position: 'fixed', 
-        top: 0, 
-        left: 0, 
-        right: 0, 
-        bottom: 0, 
-        backgroundColor: 'rgba(0, 0, 0, 0.8)', 
-        zIndex: 9999,
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}
+      className="label-modal-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div 
-        className="modal" 
-        style={{ 
-          backgroundColor: '#1a1a1a', 
-          borderRadius: '12px',
-          width: '90%',
-          maxWidth: '500px',
-          zIndex: 10000,
-          position: 'relative',
-          color: '#e0e0e0',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'visible'
-        }} 
+        className="label-modal"
         onClick={e => e.stopPropagation()}
       >
-        <div className="modal-header" style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #2a2a2a', textAlign: 'center' }}>
-          <h2 style={{ margin: 0 }}>{title}</h2>
-          <button className="close-button" onClick={onClose} style={{ position: 'absolute', right: '1rem', top: '1rem', background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '1.5rem' }}>
+        <div className="label-modal-header">
+          <h2>{title}</h2>
+          <button className="label-modal-close" onClick={onClose}>
             <FiX />
           </button>
         </div>
-        <div className="modal-content" style={{ 
-          padding: '1.5rem', 
-          textAlign: 'left',
-          width: '100%',
-          boxSizing: 'border-box'
-        }}>
-          <div className="form-group" style={{
-            width: '100%',
-            marginBottom: '1.5rem'
-          }}>
-            <label htmlFor="label-name" style={{
-              display: 'block',
-              marginBottom: '0.5rem',
-              fontWeight: 500
-            }}>
-              Nome <span className="required" style={{ color: '#ff4c4c' }}>*</span>
+        <div className="label-modal-content">
+          <div className="label-form-group">
+            <label htmlFor="label-name">
+              Nome <span className="required">*</span>
             </label>
             <input
               id="label-name"
@@ -148,36 +111,14 @@ const Modal: React.FC<ModalProps> = ({
               }}
               placeholder="Digite o nome da etiqueta"
               className={errors.title ? 'error' : ''}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '6px',
-                border: errors.title ? '1px solid #ff4c4c' : '1px solid #333',
-                backgroundColor: '#252525',
-                color: '#e0e0e0',
-                fontSize: '1rem',
-                boxSizing: 'border-box'
-              }}
             />
             {errors.title && (
-              <span className="error-message" style={{
-                color: '#ff4c4c',
-                fontSize: '0.8rem',
-                marginTop: '0.5rem',
-                display: 'block'
-              }}>{errors.title}</span>
+              <span className="label-error-message">{errors.title}</span>
             )}
           </div>
 
-          <div className="form-group" style={{
-            width: '100%',
-            marginBottom: '1.5rem'
-          }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '0.5rem',
-              fontWeight: 500
-            }}>Descrição</label>
+          <div className="label-form-group">
+            <label>Descrição</label>
             <textarea
               value={newDescription}
               onChange={(e) => {
@@ -187,99 +128,31 @@ const Modal: React.FC<ModalProps> = ({
                 }
               }}
               placeholder="Digite uma descrição (opcional)"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '6px',
-                border: errors.description ? '1px solid #ff4c4c' : '1px solid #333',
-                backgroundColor: '#252525',
-                color: '#e0e0e0',
-                fontSize: '1rem',
-                boxSizing: 'border-box',
-                minHeight: '100px',
-                resize: 'vertical'
-              }}
+              className={errors.description ? 'error' : ''}
             />
             {errors.description && (
-              <span className="error-message" style={{
-                color: '#ff4c4c',
-                fontSize: '0.8rem',
-                marginTop: '0.5rem',
-                display: 'block'
-              }}>{errors.description}</span>
+              <span className="label-error-message">{errors.description}</span>
             )}
-            <span style={{
-              color: '#888',
-              fontSize: '0.8rem',
-              marginTop: '0.5rem',
-              display: 'block'
-            }}>
+            <span className="label-char-count">
               {newDescription.length}/200 caracteres
             </span>
           </div>
 
-          <div className="form-group" style={{
-            width: '100%',
-            marginBottom: '1rem',
-            position: 'relative'
-          }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '0.5rem',
-              fontWeight: 500
-            }}>Cor da Etiqueta</label>
-            <div className="color-picker" style={{
-              position: 'relative',
-              width: '100%'
-            }}>
+          <div className="label-form-group">
+            <label>Cor da Etiqueta</label>
+            <div className="label-color-picker">
               <div 
-                className="color-preview"
-                style={{ 
-                  backgroundColor: selectedColor,
-                  width: '100%',
-                  height: '40px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  border: '1px solid #333',
-                  transition: 'all 0.2s ease'
-                }}
+                className="label-color-preview"
+                style={{ backgroundColor: selectedColor }}
                 onClick={() => setShowColorPicker(!showColorPicker)}
               />
               {showColorPicker && (
-                <div 
-                  className="color-grid"
-                  style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 8px)',
-                    left: 0,
-                    width: '100%',
-                    backgroundColor: '#1e1e1e',
-                    border: '1px solid #333',
-                    borderRadius: '8px',
-                    padding: '8px',
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(9, 1fr)',
-                    gap: '6px',
-                    zIndex: 10001,
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
-                    maxHeight: '250px',
-                    overflowY: 'auto'
-                  }}
-                >
+                <div className="label-color-grid">
                   {PRESET_COLORS.map((color) => (
                     <div
                       key={color}
-                      className={`color-option ${selectedColor === color ? 'selected' : ''}`}
-                      style={{ 
-                        backgroundColor: color,
-                        width: '100%',
-                        aspectRatio: '1',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        border: selectedColor === color ? '2px solid #fff' : '2px solid transparent',
-                        boxShadow: selectedColor === color ? '0 0 0 2px #1e1e1e' : 'none'
-                      }}
+                      className={`label-color-option ${selectedColor === color ? 'selected' : ''}`}
+                      style={{ backgroundColor: color }}
                       onClick={() => {
                         setSelectedColor(color);
                         setShowColorPicker(false);
@@ -291,40 +164,17 @@ const Modal: React.FC<ModalProps> = ({
             </div>
           </div>
         </div>
-        <div className="modal-footer" style={{ 
-          padding: '1rem 1.5rem', 
-          borderTop: '1px solid #2a2a2a', 
-          display: 'flex', 
-          justifyContent: 'flex-end', 
-          gap: '1rem' 
-        }}>
+        <div className="label-modal-footer">
           <button 
-            className="cancel-button" 
+            className="label-cancel-button" 
             onClick={onClose}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              border: '1px solid #333',
-              background: 'transparent',
-              color: '#e0e0e0',
-              cursor: 'pointer'
-            }}
           >
             Cancelar
           </button>
           <button 
-            className="save-button" 
+            className="label-save-button" 
             onClick={onSave}
             disabled={!newTitle.trim()}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              border: 'none',
-              background: '#00c2ff',
-              color: '#121212',
-              cursor: !newTitle.trim() ? 'not-allowed' : 'pointer',
-              opacity: !newTitle.trim() ? 0.7 : 1
-            }}
           >
             Salvar
           </button>
@@ -345,102 +195,34 @@ const DeleteConfirmationModal: React.FC<{
 
   return ReactDOM.createPortal(
     <div 
-      className="modal-overlay" 
-      style={{ 
-        display: 'flex', 
-        position: 'fixed', 
-        top: 0, 
-        left: 0, 
-        right: 0, 
-        bottom: 0, 
-        backgroundColor: 'rgba(0, 0, 0, 0.8)', 
-        zIndex: 9999,
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}
+      className="label-modal-overlay"
       onClick={onClose}
     >
       <div 
-        className="modal" 
-        style={{ 
-          backgroundColor: '#1a1a1a', 
-          borderRadius: '12px',
-          width: '90%',
-          maxWidth: '400px',
-          minHeight: '200px',
-          zIndex: 10000,
-          position: 'relative',
-          color: '#e0e0e0',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
-        }} 
+        className="label-modal label-delete-modal"
         onClick={e => e.stopPropagation()}
       >
-        <div className="modal-header" style={{ 
-          padding: '1rem 1.5rem', 
-          borderBottom: '1px solid #2a2a2a', 
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          justifyContent: 'center'
-        }}>
+        <div className="label-modal-header label-delete-header">
           <FiAlertCircle size={20} color="#ff4c4c" />
-          <h2 style={{ margin: 0, color: '#ff4c4c', fontSize: '1.1rem' }}>Confirmar Exclusão</h2>
+          <h2>Confirmar Exclusão</h2>
         </div>
         
-        <div className="modal-content" style={{ 
-          padding: '1.5rem',
-          paddingTop: '1rem',
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          width: '100%',
-          boxSizing: 'border-box'
-        }}>
-          <p style={{ 
-            margin: 0, 
-            fontSize: '0.95rem',
-            textAlign: 'left'
-          }}>
+        <div className="label-modal-content label-delete-content">
+          <p>
             Tem certeza que deseja excluir a etiqueta "{tagName}"?
           </p>
         </div>
 
-        <div className="modal-footer" style={{ 
-          padding: '1rem 1.5rem', 
-          borderTop: '1px solid #2a2a2a', 
-          display: 'flex', 
-          justifyContent: 'flex-end', 
-          gap: '1rem' 
-        }}>
+        <div className="label-modal-footer">
           <button 
+            className="label-cancel-button"
             onClick={onClose}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              border: '1px solid #333',
-              background: 'transparent',
-              color: '#e0e0e0',
-              cursor: 'pointer',
-              fontSize: '0.9rem'
-            }}
           >
             Cancelar
           </button>
           <button 
+            className="label-delete-button"
             onClick={onConfirm}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              border: 'none',
-              background: '#ff4c4c',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '0.9rem'
-            }}
           >
             Excluir
           </button>

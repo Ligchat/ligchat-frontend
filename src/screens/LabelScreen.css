@@ -254,8 +254,8 @@
   border-color: #00c2ff;
 }
 
-/* Modal styles */
-.modal-overlay {
+/* Modal específico para Labels - estilos com prefixo para evitar conflitos */
+.label-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -269,30 +269,23 @@
   backdrop-filter: blur(4px);
 }
 
-.modal {
+.label-modal {
   background-color: #1a1a1a;
   border-radius: 12px;
   width: 90%;
   max-width: 500px;
-  border: 1px solid #2a2a2a;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  position: relative;
+  min-width: 320px;
   z-index: 10000;
-  animation: modalAppear 0.2s ease;
+  position: relative;
+  color: #e0e0e0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: calc(100vh - 2rem);
 }
 
-@keyframes modalAppear {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-.modal-header {
+.label-modal-header {
   padding: 1.25rem;
   border-bottom: 1px solid #2a2a2a;
   display: flex;
@@ -302,14 +295,14 @@
   border-radius: 12px 12px 0 0;
 }
 
-.modal-header h2 {
+.label-modal-header h2 {
   font-size: 1.1rem;
   font-weight: 500;
   color: #00c2ff;
   margin: 0;
 }
 
-.close-button {
+.label-modal-close {
   width: 32px;
   height: 32px;
   border-radius: 6px;
@@ -323,25 +316,28 @@
   transition: all 0.2s ease;
 }
 
-.close-button:hover {
+.label-modal-close:hover {
   background-color: #ff4c4c;
   color: white;
 }
 
-.modal-content {
+.label-modal-content {
   padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
 }
 
-.form-group {
-  margin-bottom: 2rem;
+.label-form-group {
+  margin-bottom: 1.5rem;
   position: relative;
+  width: 100%;
 }
 
-.form-group:last-child {
+.label-form-group:last-child {
   margin-bottom: 0;
 }
 
-.form-group label {
+.label-form-group label {
   display: block;
   font-size: 0.9rem;
   color: #e0e0e0;
@@ -349,8 +345,8 @@
   font-weight: 500;
 }
 
-.form-group input,
-.form-group textarea {
+.label-form-group input,
+.label-form-group textarea {
   width: 100%;
   padding: 0.75rem 1rem;
   background-color: #252525;
@@ -360,28 +356,49 @@
   font-size: 0.95rem;
   transition: all 0.2s ease;
   font-family: inherit;
+  box-sizing: border-box;
 }
 
-.form-group input:focus,
-.form-group textarea:focus {
+.label-form-group input:focus,
+.label-form-group textarea:focus {
   outline: none;
   border-color: #00c2ff;
   box-shadow: 0 0 0 2px rgba(0, 194, 255, 0.1);
   background-color: #2a2a2a;
 }
 
-.form-group input::placeholder,
-.form-group textarea::placeholder {
-  color: #666;
+.label-form-group input.error,
+.label-form-group textarea.error {
+  border-color: #ff4c4c;
+  background-color: rgba(255, 76, 76, 0.05);
 }
 
-.form-group textarea {
-  resize: vertical;
-  min-height: 100px;
-  line-height: 1.5;
+.label-form-group input.error:focus,
+.label-form-group textarea.error:focus {
+  box-shadow: 0 0 0 2px rgba(255, 76, 76, 0.1);
 }
 
-.modal-footer {
+.label-form-group .required {
+  color: #ff4c4c;
+  margin-left: 4px;
+}
+
+.label-error-message {
+  color: #ff4c4c;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  display: block;
+  font-weight: 500;
+}
+
+.label-char-count {
+  color: #888;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  display: block;
+}
+
+.label-modal-footer {
   padding: 1.25rem;
   border-top: 1px solid #2a2a2a;
   display: flex;
@@ -389,59 +406,106 @@
   gap: 0.75rem;
   background-color: #1e1e1e;
   border-radius: 0 0 12px 12px;
+  flex-shrink: 0;
 }
 
-.modal-footer button {
+.label-cancel-button {
   padding: 0.75rem 1.5rem;
+  background-color: #252525;
+  border: 1px solid #333;
+  color: #e0e0e0;
   border-radius: 6px;
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
-.modal-footer .cancel-button {
-  background-color: #252525;
-  border: 1px solid #333;
-  color: #e0e0e0;
-}
-
-.modal-footer .cancel-button:hover {
+.label-cancel-button:hover {
   background-color: #2a2a2a;
 }
 
-.modal-footer .save-button {
+.label-save-button {
+  padding: 0.75rem 1.5rem;
   background-color: #00c2ff;
   border: none;
   color: #121212;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.modal-footer .save-button:hover {
+.label-save-button:hover {
   background-color: #00a8e0;
 }
 
-.modal-footer button:disabled {
+.label-save-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* Responsividade do modal */
+/* Estilos para o modal de exclusão */
+.label-delete-modal {
+  max-width: 400px;
+}
+
+.label-delete-header {
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.label-delete-header h2 {
+  color: #ff4c4c;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.label-delete-content {
+  padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.label-delete-content p {
+  margin: 0;
+  font-size: 0.95rem;
+  text-align: left;
+}
+
+.label-delete-button {
+  padding: 0.75rem 1.5rem;
+  background-color: #ff4c4c;
+  border: none;
+  color: white;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.label-delete-button:hover {
+  background-color: #ff3333;
+}
+
+/* Responsividade para o modal */
 @media (max-width: 768px) {
-  .modal {
+  .label-modal {
     width: 95%;
     margin: 1rem;
+    max-height: calc(100vh - 2rem);
   }
 
-  .modal-header,
-  .modal-content,
-  .modal-footer {
+  .label-modal-header,
+  .label-modal-content,
+  .label-modal-footer {
     padding: 1rem;
   }
 
-  .modal-footer button {
+  .label-modal-footer button {
     padding: 0.75rem 1rem;
     flex: 1;
     justify-content: center;
@@ -507,29 +571,14 @@
 }
 
 .char-count {
-  position: absolute;
-  right: 0;
-  bottom: -1.5rem;
-  font-size: 0.8rem;
-  color: #666;
-}
-
-.form-group textarea:focus + .char-count {
   color: #888;
-}
-
-/* Estilo para quando o textarea estiver próximo do limite */
-.form-group textarea.near-limit {
-  border-color: #ffaa00;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  display: block;
 }
 
 .form-group textarea.near-limit + .char-count {
   color: #ffaa00;
-}
-
-/* Estilo para quando o textarea ultrapassar o limite */
-.form-group textarea.over-limit {
-  border-color: #ff4c4c;
 }
 
 .form-group textarea.over-limit + .char-count {
@@ -643,4 +692,61 @@
     min-height: calc(100vh - 150px);
     color: #888;
     font-size: 1.2rem;
-} 
+}
+
+/* Seletor de cores com prefixo label- */
+.label-color-picker {
+  position: relative;
+  width: 100%;
+}
+
+.label-color-preview {
+  width: 100%;
+  height: 40px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid #333;
+  transition: all 0.2s ease;
+}
+
+.label-color-preview:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.label-color-grid {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 6px;
+  z-index: 10001;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.label-color-option {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.label-color-option:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.label-color-option.selected {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #1e1e1e;
+}
