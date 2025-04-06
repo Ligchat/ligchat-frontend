@@ -44,7 +44,7 @@ import FilterPanel from '../components/FilterPanel';
 import { getColumns, createColumn, moveColumn, updateColumn, deleteColumn } from '../services/ColumnService';
 import { createCard, updateCard, moveCard, Card, getCards } from '../services/CardService';
 import SessionService from '../services/SessionService';
-import { getTags } from '../services/LabelService';
+import { getTags, Tag as ApiTag } from '../services/LabelService';
 import Toast from '../components/Toast';
 import { getAllUsers, User } from '../services/UserService';
 import { getContacts, updateContact, UpdateContactRequestDTO } from '../services/ContactService';
@@ -255,74 +255,132 @@ const CRMPage: React.FC = () => {
       try {
         setIsLoading(true);
         const sectorId = SessionService.getSectorId();
+        console.log('SectorId:', sectorId);
+        
         if (!sectorId) {
           console.error('Setor não selecionado');
           setIsLoading(false);
           return;
         }
         
-        // Buscar colunas, cards, contatos, tags e usuários
-        const [columnsData, cardsData, contactsResponse, tagsResponse, usersData] = await Promise.all([
+        console.log('Iniciando carregamento dos dados...');
+        
+        // Buscar colunas, cards, contatos e usuários
+        const [columnsData, cardsData, contactsResponse, usersData] = await Promise.all([
           getColumns(),
           getCards(sectorId),
           getContacts(sectorId),
-          getTags(sectorId),
           getAllUsers()
         ]);
 
+        console.log('Dados brutos:', {
+          columnsData,
+          cardsData,
+          contactsResponse,
+          usersData
+        });
+
+        // Buscar e formatar tags
+        let formattedTags: ApiTag[] = [];
+        try {
+          const tagsResponse = await getTags(sectorId);
+          if (tagsResponse.data) {
+            formattedTags = tagsResponse.data.map(tag => ({
+              id: Number(tag.id),
+              name: tag.name,
+              color: tag.color,
+              description: tag.description,
+              sectorId: tag.sectorId
+            }));
+          }
+        } catch (error) {
+          console.warn('Não foi possível carregar as tags, continuando sem elas:', error);
+        }
+
+        console.log('Dados carregados:', {
+          colunas: columnsData,
+          cards: cardsData,
+          contatos: contactsResponse,
+          tags: formattedTags,
+          usuarios: usersData
+        });
+
         // Criar mapa de contatos para acesso rápido
         const newContactsMap = new Map(
-          contactsResponse.data.map(contact => [contact.id, contact])
+          contactsResponse.data.map(contact => [contact.id, {
+            id: contact.id,
+            name: contact.name,
+            notes: contact.notes,
+            email: contact.email,
+            number: contact.number,
+            isActive: contact.isActive,
+            priority: contact.priority,
+            tagId: contact.tagId,
+            assignedTo: contact.assignedTo
+          }])
         );
         setContactsMap(newContactsMap);
 
+        console.log('Mapa de contatos:', Array.from(newContactsMap.entries()));
+
         // Mapear as colunas com os cards
-        const mappedColumns = columnsData.map((column) => ({
-          id: column.id.toString(),
-          title: column.name,
-          cards: cardsData
+        const mappedColumns = columnsData.map((column) => {
+          const columnCards = cardsData
             .filter(card => card.columnId.toString() === column.id.toString())
             .map(card => {
+              console.log('Processando card:', card);
               const contact = newContactsMap.get(card.contactId);
+              console.log('Contato encontrado para o card:', contact);
+              
+              if (!contact) {
+                console.warn('Contato não encontrado para o card:', card);
+                return null;
+              }
+
               return {
                 id: card.id.toString(),
-                title: contact?.name || 'Sem nome',
-                content: contact?.notes || '',
-                email: contact?.email || '',
-                phone: contact?.number || '',
-                status: contact?.isActive ? 'active' : 'inactive',
-                priority: convertPriority(contact?.priority),
+                title: contact.name || 'Sem nome',
+                content: contact.notes || '',
+                email: contact.email || '',
+                phone: contact.number || '',
+                status: contact.isActive ? 'active' : 'inactive',
+                priority: convertPriority(contact.priority),
                 contactId: card.contactId,
                 columnId: card.columnId,
                 sectorId: card.sectorId,
                 position: card.position,
-                tagId: contact?.tagId || undefined,
+                tagId: contact.tagId || undefined,
                 createdAt: card.createdAt,
-                assignedTo: contact?.assignedTo ? contact.assignedTo.toString() : undefined
+                assignedTo: contact.assignedTo ? contact.assignedTo.toString() : undefined
               };
             })
-            .sort((a, b) => a.position - b.position)
-        }));
+            .filter(card => card !== null)
+            .sort((a, b) => a!.position - b!.position);
 
+          console.log(`Cards mapeados para a coluna ${column.name}:`, columnCards);
+
+          return {
+            id: column.id.toString(),
+            title: column.name,
+            cards: columnCards
+          };
+        });
+
+        console.log('Colunas mapeadas final:', mappedColumns);
         setColumns(mappedColumns);
         
         // Configurar tags
-        if (tagsResponse.data) {
-          const formattedTags = tagsResponse.data.map(tag => ({
-            id: Number(tag.id),
-            name: tag.name,
-            color: tag.color,
-            description: tag.description,
-            sectorId: tag.sectorId
-          }));
-          setTags(formattedTags);
-        }
+        setTags(formattedTags);
 
         // Configurar usuários
         setUsers(usersData);
 
-      } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+      } catch (error: any) {
+        console.error('Erro detalhado ao carregar dados:', error);
+        if (error.response) {
+          console.error('Resposta do servidor:', error.response.data);
+          console.error('Status:', error.response.status);
+        }
       } finally {
         setIsLoading(false);
       }

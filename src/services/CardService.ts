@@ -125,6 +125,8 @@ export const getCard = async (id: string): Promise<Card> => {
 
 export const getCards = async (sectorId: number): Promise<Card[]> => {
   try {
+    console.log('Buscando cards para o setor:', sectorId);
+    
     const token = localStorage.getItem('token');
     const response = await axios.get<Card[]>(
       `${API_URL}/Cards?sectorId=${sectorId}`,
@@ -135,9 +137,16 @@ export const getCards = async (sectorId: number): Promise<Card[]> => {
         },
       }
     );
+    
+    console.log('Resposta da API de cards:', response.data);
+    
     return response.data;
-  } catch (error) {
-    console.error('Error fetching cards:', error);
+  } catch (error: any) {
+    console.error('Erro detalhado ao obter cards:', error);
+    if (error.response) {
+      console.error('Resposta do servidor:', error.response.data);
+      console.error('Status:', error.response.status);
+    }
     throw new Error('Falha ao obter cards: ' + error);
   }
 };

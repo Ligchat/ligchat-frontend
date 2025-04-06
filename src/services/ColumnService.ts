@@ -69,6 +69,8 @@ export const getColumn = async (id: string): Promise<Column> => {
 export const getColumns = async (): Promise<Column[]> => {
   try {
     const sectorId = SessionService.getSectorId();
+    console.log('Buscando colunas para o setor:', sectorId);
+    
     if (!sectorId) {
       throw new Error('Setor não selecionado');
     }
@@ -80,11 +82,18 @@ export const getColumns = async (): Promise<Column[]> => {
       },
     });
     
+    console.log('Resposta da API de colunas:', response.data);
+    
     return response.data.map(column => ({
       ...column,
       id: column.id.toString()
     }));
-  } catch (error) {
+  } catch (error: any) {
+    console.error('Erro detalhado ao obter colunas:', error);
+    if (error.response) {
+      console.error('Resposta do servidor:', error.response.data);
+      console.error('Status:', error.response.status);
+    }
     throw new Error('Falha ao obter colunas: ' + error);
   }
 };
