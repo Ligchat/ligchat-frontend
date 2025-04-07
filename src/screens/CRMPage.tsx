@@ -42,7 +42,7 @@ import {
 import CardSidebar from '../components/CardSidebar';
 import FilterPanel from '../components/FilterPanel';
 import { getColumns, createColumn, moveColumn, updateColumn, deleteColumn } from '../services/ColumnService';
-import { createCard, updateCard, moveCard, Card, getCards } from '../services/CardService';
+import { createCard, updateCard, moveCard, getCards } from '../services/CardService'
 import SessionService from '../services/SessionService';
 import { getTags, Tag as ApiTag } from '../services/LabelService';
 import Toast from '../components/Toast';
@@ -651,28 +651,8 @@ const CRMPage: React.FC = () => {
     }
   };
 
-  // Primeiro, vamos garantir que a função convertToCard mantenha todos os campos
-  const convertToCard = (uiCard: UICard) => {
-    return {
-      id: uiCard.id,
-      title: uiCard.title,
-      content: uiCard.content,
-      email: uiCard.email,
-      phone: uiCard.phone,
-      status: uiCard.status,
-      createdAt: uiCard.createdAt ? new Date(uiCard.createdAt) : undefined,
-      lastContact: uiCard.lastContact ? new Date(uiCard.lastContact) : undefined,
-      priority: uiCard.priority,
-      contactId: uiCard.contactId,
-      tagId: uiCard.tagId,
-      columnId: uiCard.columnId,
-      sectorId: uiCard.sectorId,
-      position: uiCard.position
-    };
-  };
-
-  // Agora vamos ajustar o saveCardChanges
-  const saveCardChanges = async (updatedCard: UICard) => {
+  // Function to save card changes using the UICard type
+  const saveCardChanges = async (updatedCard: any) => {
     try {
       const sectorId = SessionService.getSectorId();
       if (!sectorId) {
@@ -735,8 +715,6 @@ const CRMPage: React.FC = () => {
       setTimeout(() => {
         setSidebarOpen(false);
       }, 100);
-
-      addToast('Lead atualizado com sucesso', 'success');
     } catch (error) {
       console.error('Erro ao atualizar lead:', error);
       addToast('Erro ao atualizar lead', 'error');
@@ -986,13 +964,15 @@ const CRMPage: React.FC = () => {
               {cardTag.name}
             </span>
           )}
+        </div>
+        <div className="card-title">
+          {card.title}
           {getAssigneeInitials() && (
             <div className="card-assignee">
               <span className="assignee-initials">{getAssigneeInitials()}</span>
             </div>
           )}
         </div>
-        <span className="card-title">{card.title}</span>
         {card.content && <span className="card-content">{card.content}</span>}
         
         {(card.phone || card.email) && (
@@ -1081,13 +1061,15 @@ const CRMPage: React.FC = () => {
                 {cardTag.name}
               </span>
             )}
+          </div>
+          <div className="card-title">
+            {card.title}
             {getAssigneeInitials() && (
               <div className="card-assignee">
                 <span className="assignee-initials">{getAssigneeInitials()}</span>
               </div>
             )}
           </div>
-          <span className="card-title">{card.title}</span>
           {card.content && <span className="card-content">{card.content}</span>}
           
           {(card.phone || card.email) && (

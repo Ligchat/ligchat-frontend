@@ -1,17 +1,18 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import '../styles/Chat/ChatNew.css';
 import dayjs from 'dayjs';
-import Toast from '../components/Toast';
+import Toast, { ToastContainer } from '../components/Toast';
 import SessionService from '../services/SessionService';
-import { getContacts } from '../services/ContactService';
+import { getContacts, updateContact } from '../services/ContactService';
 import { sendMessage, sendFile } from '../services/WhatsappService';
-import { getSector, Sector } from '../services/SectorService'; 
-import { getMessagesByContactId, MessageResponse } from '../services/MessageService';
+import { getSector, Sector } from '../services/SectorService';
+import { getMessagesByContactId, MessageResponse, MessageType } from '../services/MessageService';
 import { AudioMessage } from '../components/AudioMessage';
-import { FiMail, FiPhone } from 'react-icons/fi';
+import { AudioRecorder } from '../components/AudioRecorder';
+import { FiMail, FiPhone, FiX, FiSend, FiMoreVertical, FiUserPlus, FiTag } from 'react-icons/fi';
 import { getAllUsers, User } from '../services/UserService';
 import { WebSocketService } from '../services/WebSocketService';
-import { MessageType } from '../services/MessageService';
+import { getTags, Tag } from '../services/LabelService';
 
 // Componente de ícone para anexos
 const AttachmentIcon = () => (
@@ -54,6 +55,18 @@ const CheckIcon = () => (
 const BackIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M20 11H7.83L13.42 5.41L12 4L4 12L12 20L13.41 18.59L7.83 13H20V11Z" fill="currentColor"/>
+  </svg>
+);
+
+const EditIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25ZM20.71 7.04C21.1 6.65 21.1 6.02 20.71 5.63L18.37 3.29C17.98 2.9 17.35 2.9 16.96 3.29L15.13 5.12L18.88 8.87L20.71 7.04Z" fill="currentColor"/>
+  </svg>
+);
+
+const UserIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="currentColor"/>
   </svg>
 );
 
@@ -145,7 +158,7 @@ const AudioWaveform = ({ duration = 30, isPlaying = false, isRecording = false }
 };
 
 // Tipos
-interface Contact {
+interface ContactData {
   id: number;
   name: string;
   tagId: number | null;
@@ -182,19 +195,32 @@ const formatPhoneNumber = (phone: string): string => {
   // Remove todos os caracteres não numéricos
   const numbers = phone.replace(/\D/g, '');
   
-  // Verifica se é um número de celular brasileiro (com ou sem código do país)
-  if (numbers.length === 11) { // Formato: (XX) XXXXX-XXXX
-    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
-  } else if (numbers.length === 10) { // Formato: (XX) XXXX-XXXX
-    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+  // Verifica se é um número de celular brasileiro
+  if (numbers.length === 13 && numbers.startsWith('55')) { // Com DDI: +55 (XX) XXXXX-XXXX
+    return `+55 (${numbers.slice(2, 4)}) ${numbers.slice(4, 9)}-${numbers.slice(9)}`;
+  } else if (numbers.length === 11) { // Sem DDI: (XX) XXXXX-XXXX
+    return `+55 (${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+  } else if (numbers.length === 10) { // Telefone fixo: (XX) XXXX-XXXX
+    return `+55 (${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
   }
   
-  // Retorna o número original se não se encaixar nos padrões acima
-  return phone;
+  // Se o número já começar com +55, não adiciona novamente
+  if (phone.startsWith('+55')) {
+    return phone;
+  }
+  
+  // Para outros formatos, adiciona +55 no início
+  return `+55 ${phone}`;
+};
+
+const getAvatarUrl = (name: string, existingUrl: string | null) => {
+  if (existingUrl) return existingUrl;
+  // Usar o nome como seed para gerar uma cor consistente
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&seed=${encodeURIComponent(name)}`;
 };
 
 const ChatNew: React.FC = () => {
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [selectedContact, setSelectedContact] = useState<ContactData | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -208,22 +234,27 @@ const ChatNew: React.FC = () => {
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<ContactData[]>([]);
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
-  
-  // Adicionando estado para controle de reprodução de áudio
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [playingAudioId, setPlayingAudioId] = useState<number | null>(null);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
-
-  // Define the state for selectedSector
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
+  const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedTagId, setSelectedTagId] = useState<number | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [isTransferLoading, setIsTransferLoading] = useState(false);
+  const [isTagLoading, setIsTagLoading] = useState(false);
 
   const webSocketRef = useRef<WebSocketService | null>(null);
+
+  const [audioChunks, setAudioChunks] = useState<BlobPart[]>([]);
 
   // Função para reproduzir/pausar áudio
   const toggleAudioPlayback = (messageId: number) => {
@@ -312,7 +343,7 @@ const ChatNew: React.FC = () => {
   }, [messages]);
 
   // Selecionar um contato
-  const handleContactSelect = (contact: Contact) => {
+  const handleContactSelect = (contact: ContactData) => {
     if (!selectedSectorId) return; // Não permite selecionar contato sem setor
     setSelectedContact(contact);
     
@@ -328,7 +359,12 @@ const ChatNew: React.FC = () => {
   };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info') => {
-    setToast({ message, type });
+    const id = Date.now();
+    setTimeout(() => {
+    }, 5000);
+  };
+
+  const removeToast = (id: number) => {
   };
 
   useEffect(() => {
@@ -559,54 +595,75 @@ const ChatNew: React.FC = () => {
     });
   };
 
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const handleSendAudio = async (audioBlob: Blob) => {
+    if (!selectedContact || !selectedSectorId) return;
 
-  const startRecording = async () => {
+    const tempId = Date.now();
+    const audioUrl = URL.createObjectURL(audioBlob);
+
+    // Adicionar mensagem temporária
+    const newMessage: Message = {
+      id: tempId,
+      content: '',
+      mediaType: 'audio',
+      mediaUrl: audioUrl,
+      fileName: `audio_${tempId}.webm`,
+      mimeType: 'audio/webm',
+      sectorId: Number(selectedSectorId),
+      contactID: selectedContact.id,
+      sentAt: new Date().toISOString(),
+      isSent: true,
+      isRead: false,
+      status: 'sending'
+    };
+
+    // Adiciona a mensagem temporária ao estado
+    setMessages(prev => [...prev, newMessage]);
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      const audioChunks: BlobPart[] = [];
+      const base64Audio = await fileToBase64(new File([audioBlob], `audio_${tempId}.webm`, { type: 'audio/webm' }));
+      const response = await sendFile({
+        base64File: base64Audio,
+        mediaType: 'audio/webm',
+        fileName: `audio_${tempId}.webm`,
+        caption: '',
+        recipient: selectedContact.number,
+        contactId: selectedContact.id,
+        sectorId: Number(selectedSectorId)
+      });
 
-      mediaRecorder.ondataavailable = (event) => {
-        audioChunks.push(event.data);
-      };
+      // Atualiza a mensagem temporária com os dados do servidor, mantendo o tipo como audio/webm
+      setMessages(prev => prev.map(msg => 
+        msg.id === tempId 
+          ? { 
+              ...response, 
+              mediaUrl: audioUrl, 
+              mediaType: 'audio',
+              mimeType: 'audio/webm',
+              status: 'sent' 
+            }
+          : msg
+      ));
 
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/mpeg' });
-        handleAudioRecordingComplete(audioBlob);
-      };
+      // Atualizar a última mensagem do contato na lista
+      setContacts(prevContacts => prevContacts.map(contact => 
+        contact.id === selectedContact.id
+          ? {
+              ...contact,
+              lastMessage: '🎤 Áudio enviado',
+              lastMessageTime: new Date().toISOString()
+            }
+          : contact
+      ));
 
-      setMediaRecorder(mediaRecorder);
-      mediaRecorder.start();
-      setIsRecording(true);
-      setRecordingTime(0);
-      
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-      
     } catch (error) {
+      console.error('Erro ao enviar áudio:', error);
+      setMessages(prev => prev.map(msg => 
+        msg.id === tempId 
+          ? { ...msg, status: 'error' }
+          : msg
+      ));
     }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      mediaRecorder.stop();
-      mediaRecorder.stream.getTracks().forEach(track => track.stop());
-    }
-    
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-    }
-    
-    setIsRecording(false);
-    setMediaRecorder(null);
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   // Atualizar o useEffect que monitora o selectedSectorId
@@ -631,7 +688,7 @@ const ChatNew: React.FC = () => {
 
         // Processar cada contato com suas mensagens mais recentes
         const contactsWithMessages = await Promise.all(
-          contactsResponse.data.map(async (contact: Contact) => {
+          contactsResponse.data.map(async (contact: ContactData) => {
             try {
               const messages = await getMessagesByContactId(contact.id);
               const lastMessage = messages[messages.length - 1];
@@ -660,7 +717,7 @@ const ChatNew: React.FC = () => {
 
               return {
                 ...contact,
-                profilePicture: contact.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=random`,
+                profilePicture: getAvatarUrl(contact.name, contact.avatarUrl),
                 lastMessage: lastMessagePreview,
                 lastMessageTime: lastMessageTime,
                 phoneNumber: contact.number
@@ -669,7 +726,7 @@ const ChatNew: React.FC = () => {
               console.error(`Erro ao buscar mensagens para o contato ${contact.id}:`, error);
               return {
                 ...contact,
-                profilePicture: contact.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=random`,
+                profilePicture: getAvatarUrl(contact.name, contact.avatarUrl),
                 lastMessage: 'Erro ao carregar mensagens',
                 lastMessageTime: contact.createdAt,
                 phoneNumber: contact.number
@@ -679,7 +736,7 @@ const ChatNew: React.FC = () => {
         );
 
         // Ordenar contatos por data da última mensagem (mais recentes primeiro)
-        const sortedContacts = contactsWithMessages.sort((a: Contact, b: Contact) => {
+        const sortedContacts = contactsWithMessages.sort((a: ContactData, b: ContactData) => {
           const dateA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
           const dateB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
           return dateB - dateA;
@@ -749,6 +806,9 @@ const ChatNew: React.FC = () => {
         return nameParts[0].substring(0, 2).toUpperCase();
       })() : null;
 
+      // Encontrar a tag do contato
+      const tag = tags.find(t => t.id === Number(contact.tagId));
+
       return (
         <div
           key={contact.id}
@@ -757,16 +817,24 @@ const ChatNew: React.FC = () => {
         >
           <div className="chat-new-contact-avatar">
             <img 
-              src={contact.profilePicture} 
+              src={getAvatarUrl(contact.name, contact.avatarUrl)}
               alt={contact.name}
+              style={tag ? {
+                borderColor: tag.color
+              } : undefined}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=random`;
+                target.src = getAvatarUrl(contact.name, null);
               }}
             />
             {assigneeInitials && (
               <div className="chat-new-contact-assignee">
-                <span className="assignee-initials" title={assignedUser?.name}>{assigneeInitials}</span>
+                <span 
+                  className="assignee-initials" 
+                  title={assignedUser?.name}
+                >
+                  {assigneeInitials}
+                </span>
               </div>
             )}
           </div>
@@ -815,66 +883,6 @@ const ChatNew: React.FC = () => {
       return <span className="chat-new-message-status">✓✓</span>;
     } else {
       return <span className="chat-new-message-status">✓</span>;
-    }
-  };
-
-  const handleAudioRecordingComplete = async (audioBlob: Blob) => {
-    if (!selectedContact || !selectedSectorId) return;
-
-    const tempId = Date.now();
-    const newMessage: Message = {
-      id: tempId,
-      content: '',
-      isSent: true,
-      sentAt: new Date().toISOString(),
-      isRead: false,
-      mediaType: 'audio',
-      mediaUrl: URL.createObjectURL(audioBlob),
-      fileName: `audio_${Date.now()}.mp3`,
-      mimeType: 'audio/mpeg',
-      sectorId: Number(selectedSectorId),
-      contactID: selectedContact.id,
-      status: 'sending'
-    };
-
-    setMessages(prev => [...prev, newMessage]);
-
-    try {
-      const base64Audio = await fileToBase64(new File([audioBlob], 'audio.mp3', { type: 'audio/mpeg' }));
-      const response = await sendFile({
-        base64File: base64Audio,
-        mediaType: 'audio/mpeg',
-        fileName: `audio_${Date.now()}.mp3`,
-        caption: '',
-        recipient: selectedContact.number,
-        contactId: selectedContact.id,
-        sectorId: Number(selectedSectorId)
-      });
-
-      setMessages(prev => prev.map(msg => 
-        msg.id === tempId 
-          ? { ...msg, id: response.id, status: 'sent' }
-          : msg
-      ));
-
-      // Atualizar a última mensagem do contato na lista
-      setContacts(prevContacts => prevContacts.map(contact => 
-        contact.id === selectedContact.id
-          ? {
-              ...contact,
-              lastMessage: '🎤 Áudio enviado',
-              lastMessageTime: new Date().toISOString()
-            }
-          : contact
-      ));
-
-    } catch (error) {
-      console.error('Erro ao enviar áudio:', error);
-      setMessages(prev => prev.map(msg => 
-        msg.id === tempId 
-          ? { ...msg, status: 'error' }
-          : msg
-      ));
     }
   };
 
@@ -934,7 +942,10 @@ const ChatNew: React.FC = () => {
           return (
             <AudioMessage
               src={message.mediaUrl}
-              isSent={message.isSent}
+              isSent={message.isSent || message.status === 'sending' || message.status === 'sent'}
+              onCancel={message.status === 'sending' ? () => {
+                setMessages(prev => prev.filter(m => m.id !== message.id));
+              } : undefined}
             />
           );
 
@@ -948,17 +959,21 @@ const ChatNew: React.FC = () => {
       }
     };
 
+    // Determinar se a mensagem deve ser exibida como enviada
+    // Agora considera APENAS o isSent para determinar se a mensagem foi enviada
+    const shouldRenderAsSent = message.isSent;
+
     return (
       <div 
         key={message.id} 
-        className={`chat-new-message ${message.isSent ? 'sent' : 'received'}`}
+        className={`chat-new-message ${shouldRenderAsSent ? 'sent' : 'received'}`}
       >
         {renderMediaContent()}
         <div className="chat-new-message-info">
           <span className="chat-new-message-time">
             {dayjs(message.sentAt).format('HH:mm')}
           </span>
-          {message.isSent && renderMessageStatus(message)}
+          {shouldRenderAsSent && renderMessageStatus(message)}
         </div>
       </div>
     );
@@ -986,9 +1001,6 @@ const ChatNew: React.FC = () => {
         status: 'sent'
       };
       
-      console.log('Contato selecionado:', selectedContact?.id);
-      console.log('Message contactId:', message.contactId);
-      
       if (selectedContact && message.contactId === selectedContact.id) {
         setMessages(prev => [...prev, normalizedMessage]);
       }
@@ -1005,25 +1017,22 @@ const ChatNew: React.FC = () => {
         sectorId: message.sectorId,
         contactID: contactId,
         sentAt: message.sentAt || new Date().toISOString(),
-        isSent: false,
+        isSent: message.isAgent || false,
         isRead: false,
         status: 'sent'
       };
 
-      console.log('Mensagem normalizada:', normalizedMessage);
-      console.log('Contato selecionado:', selectedContact?.id);
-      console.log('Message contactID:', normalizedMessage.contactID);
-
       // Verificar se a mensagem é para o contato atual e atualizar o estado
       if (selectedContact && (Number(normalizedMessage.contactID) === selectedContact.id)) {
-        console.log('Adicionando mensagem ao chat:', normalizedMessage);
         setMessages(prevMessages => {
-          // Verificar se a mensagem já existe
-          const messageExists = prevMessages.some(m => m.id === normalizedMessage.id);
+          // Verificar se a mensagem já existe ou se é uma mensagem de áudio que já está sendo enviada
+          const messageExists = prevMessages.some(m => 
+            m.id === normalizedMessage.id || 
+            (m.mediaType === 'audio' && m.status === 'sending' && normalizedMessage.mediaType === 'audio')
+          );
+          
           if (!messageExists) {
-            const newMessages = [...prevMessages, normalizedMessage];
-            console.log('Nova lista de mensagens:', newMessages);
-            return newMessages;
+            return [...prevMessages, normalizedMessage];
           }
           return prevMessages;
         });
@@ -1068,14 +1077,14 @@ const ChatNew: React.FC = () => {
           if (contact.id === contactId) {
             return {
               ...contact,
-              profilePicture: contact.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=random`,
+              profilePicture: getAvatarUrl(contact.name, contact.avatarUrl),
               lastMessage: messagePreview,
               lastMessageTime: new Date().toISOString()
             };
           }
           return {
             ...contact,
-            profilePicture: contact.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=random`,
+            profilePicture: getAvatarUrl(contact.name, contact.avatarUrl),
             lastMessage: existingContact?.lastMessage || 'Nenhuma mensagem',
             lastMessageTime: existingContact?.lastMessageTime || contact.createdAt
           };
@@ -1119,6 +1128,121 @@ const ChatNew: React.FC = () => {
     };
   }, [messageHandler, selectedContact]);
 
+  const fetchInitialData = async () => {
+    setIsLoading(true);
+    try {
+      const sectorId = SessionService.getSectorId();
+      if (!sectorId) {
+        setMessages([]);
+        setTags([]);
+        setContacts([]);
+        return;
+      }
+
+      // Buscar tags e contatos primeiro
+      const [tagsResponse, contactsResponse] = await Promise.all([
+        getTags(sectorId),
+        getContacts(sectorId)
+      ]);
+
+      // Definir tags e contatos
+      setTags(tagsResponse.data || []);
+      setContacts(contactsResponse.data || []);
+    } catch (error) {
+      console.error('Erro ao buscar dados iniciais:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInitialData();
+  }, [selectedSectorId]);
+
+  // Fechar menu quando clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleTransferContact = async () => {
+    if (!selectedContact || !selectedUserId) return;
+
+    setIsTransferLoading(true);
+    try {
+      await updateContact(selectedContact.id, {
+        name: selectedContact.name,
+        email: selectedContact.email,
+        phoneWhatsapp: selectedContact.number,
+        notes: selectedContact.notes,
+        sectorId: selectedContact.sectorId,
+        isActive: selectedContact.isActive,
+        priority: selectedContact.priority,
+        aiActive: selectedContact.aiActive,
+        assignedTo: selectedUserId,
+        tagId: selectedContact.tagId,
+        avatarUrl: selectedContact.avatarUrl
+      });
+
+      setContacts(prevContacts => prevContacts.map(contact => 
+        contact.id === selectedContact.id
+          ? { ...contact, assignedTo: selectedUserId }
+          : contact
+      ));
+
+      showToast('Contato transferido com sucesso', 'success');
+    } catch (error) {
+      console.error('Erro ao transferir contato:', error);
+      showToast('Erro ao transferir contato', 'error');
+    } finally {
+      setIsTransferLoading(false);
+      setShowTransferModal(false);
+      setSelectedUserId(null);
+    }
+  };
+
+  const handleChangeTag = async () => {
+    if (!selectedContact) return;
+
+    setIsTagLoading(true);
+    try {
+      await updateContact(selectedContact.id, {
+        name: selectedContact.name,
+        email: selectedContact.email,
+        phoneWhatsapp: selectedContact.number,
+        notes: selectedContact.notes,
+        sectorId: selectedContact.sectorId,
+        isActive: selectedContact.isActive,
+        priority: selectedContact.priority,
+        aiActive: selectedContact.aiActive,
+        assignedTo: selectedContact.assignedTo,
+        tagId: selectedTagId || null,
+        avatarUrl: selectedContact.avatarUrl
+      });
+
+      setContacts(prevContacts => prevContacts.map(contact => 
+        contact.id === selectedContact.id
+          ? { ...contact, tagId: selectedTagId || null }
+          : contact
+      ));
+
+      showToast(selectedTagId ? 'Tag alterada com sucesso' : 'Tag removida com sucesso', 'success');
+    } catch (error) {
+      console.error('Erro ao alterar tag:', error);
+      showToast('Erro ao alterar tag', 'error');
+    } finally {
+      setIsTagLoading(false);
+      setShowTagModal(false);
+      setSelectedTagId(null);
+    }
+  };
+
   return (
     <div className="chat-new-container dark-mode">
       {/* Sidebar de contatos */}
@@ -1140,7 +1264,6 @@ const ChatNew: React.FC = () => {
       <div className={`chat-new-main ${!selectedSectorId ? 'disabled' : ''}`}>
         {selectedContact ? (
           <>
-            {/* Cabeçalho do chat */}
             <div className="chat-new-header">
               {isMobile && (
                 <button 
@@ -1153,49 +1276,86 @@ const ChatNew: React.FC = () => {
               )}
               <div className="chat-new-header-contact">
                 <div className="chat-new-header-avatar">
-                  <img src={selectedContact.profilePicture} alt={selectedContact.name} />
+                  <img 
+                    src={selectedContact.profilePicture} 
+                    alt={selectedContact.name}
+                    style={selectedContact.tagId ? {
+                      borderColor: tags.find(t => t.id === selectedContact.tagId)?.color
+                    } : undefined}
+                  />
                 </div>
                 <div className="chat-new-header-info">
-                  <div className="chat-new-header-name">{selectedContact.name}</div>
-                  <div className="chat-new-header-phone">
-                    {selectedContact.number && formatPhoneNumber(selectedContact.number)}
+                  <div className="chat-new-header-group">
+                    <div className="chat-new-header-left">
+                      <span className="chat-new-header-name">
+                        {selectedContact.name}
+                      </span>
+                      {selectedContact.number && (
+                        <span className="chat-new-header-phone">
+                          <FiPhone />
+                          {formatPhoneNumber(selectedContact.number)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="chat-new-header-right">
+                      {selectedContact.tagId && (
+                        <span 
+                          className="chat-new-header-tag"
+                          style={{
+                            backgroundColor: tags.find(t => t.id === selectedContact.tagId)?.color,
+                            color: '#fff'
+                          }}
+                        >
+                          {tags.find(t => t.id === selectedContact.tagId)?.name}
+                        </span>
+                      )}
+                      {selectedContact.assignedTo && (
+                        <span className="chat-new-header-assigned">
+                          <UserIcon />
+                          <span>{users.find(u => u.id === selectedContact.assignedTo)?.name}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-              <div className="chat-new-header-actions">
+              <div className="chat-new-header-actions" ref={menuRef}>
                 <button 
-                  className="chat-new-header-button" 
-                  title="Informações do contato"
-                  disabled={!selectedSectorId}
+                  className="chat-new-header-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(!showMenu);
+                  }}
                 >
-                  ℹ️
+                  <FiMoreVertical />
                 </button>
-                <div className="chat-new-dropdown">
-                  <button 
-                    className="chat-new-header-button" 
-                    onClick={() => selectedSectorId && setShowDropdown(!showDropdown)}
-                    title="Mais opções"
-                    disabled={!selectedSectorId}
-                  >
-                    ⋮
-                  </button>
-                  {showDropdown && selectedSectorId && (
-                    <div className="chat-new-dropdown-menu">
-                      <div className="chat-new-dropdown-item">
-                        <span>📌</span>
-                        <span>Fixar conversa</span>
-                      </div>
-                      <div className="chat-new-dropdown-item">
-                        <span>🔇</span>
-                        <span>Silenciar notificações</span>
-                      </div>
-                      <div className="chat-new-dropdown-item">
-                        <span>🗑️</span>
-                        <span>Apagar conversa</span>
-                      </div>
+                {showMenu && (
+                  <div className="chat-new-header-menu">
+                    <div 
+                      className="chat-new-header-menu-item"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowTransferModal(true);
+                        setShowMenu(false);
+                      }}
+                    >
+                      <FiUserPlus />
+                      Transferir contato
                     </div>
-                  )}
-                </div>
+                    <div className="chat-new-header-menu-divider" />
+                    <div 
+                      className="chat-new-header-menu-item"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowTagModal(true);
+                        setShowMenu(false);
+                      }}
+                    >
+                      <FiTag />
+                      Alterar tag
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1208,14 +1368,10 @@ const ChatNew: React.FC = () => {
             {/* Área de input */}
             <div className="chat-new-input-area">
               {isRecording ? (
-                <div className="chat-new-recording-indicator">
-                  <div className="chat-new-recording-pulse"></div>
-                  <div className="chat-new-recording-waveform">
-                    <AudioWaveform isPlaying={false} isRecording={true} />
-                  </div>
-                  <span className="chat-new-recording-time">{formatTime(recordingTime)}</span>
-                  <span className="chat-new-recording-cancel" onClick={stopRecording}>Cancelar</span>
-                </div>
+                <AudioRecorder
+                  onSend={handleSendAudio}
+                  onCancel={() => setIsRecording(false)}
+                />
               ) : (
                 <div className="chat-new-input-container">
                   <textarea
@@ -1252,8 +1408,8 @@ const ChatNew: React.FC = () => {
                       <button 
                         className="chat-new-input-button" 
                         title="Gravar áudio"
-                        onClick={startRecording}
-                        disabled={!selectedSectorId || isRecording}
+                        onClick={() => setIsRecording(true)}
+                        disabled={!selectedSectorId}
                       >
                         <MicIcon />
                       </button>
@@ -1290,14 +1446,91 @@ const ChatNew: React.FC = () => {
           </div>
         )}
       </div>
-      
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-          duration={5000}
-        />
+
+      {/* Modal de transferência */}
+      {showTransferModal && (
+        <div className="chat-new-modal">
+          <div className="chat-new-modal-content">
+            <div className="chat-new-modal-header">
+              <h3 className="chat-new-modal-title">Transferir contato</h3>
+            </div>
+            <div className="chat-new-modal-body">
+              <select 
+                className="chat-new-modal-select"
+                value={selectedUserId || ''}
+                onChange={(e) => setSelectedUserId(Number(e.target.value))}
+              >
+                <option value="">Selecione um usuário</option>
+                {users.map(user => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="chat-new-modal-actions">
+              <button 
+                className="chat-new-modal-button cancel"
+                onClick={() => {
+                  setShowTransferModal(false);
+                  setSelectedUserId(null);
+                }}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="chat-new-modal-button confirm"
+                onClick={handleTransferContact}
+                disabled={!selectedUserId || isTransferLoading}
+              >
+                {isTransferLoading ? 'Transferindo...' : 'Transferir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de tags */}
+      {showTagModal && (
+        <div className="chat-new-modal">
+          <div className="chat-new-modal-content">
+            <div className="chat-new-modal-header">
+              <h3 className="chat-new-modal-title">Alterar tag</h3>
+            </div>
+            <div className="chat-new-modal-body">
+              <select 
+                className="chat-new-modal-select"
+                value={selectedTagId || ''}
+                onChange={(e) => setSelectedTagId(Number(e.target.value))}
+              >
+                <option value="">Sem tag</option>
+                {tags.map(tag => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="chat-new-modal-actions">
+              <button 
+                className="chat-new-modal-button cancel"
+                onClick={() => {
+                  setShowTagModal(false);
+                  setSelectedTagId(null);
+                }}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="chat-new-modal-button confirm"
+                onClick={handleChangeTag}
+                disabled={isTagLoading}
+              >
+                {isTagLoading ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

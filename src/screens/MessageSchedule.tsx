@@ -75,12 +75,6 @@ const Icons = {
   ),
 };
 
-interface User {
-  id: number;
-  name: string;
-  photoUrl?: string;
-}
-
 interface Message {
   id?: number;
   title: string;
@@ -88,17 +82,10 @@ interface Message {
   description: string;
   labels: string[];
   contactId: number | null;
-  createdBy: User;
   contact: Contact;
 }
 
 const SCOPES = 'https://www.googleapis.com/auth/calendar';
-
-const MOCK_USER = {
-  id: 1,
-  name: "Admin",
-  photoUrl: "https://ui-avatars.com/api/?name=Admin&background=random"
-};
 
 const MessageSchedule: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -116,7 +103,6 @@ const MessageSchedule: React.FC = () => {
     description: '',
     labels: [],
     contactId: null,
-    createdBy: {} as User,
     contact: {} as Contact
   });
   const [selectedSector, setSelectedSector] = useState<number | null>(null);
@@ -172,7 +158,6 @@ const MessageSchedule: React.FC = () => {
             description: msg.messageText,
             labels: msg.tagIds ? msg.tagIds.split(',') : [],
             contactId: defaultContact?.id || null,
-            createdBy: MOCK_USER,
             contact: defaultContact
           };
         });
@@ -319,7 +304,6 @@ const MessageSchedule: React.FC = () => {
         description: message.description,
         labels: message.labels,
         contactId: message.contactId,
-        createdBy: message.createdBy,
         contact: message.contact,
       });
     } else {
@@ -329,7 +313,6 @@ const MessageSchedule: React.FC = () => {
         description: '',
         labels: [],
         contactId: null,
-        createdBy: {} as User,
         contact: {} as Contact
       });
     }
@@ -364,21 +347,18 @@ const MessageSchedule: React.FC = () => {
     });
   };
 
-  const removeTag = (tagId: string) => {
+  const removeTag = () => {
     setNewMessage(prev => ({
       ...prev,
-      labels: prev.labels.filter(id => id !== tagId)
+      labels: []
     }));
   };
 
   const toggleTagSelection = (tagId: string) => {
-    setNewMessage(prev => {
-      const isSelected = prev.labels.includes(tagId);
-      return {
-        ...prev,
-        labels: isSelected ? prev.labels.filter(id => id !== tagId) : [...prev.labels, tagId]
-      };
-    });
+    setNewMessage(prev => ({
+      ...prev,
+      labels: [tagId]
+    }));
     setIsTagsDropdownOpen(false);
   };
 
@@ -407,18 +387,18 @@ const MessageSchedule: React.FC = () => {
     }
 
     return (
-      <div className="message-card">
-        <div className="message-header">
-          <h3 className="message-title">{message.title}</h3>
-          <div className="message-actions">
+      <div className="message-schedule-card">
+        <div className="message-schedule-card-header">
+          <h3 className="message-schedule-card-title">{message.title}</h3>
+          <div className="message-schedule-card-actions">
             <button 
-              className="action-button edit"
+              className="message-schedule-action-button edit"
               onClick={() => showDrawer(index)}
             >
               <Icons.Edit />
             </button>
             <button 
-              className="action-button delete"
+              className="message-schedule-action-button delete"
               onClick={() => setConfirmDeleteIndex(index)}
             >
               <Icons.Delete />
@@ -426,39 +406,34 @@ const MessageSchedule: React.FC = () => {
           </div>
         </div>
         
-        <div className="message-creator">
-          <img 
-            src={message.createdBy.photoUrl || '/default-avatar.png'} 
-            alt={message.createdBy.name}
-            className="creator-avatar"
-          />
-          <span className="creator-name">{message.createdBy.name}</span>
+        <div className="message-schedule-card-recipient">
+          <span className="message-schedule-recipient-name">{message.contact.name}</span>
         </div>
 
-        <div className="message-recipient">
-          <span className="recipient-label">Para:</span>
-          <span className="recipient-name">{message.contact.name}</span>
-        </div>
-
-        <div className="message-date">
+        <div className="message-schedule-card-date">
+          <Icons.Calendar />
           {dayjs(message.date).format('DD/MM/YYYY HH:mm')}
         </div>
         
-        <p className="message-description">
+        <p className="message-schedule-card-description">
           {message.description}
         </p>
         
-        <div className="labels-section">
-          <div className="labels-title">Etiquetas</div>
-          <div className="labels-container">
-            {message.labels.map((labelId) => {
-              const tag = tags.find(t => t.id === Number(labelId));
-              return tag ? (
-                <span key={labelId} className="label-tag">
-                  {tag.name}
-                </span>
-              ) : null;
-            })}
+        <div className="message-schedule-labels-section">
+          <div className="message-schedule-labels-title">Etiquetas do usuário</div>
+          <div className="message-schedule-labels-container">
+            {message.labels.length > 0 ? (
+              (() => {
+                const tag = tags.find(t => t.id === Number(message.labels[0]));
+                return tag ? (
+                  <span key={tag.id} className="message-schedule-label-tag">
+                    {tag.name}
+                  </span>
+                ) : null;
+              })()
+            ) : (
+              <span className="message-schedule-label-tag no-tags">Não definido</span>
+            )}
           </div>
         </div>
       </div>
@@ -548,54 +523,29 @@ const MessageSchedule: React.FC = () => {
         </div>
 
         <div className="form-group">
-          <label className="form-label">Etiquetas</label>
-          <div className="selected-tags">
-            {newMessage.labels.map((labelId) => {
-              const tag = tags.find(t => t.id === Number(labelId));
-              return tag ? (
-                <span 
-                  key={labelId} 
-                  className="selected-tag"
-                  style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: `${tag.color}40` }}
-                >
-                  {tag.name}
-                  <span 
-                    className="tag-remove"
-                    onClick={() => removeTag(String(tag.id))}
-                  >
-                    ×
-                  </span>
-                </span>
-              ) : null;
-            })}
-          </div>
-          <div className="tags-dropdown">
-            <button
-              className="form-input"
-              onClick={() => setIsTagsDropdownOpen(!isTagsDropdownOpen)}
-            >
-              Selecionar etiquetas
-            </button>
-            {isTagsDropdownOpen && (
-              <div className="tags-dropdown-content">
-                {tags.map((tag) => (
-                  <div
-                    key={tag.id}
-                    className={`tags-dropdown-item ${
-                      newMessage.labels.includes(String(tag.id)) ? 'selected' : ''
-                    }`}
-                    onClick={() => toggleTagSelection(String(tag.id))}
-                    style={{ 
-                      backgroundColor: newMessage.labels.includes(String(tag.id)) ? `${tag.color}20` : 'transparent',
-                      color: tag.color
-                    }}
-                  >
-                    {tag.name}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <label className="form-label">Etiquetas do usuário</label>
+          <select
+            className={`form-select`}
+            value={newMessage.labels[0] || ''}
+            onChange={(e) => {
+              if (e.target.value === '') {
+                removeTag();
+              } else {
+                toggleTagSelection(e.target.value);
+              }
+            }}
+          >
+            <option value="">Selecione uma etiqueta</option>
+            {tags.map((tag) => (
+              <option 
+                key={tag.id} 
+                value={tag.id}
+                style={{ color: tag.color }}
+              >
+                {tag.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="form-actions">
@@ -611,36 +561,36 @@ const MessageSchedule: React.FC = () => {
   };
 
   return (
-    <div className="schedule-screen">
+    <div className="message-schedule-screen">
       {isLoading && (
         <div className="loading-overlay">
           <div className="spinner"></div>
         </div>
       )}
 
-      <div className="schedule-header">
-        <div className="header-content">
+      <div className="message-schedule-header">
+        <div className="message-schedule-header-content">
           <h1>Agendamento de mensagem</h1>
-          <p className="header-description">
+          <p className="message-schedule-header-description">
             Gerencie suas mensagens agendadas
           </p>
         </div>
       </div>
 
-      <div className="schedule-content">
+      <div className="message-schedule-content">
         {!selectedSector ? (
           <div className="no-sector-text">
             Nenhum setor selecionado
           </div>
         ) : (
-          <div className="messages-grid">
+          <div className="message-schedule-grid">
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {renderMessageCard(message, index)}
               </div>
             ))}
             <div 
-              className="add-message-card"
+              className="message-schedule-add-card"
               onClick={() => showDrawer(null)}
             >
               <Icons.Plus />

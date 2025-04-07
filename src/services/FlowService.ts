@@ -1,4 +1,3 @@
-import { message } from 'antd';
 import SessionService from './SessionService';
 import axios from 'axios';
 

@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Input, Button, Typography, message, Row, Col, List, Modal, Spin } from 'antd';
+import { Button, Input, Modal } from '../components/CustomComponents';
 import SessionService from '../services/SessionService';
 import { VariableInterface, getVariablesBySector, editVariable, createVariable, deleteVariable } from '../services/VariablesService';
 import LoadingOverlay from '../components/LoadingOverlay';
-
-const { Title } = Typography;
 
 const VariablesPage: React.FC = () => {
   const [variableName, setVariableName] = useState('');
@@ -37,12 +35,12 @@ const VariablesPage: React.FC = () => {
     }
   };
 
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setVariableName(e.target.value);
+  const handleNameChange = (value: string) => {
+    setVariableName(value);
   };
 
-  const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setVariableValue(e.target.value);
+  const handleValueChange = (value: string) => {
+    setVariableValue(value);
   };
 
   const handleAddVariable = async () => {
@@ -60,10 +58,10 @@ const VariablesPage: React.FC = () => {
       setIsSaving(true);
       if (isEditing && editIndex !== null) {
         await editVariable(variables[editIndex].id!, variable);
-        message.success(`Variável "${variableName}" editada com sucesso!`);
+        console.log('success', `Variável "${variableName}" editada com sucesso!`);
       } else {
         const createdVariable = await createVariable(variable);
-        message.success(`Variável "${variableName}" com valor "${variableValue}" cadastrada com sucesso!`);
+        console.log('success', `Variável "${variableName}" com valor "${variableValue}" cadastrada com sucesso!`);
         setVariables([...variables, createdVariable]);
       }
       fetchVariables();
@@ -88,18 +86,16 @@ const VariablesPage: React.FC = () => {
   };
 
   const handleDeleteVariable = async (index: number) => {
-    Modal.confirm({
-      title: 'Tem certeza que deseja excluir esta variável?',
-      onOk: async () => {
-        try {
-          await deleteVariable(variables[index].id!);
-          message.success('Variável excluída com sucesso!');
-          fetchVariables();
-        } catch (error) {
-          console.error('Erro ao excluir variável:', error);
-        }
-      },
-    });
+    const confirmDelete = window.confirm('Tem certeza que deseja excluir esta variável?');
+    if (confirmDelete) {
+      try {
+        await deleteVariable(variables[index].id!);
+        console.log('success', 'Variável excluída com sucesso!');
+        fetchVariables();
+      } catch (error) {
+        console.error('Erro ao excluir variável:', error);
+      }
+    }
   };
 
   const handleCancel = () => {
@@ -111,8 +107,8 @@ const VariablesPage: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: '24px' }}>
-                    <Title style={{color: '#1890ff'}} level={3}>Cadastro de Variáveis</Title>
+    <div className="p-6">
+      <h3 className="text-2xl text-blue-600 mb-6">Cadastro de Variáveis</h3>
       {isLoading ? (
         selectedSector === null ? (
           <div className="flex justify-center items-center h-64 text-lg text-gray-500">
@@ -124,36 +120,34 @@ const VariablesPage: React.FC = () => {
       ) : (
         <>
           {selectedSector !== null && (
-            <Card>
-              <Button type="primary" onClick={() => setIsModalVisible(true)} style={{ marginBottom: '16px' }}>
+            <div className="bg-white rounded-lg shadow p-6">
+              <Button type="primary" onClick={() => setIsModalVisible(true)} className="mb-4">
                 {isEditing ? 'Salvar' : 'Cadastrar'}
               </Button>
-              <List
-                style={{ marginTop: '24px' }}
-                header={
-                  <Row style={{ width: '100%' }}>
-                    <Col span={8}><Title level={4}>Nome</Title></Col>
-                    <Col span={8}><Title level={4}>Valor</Title></Col>
-                    <Col span={8}><Title level={4}>Ações</Title></Col>
-                  </Row>
-                }
-                bordered
-                dataSource={variables}
-                locale={{ emptyText: 'Nenhuma variável cadastrada' }}
-                renderItem={(item, index) => (
-                  <List.Item>
-                    <Row style={{ width: '100%' }}>
-                      <Col span={8}><strong>{item.name}</strong></Col>
-                      <Col span={8}>{item.value}</Col>
-                      <Col span={8}>
-                        <Button type="link" onClick={() => handleEditVariable(index)}>Editar</Button>
-                        <Button type="link" danger onClick={() => handleDeleteVariable(index)}>Excluir</Button>
-                      </Col>
-                    </Row>
-                  </List.Item>
-                )}
-              />
-            </Card>
+              <div className="mt-6">
+                <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 rounded-t-lg">
+                  <div className="col-span-4"><h4 className="text-lg font-semibold">Nome</h4></div>
+                  <div className="col-span-4"><h4 className="text-lg font-semibold">Valor</h4></div>
+                  <div className="col-span-4"><h4 className="text-lg font-semibold">Ações</h4></div>
+                </div>
+                <div className="border rounded-b-lg">
+                  {variables.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500">Nenhuma variável cadastrada</div>
+                  ) : (
+                    variables.map((item, index) => (
+                      <div key={index} className="grid grid-cols-12 gap-4 p-4 border-t">
+                        <div className="col-span-4"><strong>{item.name}</strong></div>
+                        <div className="col-span-4">{item.value}</div>
+                        <div className="col-span-4">
+                          <Button type="text" onClick={() => handleEditVariable(index)}>Editar</Button>
+                          <Button type="text" onClick={() => handleDeleteVariable(index)}>Excluir</Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
           )}
 
           {selectedSector === null && (
@@ -165,30 +159,36 @@ const VariablesPage: React.FC = () => {
       )}
 
       <Modal
-        title={isEditing ? 'Editar Variável' : 'Cadastrar Variável'}
         visible={isModalVisible}
-        onOk={handleAddVariable}
-        onCancel={handleCancel}
-        okText={isEditing ? 'Salvar' : 'Cadastrar'}
-        cancelText="Cancelar"
-        confirmLoading={isSaving}
+        onClose={handleCancel}
+        title={isEditing ? 'Editar Variável' : 'Cadastrar Variável'}
+        footer={
+          <>
+            <Button type="text" onClick={handleCancel}>
+              Cancelar
+            </Button>
+            <Button type="primary" onClick={handleAddVariable} disabled={isSaving}>
+              {isEditing ? 'Salvar' : 'Cadastrar'}
+            </Button>
+          </>
+        }
       >
-        <Row gutter={[16, 16]}>
-          <Col span={12}>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
             <Input
               value={variableName}
               onChange={handleNameChange}
               placeholder="Digite o nome da variável"
             />
-          </Col>
-          <Col span={12}>
+          </div>
+          <div>
             <Input
               value={variableValue}
               onChange={handleValueChange}
               placeholder="Digite o valor da variável"
             />
-          </Col>
-        </Row>
+          </div>
+        </div>
       </Modal>
     </div>
   );

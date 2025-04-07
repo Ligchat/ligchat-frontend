@@ -1,0 +1,125 @@
+.audio-recorder {
+  background-color: #1a1a1a;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 8px 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 100%;
+  min-width: 280px;
+}
+
+.audio-recorder-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.audio-recorder-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.audio-recorder-indicator::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #1e3a8a, #60a5fa);
+  width: 100%;
+  animation: progress 2s ease-in-out infinite;
+}
+
+.audio-recorder-pulse {
+  width: 8px;
+  height: 8px;
+  background-color: #60a5fa;
+  border-radius: 50%;
+  position: relative;
+}
+
+.audio-recorder-pulse::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: #60a5fa;
+  border-radius: 50%;
+  animation: ripple 1.5s ease-in-out infinite;
+  opacity: 0.5;
+}
+
+.audio-recorder-time {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.audio-recorder-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.audio-recorder-button {
+  background: none;
+  border: none;
+  padding: 12px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+}
+
+.audio-recorder-button.cancel {
+  background-color: rgba(255, 68, 68, 0.9);
+}
+
+.audio-recorder-button.send {
+  background-color: rgba(76, 175, 80, 0.9);
+}
+
+.audio-recorder-button:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
+.audio-recorder-button:active {
+  transform: scale(0.95);
+}
+
+@keyframes progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}

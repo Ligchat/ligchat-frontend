@@ -1,28 +1,24 @@
 import React from 'react';
-import { Layout, Typography, Divider } from 'antd';
-import '../styles/PrivacyPolicyPage.css'; // Importar o CSS
-
-const { Content } = Layout;
-const { Title, Paragraph } = Typography;
+import '../styles/PrivacyPolicyPage.css';
 
 const PrivacyPolicyPage: React.FC = () => {
   return (
-    <Layout className="privacy-policy-layout">
-      <Content className="privacy-policy-content">
-        <Title level={2} className="privacy-policy-title">Política de Privacidade</Title>
-        <Paragraph className="privacy-policy-paragraph">
+    <div className="privacy-policy-layout">
+      <main className="privacy-policy-content">
+        <h1 className="privacy-policy-title">Política de Privacidade</h1>
+        <p className="privacy-policy-paragraph">
           <strong>Última atualização:</strong> 17/10/2024
-        </Paragraph>
+        </p>
 
-        <Paragraph className="privacy-policy-paragraph">
+        <p className="privacy-policy-paragraph">
           Bem-vindo à nossa plataforma SaaS. Sua privacidade é importante para nós. Esta Política de Privacidade
           descreve como coletamos, usamos, compartilhamos e protegemos suas informações pessoais.
-        </Paragraph>
+        </p>
 
-        <Divider />
+        <hr className="privacy-policy-divider" />
 
-        <Title level={3} className="privacy-policy-title">1. Informações que Coletamos</Title>
-        <Paragraph className="privacy-policy-paragraph">
+        <h2 className="privacy-policy-title">1. Informações que Coletamos</h2>
+        <div className="privacy-policy-paragraph">
           <ul className="privacy-policy-list">
             <li>
               <strong>Dados de Registro:</strong> Nome, endereço de e-mail, número de telefone e outras informações
@@ -41,12 +37,12 @@ const PrivacyPolicyPage: React.FC = () => {
               usuário e personalizar conteúdo.
             </li>
           </ul>
-        </Paragraph>
+        </div>
 
-        <Divider />
+        <hr className="privacy-policy-divider" />
 
-        <Title level={3} className="privacy-policy-title">2. Como Usamos suas Informações</Title>
-        <Paragraph className="privacy-policy-paragraph">
+        <h2 className="privacy-policy-title">2. Como Usamos suas Informações</h2>
+        <div className="privacy-policy-paragraph">
           <ul className="privacy-policy-list">
             <li>
               <strong>Fornecimento de Serviços:</strong> Para operar e manter a plataforma.
@@ -62,12 +58,12 @@ const PrivacyPolicyPage: React.FC = () => {
               serviços.
             </li>
           </ul>
-        </Paragraph>
+        </div>
 
-        <Divider />
+        <hr className="privacy-policy-divider" />
 
-        <Title level={3} className="privacy-policy-title">3. Compartilhamento de Informações</Title>
-        <Paragraph className="privacy-policy-paragraph">
+        <h2 className="privacy-policy-title">3. Compartilhamento de Informações</h2>
+        <div className="privacy-policy-paragraph">
           <ul className="privacy-policy-list">
             <li>
               <strong>Com Terceiros de Confiança:</strong> Prestadores de serviços que auxiliam na operação da
@@ -80,21 +76,21 @@ const PrivacyPolicyPage: React.FC = () => {
               <strong>Transferências de Negócios:</strong> Em caso de fusão, aquisição ou venda de ativos.
             </li>
           </ul>
-        </Paragraph>
+        </div>
 
-        <Divider />
+        <hr className="privacy-policy-divider" />
 
-        <Title level={3} className="privacy-policy-title">4. Segurança dos Dados</Title>
-        <Paragraph className="privacy-policy-paragraph">
+        <h2 className="privacy-policy-title">4. Segurança dos Dados</h2>
+        <p className="privacy-policy-paragraph">
           Implementamos medidas de segurança adequadas para proteger suas informações contra acesso não autorizado,
           alteração, divulgação ou destruição. Utilizamos protocolos seguros de comunicação e armazenamento, além de
           controles de acesso restrito às informações pessoais.
-        </Paragraph>
+        </p>
 
-        <Divider />
+        <hr className="privacy-policy-divider" />
 
-        <Title level={3} className="privacy-policy-title">5. Seus Direitos</Title>
-        <Paragraph className="privacy-policy-paragraph">
+        <h2 className="privacy-policy-title">5. Seus Direitos</h2>
+        <div className="privacy-policy-paragraph">
           <ul className="privacy-policy-list">
             <li>
               <strong>Acesso e Correção:</strong> Você pode acessar e atualizar suas informações pessoais a qualquer
@@ -108,26 +104,26 @@ const PrivacyPolicyPage: React.FC = () => {
               mensagens.
             </li>
           </ul>
-        </Paragraph>
+        </div>
 
-        <Divider />
+        <hr className="privacy-policy-divider" />
 
-        <Title level={3} className="privacy-policy-title">6. Alterações nesta Política</Title>
-        <Paragraph className="privacy-policy-paragraph">
+        <h2 className="privacy-policy-title">6. Alterações nesta Política</h2>
+        <p className="privacy-policy-paragraph">
           Podemos atualizar nossa Política de Privacidade periodicamente. Notificaremos sobre quaisquer alterações
           publicando a nova política nesta página e atualizando a data de "Última atualização" no topo. Recomendamos que
           você revise esta política regularmente para se manter informado sobre como protegemos suas informações.
-        </Paragraph>
+        </p>
 
-        <Divider />
+        <hr className="privacy-policy-divider" />
 
-        <Title level={3} className="privacy-policy-title">7. Contato</Title>
-        <Paragraph className="privacy-policy-paragraph">
+        <h2 className="privacy-policy-title">7. Contato</h2>
+        <p className="privacy-policy-paragraph">
           Se tiver dúvidas ou preocupações sobre esta Política de Privacidade, entre em contato conosco através dos meios
           disponíveis em nossa plataforma.
-        </Paragraph>
-      </Content>
-    </Layout>
+        </p>
+      </main>
+    </div>
   );
 };
 

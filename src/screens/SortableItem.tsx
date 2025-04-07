@@ -1,10 +1,10 @@
 // src/components/SortableItem.tsx
 
 import React from 'react';
-import { Card, Button } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Button } from '../components/CustomComponents';
 
 interface CardType {
   id: number;
@@ -47,11 +47,15 @@ const SortableItem: React.FC<SortableItemProps> = ({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const handleDelete = () => {
+    handleDeleteCard(card.id);
+  };
+
   return (
-    <Card
+    <div
       ref={setNodeRef}
       style={style}
-      className="mb-4 cursor-move"
+      className="mb-4 cursor-move p-4 bg-white rounded-lg shadow"
       onClick={() => openEditCardPanel(card, columnId)}
       {...attributes}
       {...listeners}
@@ -60,14 +64,16 @@ const SortableItem: React.FC<SortableItemProps> = ({
       <p className="text-gray-500">Último contato: {new Date(card.lastContact).toLocaleDateString()}</p>
       <p className="text-gray-500">Telefone: {card.phone}</p>
       <p className="text-gray-500">Email: {card.email}</p>
-      <Button
-        danger
-        icon={<DeleteOutlined />}
-        onClick={(e) => { e.stopPropagation(); handleDeleteCard(card.id); }}
-      >
-        Excluir
-      </Button>
-    </Card>
+      <div onClick={(e) => e.stopPropagation()}>
+        <Button
+          type="text"
+          icon={<DeleteOutlined />}
+          onClick={handleDelete}
+        >
+          Excluir
+        </Button>
+      </div>
+    </div>
   );
 };
 

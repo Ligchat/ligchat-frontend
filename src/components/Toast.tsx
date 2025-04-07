@@ -25,7 +25,7 @@ const Toast: React.FC<ToastProps> = ({
 
         timerRef.current = window.setTimeout(() => {
             setIsClosing(true);
-        }, 100);
+        }, duration - 300);
 
         const timer = window.setTimeout(() => {
             onClose();
@@ -61,7 +61,19 @@ const Toast: React.FC<ToastProps> = ({
             </div>
             <div 
                 className={`toast-progress ${isClosing ? 'closing' : ''}`}
+                style={{ transitionDuration: `${duration}ms` }}
             />
+        </div>
+    );
+};
+
+export const ToastContainer: React.FC<{ 
+    children: React.ReactNode;
+    style?: React.CSSProperties;
+}> = ({ children, style }) => {
+    return (
+        <div className="toast-container" style={style}>
+            {children}
         </div>
     );
 };

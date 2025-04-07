@@ -1,8 +1,4 @@
 import React from 'react';
-import { Layout, Typography } from 'antd';
-
-const { Content } = Layout;
-const { Title, Text } = Typography;
 
 const ProfileScreen: React.FC = () => {
   const user = {
@@ -11,13 +7,13 @@ const ProfileScreen: React.FC = () => {
   };
 
   return (
-    <Layout className="layout">
-      <Content style={{ padding: '50px', textAlign: 'center' }}>
-        <Title level={2}>Profile</Title>
-        <Text strong>Name:</Text> <Text>{user.name}</Text> <br />
-        <Text strong>Email:</Text> <Text>{user.email}</Text>
-      </Content>
-    </Layout>
+    <div className="layout">
+      <main style={{ padding: '50px', textAlign: 'center' }}>
+        <h2>Profile</h2>
+        <p><strong>Name:</strong> {user.name}</p>
+        <p><strong>Email:</strong> {user.email}</p>
+      </main>
+    </div>
   );
 };
 

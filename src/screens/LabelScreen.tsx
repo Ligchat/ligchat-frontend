@@ -85,7 +85,7 @@ const Modal: React.FC<ModalProps> = ({
       }}
     >
       <div 
-        className="label-modal"
+        className="label-modal" 
         onClick={e => e.stopPropagation()}
       >
         <div className="label-modal-header">
@@ -398,14 +398,14 @@ const LabelScreen = () => {
 
     return (
         <>
-            <div className="label-screen">
-                <div className="label-header">
-                    <div className="header-content">
+            <div className="ls-container">
+                <div className="ls-header">
+                    <div className="ls-header-content">
                         <h1>Etiquetas</h1>
-                        <p className="header-description">Gerencie as etiquetas para organizar seus contatos</p>
+                        <p className="ls-header-description">Gerencie as etiquetas para organizar seus contatos</p>
                     </div>
                     <button 
-                        className="add-label-button"
+                        className="ls-add-button"
                         onClick={handleAddNew}
                         disabled={!SessionService.getSectorId()}
                     >
@@ -414,59 +414,52 @@ const LabelScreen = () => {
                     </button>
                 </div>
 
-                <div className="labels-container">
-                    <div className="labels-header">
-                        <div className="label-row header">
-                            <div className="label-name">Nome</div>
-                            <div className="label-description">Descrição</div>
-                            <div className="label-actions">Ações</div>
-                        </div>
-                    </div>
-                    
+                <div className="ls-content">
                     {isLoading && SessionService.getSectorId() ? (
-                        <div className="labels-list">
-                            <div className="loading-overlay">
-                                <div className="card-loading">
-                                    <div className="card-loading-spinner" />
-                                    <span className="loading-text">Carregando etiquetas...</span>
-                                </div>
-                            </div>
+                        <div className="ls-loading">
+                            <div className="ls-spinner" />
                         </div>
                     ) : !SessionService.getSectorId() ? (
-                        <div className="no-sector-text">
+                        <div className="ls-no-sector">
                             Nenhum setor selecionado
                         </div>
                     ) : tags.length === 0 ? (
-                        <div className="empty-state">
-                            <p>Nenhuma etiqueta encontrada</p>
-                            <button className="add-first-label" onClick={handleAddNew}>
-                                <FiPlus /> Criar primeira etiqueta
-                            </button>
+                        <div className="ls-empty">
+                            <div className="ls-empty-icon">
+                                <FiAlertCircle />
+                            </div>
+                            <h3 className="ls-empty-title">Nenhuma etiqueta encontrada</h3>
+                            <p className="ls-empty-description">Clique no botão "Nova Etiqueta" para começar</p>
                         </div>
                     ) : (
-                        <div className="labels-list">
+                        <div className="ls-table">
+                            <div className="ls-row ls-row-header">
+                                <div className="ls-name">Nome</div>
+                                <div className="ls-description">Descrição</div>
+                                <div className="ls-actions">Ações</div>
+                            </div>
                             {tags.map((tag, index) => (
-                                <div key={tag.id} className="label-row">
-                                    <div className="label-name">
+                                <div key={tag.id} className="ls-row">
+                                    <div className="ls-name">
                                         <span 
-                                            className="label-indicator" 
+                                            className="ls-color" 
                                             style={{ backgroundColor: tag.color }}
                                         ></span>
                                         {tag.name}
                                     </div>
-                                    <div className="label-description">
+                                    <div className="ls-description">
                                         {tag.description || "Sem descrição"}
                                     </div>
-                                    <div className="label-actions">
+                                    <div className="ls-actions">
                                         <button 
-                                            className="action-button edit" 
+                                            className="ls-action-button edit" 
                                             onClick={() => handleEdit(index)}
                                             title="Editar"
                                         >
                                             <FiEdit2 />
                                         </button>
                                         <button 
-                                            className="action-button delete" 
+                                            className="ls-action-button delete" 
                                             onClick={() => setDeleteModalOpen(index)}
                                             title="Excluir"
                                         >
@@ -504,7 +497,7 @@ const LabelScreen = () => {
                 tagName={deleteModalOpen !== null ? tags[deleteModalOpen].name : ''}
             />
 
-            <div className="toast-container">
+            <div className="ls-toast-container">
                 {toasts.map(toast => (
                     <Toast
                         key={toast.id}

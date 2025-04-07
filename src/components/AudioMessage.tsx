@@ -1,13 +1,25 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { PlayCircleFilled, PauseCircleFilled } from '@ant-design/icons';
 import './AudioMessage.css';
 
 interface AudioMessageProps {
   src: string;
   isSent: boolean;
+  onCancel?: () => void;
 }
 
-export const AudioMessage: React.FC<AudioMessageProps> = ({ src, isSent }) => {
+const PlayIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8 5V19L19 12L8 5Z" fill="currentColor"/>
+  </svg>
+);
+
+const PauseIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M6 19H10V5H6V19ZM14 5V19H18V5H14Z" fill="currentColor"/>
+  </svg>
+);
+
+export const AudioMessage: React.FC<AudioMessageProps> = ({ src, isSent, onCancel }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -199,7 +211,7 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ src, isSent }) => {
         disabled={!isLoaded}
         aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
       >
-        {isPlaying ? <PauseCircleFilled /> : <PlayCircleFilled />}
+        {isPlaying ? <PauseIcon /> : <PlayIcon />}
       </button>
       
       <div className="audio-content">

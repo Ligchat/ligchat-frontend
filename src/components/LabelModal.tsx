@@ -99,7 +99,7 @@ const LabelModal: React.FC<LabelModalProps> = ({
                 </div>
               )}
             </div>
-          </div>
+          </div> 
 
           <div className="form-group">
             <label htmlFor="label-description">Descrição</label>

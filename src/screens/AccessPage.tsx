@@ -384,14 +384,14 @@ const AccessPage: React.FC = () => {
   };
 
   return (
-    <div className="access-screen">
-      <div className="access-header">
-        <div className="header-content">
+    <div className="ap-screen">
+      <div className="ap-header">
+        <div className="ap-header-content">
           <h1>Acessos</h1>
-          <p className="header-description">Gerencie os acessos dos usuários</p>
+          <p className="ap-header-description">Gerencie os acessos dos usuários</p>
         </div>
         <button 
-          className="add-user-button" 
+          className="ap-add-button" 
           onClick={() => setIsDrawerOpen(true)}
           disabled={!SessionService.getSectorId()}
         >
@@ -399,135 +399,133 @@ const AccessPage: React.FC = () => {
         </button>
       </div>
 
-      <div className="access-content">
-        {isLoading ? (
-          <div className="loading-container">
-            <div className="loading-spinner"></div>
-            <p>Carregando Acessos...</p>
-          </div>
-        ) : (
-          <>
-            {!SessionService.getSectorId() ? (
-              <div className="no-sector-text">
-                Nenhum setor selecionado
-              </div>
-            ) : people.length === 0 ? (
-              <div className="empty-state">
-                <p>Nenhum usuário encontrado</p>
-              </div>
-            ) : (
-              <div className="users-grid">
-                {people.map((person) => (
-                  <div key={person.id} className="user-card">
-                    {person.isDeleting ? (
-                        <div className="delete-confirmation">
-                            <div className="delete-message-container">
-                                <h4 className="delete-title">Confirmar Exclusão</h4>
-                                <p className="delete-message">
-                                    Tem certeza que deseja excluir o acesso de "{person.name}"?
-                                    <br />
-                                    Esta ação não poderá ser desfeita.
-                                </p>
-                            </div>
-                            <div className="confirmation-actions">
-                                <button 
-                                    className="cancel-button" 
-                                    onClick={() => toggleDeleteMode(person.id.toString(), false)}
-                                >
-                                    <FiX /> Cancelar
-                                </button>
-                                <button 
-                                    className="confirm-button" 
-                                    onClick={() => handleDeletePerson(person.id.toString())}
-                                >
-                                    <FiCheck /> Confirmar
-                                </button>
-                            </div>
+      {isLoading ? (
+        <div className="ap-loading">
+          <div className="ap-spinner"></div>
+          <p>Carregando Acessos...</p>
+        </div>
+      ) : (
+        <div className="ap-content">
+          {!SessionService.getSectorId() ? (
+            <div className="ap-no-sector"> 
+              Nenhum setor selecionado
+            </div>
+          ) : people.length === 0 ? (
+            <div className="ap-empty">
+              <p>Nenhum usuário encontrado</p>
+            </div>
+          ) : (
+            <div className="ap-grid">
+              {people.map((person) => (
+                <div key={person.id} className="ap-card">
+                  {person.isDeleting ? (
+                    <div className="ap-delete-confirm">
+                      <div className="ap-delete-message">
+                        <h4 className="ap-delete-title">Confirmar Exclusão</h4>
+                        <p className="ap-delete-text">
+                          Tem certeza que deseja excluir o acesso de "{person.name}"?
+                          <br />
+                          Esta ação não poderá ser desfeita.
+                        </p>
+                      </div>
+                      <div className="ap-confirm-actions">
+                        <button 
+                          className="ap-button ap-button-secondary" 
+                          onClick={() => toggleDeleteMode(person.id.toString(), false)}
+                        >
+                          <FiX /> Cancelar
+                        </button>
+                        <button 
+                          className="ap-button ap-button-danger" 
+                          onClick={() => handleDeletePerson(person.id.toString())}
+                        >
+                          <FiCheck /> Confirmar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="ap-card-content">
+                      <div className={`ap-status-indicator ${person.status ? 'active' : 'inactive'}`}>
+                        {person.status ? (
+                          <>
+                            <FiToggleRight />
+                            <span>Ativo</span>
+                          </>
+                        ) : (
+                          <>
+                            <FiToggleLeft />
+                            <span>Desativado</span>
+                          </>
+                        )}
+                      </div>
+                      <div className="ap-card-header">
+                        <h3 className="ap-card-title">{person.name}</h3>
+                        <div className="ap-card-actions">
+                          <button 
+                            className="ap-action-button edit" 
+                            onClick={() => handleEditPerson(person)}
+                          >
+                            <FiEdit2 />
+                          </button>
+                          <button 
+                            className="ap-action-button delete" 
+                            onClick={() => toggleDeleteMode(person.id.toString(), true)}
+                          >
+                            <FiTrash2 />
+                          </button>
                         </div>
-                    ) : (
-                        <div className="user-card-content">
-                            <div className={`status-indicator ${person.status ? 'active' : 'inactive'}`}>
-                                {person.status ? (
-                                    <>
-                                        <FiToggleRight />
-                                        <span>Ativo</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <FiToggleLeft />
-                                        <span>Desativado</span>
-                                    </>
-                                )}
-                            </div>
-                            <div className="user-card-header">
-                                <h3>{person.name}</h3>
-                                <div className="user-actions">
-                                    <button 
-                                        className="action-button edit" 
-                                        onClick={() => handleEditPerson(person)}
-                                    >
-                                        <FiEdit2 />
-                                    </button>
-                                    <button 
-                                        className="action-button delete" 
-                                        onClick={() => toggleDeleteMode(person.id.toString(), true)}
-                                    >
-                                        <FiTrash2 />
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="user-info">
-                                <div className="info-item">
-                                    <FiMail />
-                                    <span>{person.email || 'Email não informado'}</span>
-                                </div>
-                                <div className="info-item">
-                                    <FiUser />
-                                    <span>WhatsApp: {person.phoneWhatsapp || 'Não informado'}</span>
-                                </div>
-                                <div className="info-item">
-                                    <span>Tipo: {person.isAdmin ? 'Administrador' : 'Colaborador'}</span>
-                                </div>
-                                {person.sectors && person.sectors.length > 0 && (
-                                    <div className="info-item">
-                                        <span className="label">Setores:</span>
-                                        <span className="sectors-text">{person.sectors.map(s => s.name).join(', ')}</span>
-                                    </div>
-                                )}
-                            </div>
+                      </div>
+                      <div className="ap-card-info">
+                        <div className="ap-info-item">
+                          <FiMail />
+                          <span>{person.email || 'Email não informado'}</span>
                         </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+                        <div className="ap-info-item">
+                          <FiUser />
+                          <span>WhatsApp: {person.phoneWhatsapp || 'Não informado'}</span>
+                        </div>
+                        <div className="ap-info-item">
+                          <span>Tipo: {person.isAdmin ? 'Administrador' : 'Colaborador'}</span>
+                        </div>
+                        {person.sectors && person.sectors.length > 0 && (
+                          <div className="ap-info-item">
+                            <span className="ap-info-label">Setores:</span>
+                            <span className="ap-info-text">{person.sectors.map(s => s.name).join(', ')}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {(isDrawerOpen || editingPerson) && (
-        <div className="drawer-overlay">
-          <div className="access-drawer">
-            <div className="drawer-header">
-              <h2>{editingPerson ? 'Editar Usuário' : 'Novo Usuário'}</h2>
+        <div className="ap-drawer-overlay">
+          <div className="ap-drawer">
+            <div className="ap-drawer-header">
+              <h2 className="ap-drawer-title">{editingPerson ? 'Editar Usuário' : 'Novo Usuário'}</h2>
               <button 
-                className="close-button"
+                className="ap-button ap-button-icon"
                 onClick={handleCloseDrawer}
               >
                 <FiX />
               </button>
             </div>
             
-            <div className="drawer-content">
-              <form onSubmit={(e) => {
+            <div className="ap-drawer-content">
+              <form className="ap-form" onSubmit={(e) => {
                 e.preventDefault();
                 editingPerson ? handleSavePerson() : handleAddPerson();
               }}>
-                <div className="form-group">
-                  <label>Nome do Usuário <span className="required">*</span></label>
+                <div className="ap-form-group">
+                  <label className="ap-form-label">Nome do Usuário <span className="ap-required">*</span></label>
                   <input
                     type="text"
-                    className={`form-input ${errors.name ? 'error' : ''}`}
+                    className={`ap-form-input ${errors.name ? 'error' : ''}`}
                     placeholder="Digite o nome do usuário"
                     value={editingPerson?.name || newPerson.name}
                     onChange={(e) => {
@@ -542,14 +540,14 @@ const AccessPage: React.FC = () => {
                     }}
                     disabled={isLoading}
                   />
-                  {errors.name && <span className="error-message">{errors.name}</span>}
+                  {errors.name && <span className="ap-error-message">{errors.name}</span>}
                 </div>
 
-                <div className="form-group">
-                  <label>Email <span className="required">*</span></label>
+                <div className="ap-form-group">
+                  <label className="ap-form-label">Email <span className="ap-required">*</span></label>
                   <input
                     type="email"
-                    className={`form-input ${errors.email ? 'error' : ''}`}
+                    className={`ap-form-input ${errors.email ? 'error' : ''}`}
                     placeholder="Digite o email"
                     value={editingPerson?.email || newPerson.email}
                     onChange={(e) => {
@@ -564,90 +562,14 @@ const AccessPage: React.FC = () => {
                     }}
                     disabled={isLoading}
                   />
-                  {errors.email && <span className="error-message">{errors.email}</span>}
+                  {errors.email && <span className="ap-error-message">{errors.email}</span>}
                 </div>
 
-                <div className="form-group">
-                  <label>Setores</label>
-                  <div className={`multi-select-container ${errors.sectors ? 'error' : ''}`}>
-                    <div className="selected-sectors">
-                      {selectedSectors.map((sectorId) => {
-                        const sector = sectors.find(s => s.id === Number(sectorId));
-                        return sector && (
-                          <span key={sectorId} className="selected-sector">
-                            {sector.name}
-                            <button 
-                              type="button" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handleRemoveSector(sectorId);
-                              }}
-                            >
-                              <FiX size={14} />
-                            </button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                    <div className="sector-select-input">
-                      <input
-                        type="text"
-                        placeholder="Pesquisar setores..."
-                        value={sectorSearchText}
-                        onChange={(e) => setSectorSearchText(e.target.value)}
-                        onFocus={() => setShowSectorDropdown(true)}
-                      />
-                      <button 
-                        type="button"
-                        className="toggle-dropdown"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setShowSectorDropdown(!showSectorDropdown);
-                        }}
-                      >
-                        <FiChevronDown />
-                      </button>
-                    </div>
-                    {showSectorDropdown && (
-                      <div className="sectors-dropdown">
-                        {sectors
-                          .filter(sector => 
-                            sector.name.toLowerCase().includes(sectorSearchText.toLowerCase()) &&
-                            !selectedSectors.includes(sector.id.toString())
-                          )
-                          .map((sector) => (
-                            <div
-                              key={sector.id}
-                              className="sector-option"
-                              onClick={() => {
-                                handleSectorSelect(sector.id);
-                                if (errors.sectors) {
-                                  setErrors({ ...errors, sectors: undefined });
-                                }
-                              }}
-                            >
-                              {sector.name}
-                            </div>
-                          ))}
-                        {sectors.filter(sector => 
-                          sector.name.toLowerCase().includes(sectorSearchText.toLowerCase()) &&
-                          !selectedSectors.includes(sector.id.toString())
-                        ).length === 0 && (
-                          <div className="sector-option" style={{ color: '#888' }}>
-                            Nenhum setor encontrado
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {errors.sectors && <span className="error-message">{errors.sectors}</span>}
-                </div>
-
-                <div className="form-group">
-                  <label>Nível de Acesso</label>
+                <div className="ap-form-group">
+                  <label className="ap-form-label">Nível de Acesso</label>
                   <select
-                    className="select-field"
-                    value={isAdmin ? "Administrador" : "Colaborador"}
+                    className="ap-form-select"
+                    value={editingPerson ? (editingPerson.isAdmin ? "Administrador" : "Colaborador") : (isAdmin ? "Administrador" : "Colaborador")}
                     onChange={handleSelectChange}
                     disabled={isLoading}
                   >
@@ -656,16 +578,16 @@ const AccessPage: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="form-group">
-                  <label>Status</label>
-                  <div className="switch-field">
-                    <span className={`switch-label ${editingPerson ? (editingPerson.status ? 'active' : 'inactive') : (newPerson.status ? 'active' : 'inactive')}`}>
-                      <span className="status-text">
+                <div className="ap-form-group">
+                  <label className="ap-form-label">Status</label>
+                  <div className="ap-switch">
+                    <div className={`ap-switch-label ${editingPerson ? (editingPerson.status ? 'active' : 'inactive') : (newPerson.status ? 'active' : 'inactive')}`}>
+                      <span className="ap-switch-text">
                         {editingPerson ? (editingPerson.status ? 'Ativo' : 'Inativo') : (newPerson.status ? 'Ativo' : 'Inativo')}
                       </span>
-                    </span>
+                    </div>
                     <div 
-                      className={`switch-toggle ${editingPerson ? (editingPerson.status ? 'active' : '') : (newPerson.status ? 'active' : '')}`}
+                      className={`ap-switch-toggle ${editingPerson ? (editingPerson.status ? 'active' : '') : (newPerson.status ? 'active' : '')}`}
                       onClick={handleToggleStatus}
                       role="button"
                       tabIndex={0}
@@ -678,17 +600,17 @@ const AccessPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="drawer-footer">
+                <div className="ap-drawer-footer">
                   <button 
                     type="button"
-                    className="cancel-button"
+                    className="ap-button ap-button-secondary"
                     onClick={handleCloseDrawer}
                   >
                     Cancelar
                   </button>
                   <button 
                     type="submit"
-                    className="save-button"
+                    className="ap-button ap-button-primary"
                     disabled={isLoading}
                   >
                     {editingPerson ? 'Salvar' : 'Adicionar'}
@@ -700,7 +622,7 @@ const AccessPage: React.FC = () => {
         </div>
       )}
 
-      <div className="toast-container">
+      <div className="ap-toast-container">
         {toasts.map(toast => (
           <Toast
             key={toast.id}

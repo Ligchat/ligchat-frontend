@@ -28,7 +28,7 @@ interface Card {
   content: string;
   email?: string;
   phone?: string;
-  assignedTo?: string;
+  assignedTo?: string | number;
   assigneeAvatar?: string;
   createdAt?: string;
   lastContact?: string;
@@ -36,10 +36,12 @@ interface Card {
   priority?: 'high' | 'medium' | 'low';
   contactId: number;
   tagId?: number;
-  columnId: number;
+  columnId?: number;
   sectorId: number;
-  position: number;
+  position?: number;
   user_id?: number;
+  number?: string;
+  name?: string;
 }
 
 interface CardSidebarProps {
@@ -50,6 +52,7 @@ interface CardSidebarProps {
   isNewCard?: boolean;
   columnId?: string;
   addToast?: (message: string, type: 'success' | 'error' | 'info') => void;
+  mode?: 'chat' | 'crm';
 }
 
 const CardSidebar: React.FC<CardSidebarProps> = ({ 
@@ -59,7 +62,8 @@ const CardSidebar: React.FC<CardSidebarProps> = ({
   onSave,
   isNewCard = false,
   columnId,
-  addToast
+  addToast,
+  mode = 'crm'
 }) => {
   const [editingCard, setEditingCard] = useState<Card | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -77,16 +81,23 @@ const CardSidebar: React.FC<CardSidebarProps> = ({
         title: '',
         content: '',
         createdAt: new Date().toISOString().split('T')[0],
-        columnId: parseInt(columnId || '0'),
+        columnId: columnId ? parseInt(columnId) : undefined,
         sectorId: SessionService.getSectorId() || 0,
         position: 0,
         contactId: 0
       });
       setIsEditing(true);
     } else if (selectedCard) {
-      setEditingCard({...selectedCard});
+      const normalizedCard: Card = mode === 'chat' ? {
+        ...selectedCard,
+        title: selectedCard.name || selectedCard.title,
+        phone: selectedCard.number || selectedCard.phone,
+        content: selectedCard.notes?.toString() || selectedCard.content
+      } : selectedCard;
+      
+      setEditingCard(normalizedCard);
     }
-  }, [selectedCard, isNewCard, columnId]);
+  }, [selectedCard, isNewCard, columnId, mode]);
 
   // Adicionar useEffect para fechar os dropdowns quando clicar fora
   useEffect(() => {
@@ -162,17 +173,27 @@ const CardSidebar: React.FC<CardSidebarProps> = ({
   const saveChanges = async () => {
     if (!editingCard) return;
     
-    if (!editingCard.title?.trim()) {
-      addToast?.('Por favor, preencha o título do lead.', 'error');
+    const requiredField = mode === 'chat' ? 'name' : 'title';
+    const fieldLabel = mode === 'chat' ? 'nome do contato' : 'título do lead';
+    
+    if (!editingCard[requiredField]?.trim() && !editingCard.title?.trim()) {
+      addToast?.(`Por favor, preencha o ${fieldLabel}.`, 'error');
       return;
     }
     
     try {
-      await onSave(editingCard);
-      addToast?.('Lead atualizado com sucesso!', 'success');
+      const normalizedCard: Card = mode === 'chat' ? {
+        ...editingCard,
+        name: editingCard.title,
+        number: editingCard.phone,
+        notes: editingCard.content ? [editingCard.content] : undefined
+      } : editingCard;
+
+      await onSave(normalizedCard);
+      addToast?.(mode === 'chat' ? 'Contato atualizado com sucesso!' : 'Lead atualizado com sucesso!', 'success');
       handleClose();
     } catch (error) {
-      addToast?.('Erro ao salvar o lead.', 'error');
+      addToast?.(mode === 'chat' ? 'Erro ao salvar o contato.' : 'Erro ao salvar o lead.', 'error');
     }
   };
 
@@ -252,301 +273,352 @@ const CardSidebar: React.FC<CardSidebarProps> = ({
   };
 
   return (
-    <div className={`card-sidebar ${isOpen ? 'open' : ''}`}>
-      <div className="card-sidebar-header">
-        <div className="card-sidebar-actions">
-          <button className="sidebar-icon-button" onClick={handleClose}>
-            <FiX />
-          </button>
+    <>
+      <div className={`card-sidebar-overlay ${isOpen ? 'open' : ''}`} onClick={handleClose}></div>
+      <div className={`card-sidebar ${isOpen ? 'open' : ''}`}>
+        <div className="card-sidebar-header">
+          <div className="card-sidebar-actions">
+            <button className="sidebar-icon-button" onClick={handleClose}>
+              <FiX />
+            </button>
+          </div>
+          <h2>
+            {isNewCard ? (mode === 'chat' ? "Novo Contato" : "Novo Lead") : 
+             isEditing ? (mode === 'chat' ? "Editar Contato" : "Editar Lead") : 
+             editingCard?.title}
+          </h2>
         </div>
-        <h2>{isNewCard ? "Novo Lead" : isEditing ? "Editar Lead" : editingCard?.title}</h2>
-      </div>
 
-      <div className="card-sidebar-content">
-        {isEditing || isNewCard ? (
-          // Modo de edição
-          <div className="card-edit-form">
-            <div className="form-group">
-              <label htmlFor="edit-title">Título do Lead <span className="required">*</span></label>
-              <input
-                id="edit-title"
-                type="text"
-                value={editingCard?.title || ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value.length <= 50) {
-                    updateEditingCard('title', value);
-                  }
-                }}
-                placeholder="Digite o título do lead"
-                maxLength={50}
-              />
-              <div className="character-count">
-                {`${editingCard?.title?.length || 0}/50`}
-              </div>
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="edit-content">Descrição</label>
-              <textarea
-                id="edit-content"
-                value={editingCard?.content || ''}
-                onChange={(e) => updateEditingCard('content', e.target.value)}
-                placeholder="Descrição do lead"
-                rows={3}
-              />
-            </div>
-            
-            <div className="form-group">
-              <label>Prioridade</label>
-              <div className="contact-select">
-                <div 
-                  className="select-input"
-                  onClick={() => setPriorityDropdownOpen(!isPriorityDropdownOpen)}
-                >
-                  <input
-                    type="text"
-                    value={editingCard?.priority ? 
-                      editingCard.priority === 'high' ? 'Alta' :
-                      editingCard.priority === 'medium' ? 'Média' : 'Baixa'
-                      : ''
+        <div className="card-sidebar-content">
+          {isEditing || isNewCard ? (
+            <div className="card-edit-form">
+              <div className="form-group">
+                <label htmlFor="edit-title">
+                  {mode === 'chat' ? 'Nome do Contato' : 'Título do Lead'} 
+                  <span className="required">*</span>
+                </label>
+                <input
+                  id="edit-title"
+                  type="text"
+                  value={editingCard?.title || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value.length <= 50) {
+                      updateEditingCard('title', value);
+                      if (mode === 'chat') {
+                        updateEditingCard('name', value);
+                      }
                     }
-                    readOnly
-                    placeholder="Selecione a prioridade"
-                  />
-                  <FiChevronDown className={`dropdown-icon ${isPriorityDropdownOpen ? 'open' : ''}`} />
+                  }}
+                  placeholder={mode === 'chat' ? "Digite o nome do contato" : "Digite o título do lead"}
+                  maxLength={50}
+                />
+                <div className="character-count">
+                  {`${editingCard?.title?.length || 0}/50`}
                 </div>
-                {isPriorityDropdownOpen && (
-                  <div className="contact-dropdown">
-                    <div className="contact-option" onClick={() => {
-                      updateEditingCard('priority', 'high');
-                      setPriorityDropdownOpen(false);
-                    }}>
-                      Alta
+              </div>
+
+              {mode === 'chat' && (
+                <div className="form-group">
+                  <label htmlFor="edit-phone">Telefone <span className="required">*</span></label>
+                  <input
+                    id="edit-phone"
+                    type="text"
+                    value={editingCard?.phone || ''}
+                    onChange={(e) => {
+                      updateEditingCard('phone', e.target.value);
+                      updateEditingCard('number', e.target.value);
+                    }}
+                    placeholder="Digite o telefone"
+                  />
+                </div>
+              )}
+              
+              <div className="form-group">
+                <label htmlFor="edit-email">Email</label>
+                <input
+                  id="edit-email"
+                  type="email"
+                  value={editingCard?.email || ''}
+                  onChange={(e) => updateEditingCard('email', e.target.value)}
+                  placeholder="Digite o email"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="edit-content">{mode === 'chat' ? 'Observações' : 'Descrição'}</label>
+                <textarea
+                  id="edit-content"
+                  value={editingCard?.content || ''}
+                  onChange={(e) => updateEditingCard('content', e.target.value)}
+                  placeholder={mode === 'chat' ? "Observações sobre o contato" : "Descrição do lead"}
+                  rows={3}
+                />
+              </div>
+
+              {mode === 'crm' && (
+                <div className="form-group">
+                  <label>Prioridade</label>
+                  <div className="contact-select">
+                    <div 
+                      className="select-input"
+                      onClick={() => setPriorityDropdownOpen(!isPriorityDropdownOpen)}
+                    >
+                      <input
+                        type="text"
+                        value={editingCard?.priority ? 
+                          editingCard.priority === 'high' ? 'Alta' :
+                          editingCard.priority === 'medium' ? 'Média' : 'Baixa'
+                          : ''
+                        }
+                        readOnly
+                        placeholder="Selecione a prioridade"
+                      />
+                      <FiChevronDown className={`dropdown-icon ${isPriorityDropdownOpen ? 'open' : ''}`} />
                     </div>
-                    <div className="contact-option" onClick={() => {
-                      updateEditingCard('priority', 'medium');
-                      setPriorityDropdownOpen(false);
-                    }}>
-                      Média
-                    </div>
-                    <div className="contact-option" onClick={() => {
-                      updateEditingCard('priority', 'low');
-                      setPriorityDropdownOpen(false);
-                    }}>
-                      Baixa
-                    </div>
+                    {isPriorityDropdownOpen && (
+                      <div className="contact-dropdown">
+                        <div className="contact-option" onClick={() => {
+                          updateEditingCard('priority', 'high');
+                          setPriorityDropdownOpen(false);
+                        }}>
+                          Alta
+                        </div>
+                        <div className="contact-option" onClick={() => {
+                          updateEditingCard('priority', 'medium');
+                          setPriorityDropdownOpen(false);
+                        }}>
+                          Média
+                        </div>
+                        <div className="contact-option" onClick={() => {
+                          updateEditingCard('priority', 'low');
+                          setPriorityDropdownOpen(false);
+                        }}>
+                          Baixa
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="form-group">
-              <label>Tag</label>
-              <div className="contact-select">
-                <div 
-                  className="select-input"
-                  onClick={() => setTagDropdownOpen(!isTagDropdownOpen)}
-                >
-                  <input
-                    type="text"
-                    value={editingCard?.tagId ? 
-                      tags.find(t => t.id === editingCard.tagId)?.name || '' 
-                      : ''
-                    }
-                    readOnly
-                    placeholder="Selecione uma tag"
-                  />
-                  <FiChevronDown className={`dropdown-icon ${isTagDropdownOpen ? 'open' : ''}`} />
                 </div>
-                {isTagDropdownOpen && (
-                  <div className="contact-dropdown">
-                    {tags.map(tag => (
+              )}
+              
+              <div className="form-group">
+                <label>Tag</label>
+                <div className="contact-select">
+                  <div 
+                    className="select-input"
+                    onClick={() => setTagDropdownOpen(!isTagDropdownOpen)}
+                  >
+                    <input
+                      type="text"
+                      value={editingCard?.tagId ? 
+                        tags.find(t => t.id === editingCard.tagId)?.name || '' 
+                        : ''
+                      }
+                      readOnly
+                      placeholder="Selecione uma tag"
+                    />
+                    <FiChevronDown className={`dropdown-icon ${isTagDropdownOpen ? 'open' : ''}`} />
+                  </div>
+                  {isTagDropdownOpen && (
+                    <div className="contact-dropdown">
                       <div 
-                        key={tag.id}
                         className="contact-option"
                         onClick={() => {
-                          updateEditingCard('tagId', tag.id);
+                          updateEditingCard('tagId', undefined);
                           setTagDropdownOpen(false);
                         }}
                       >
-                        {tag.name}
+                        Nenhuma tag
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="form-group">
-              <label>Responsável</label>
-              <div className="contact-select">
-                <div 
-                  className="select-input"
-                  onClick={() => setResponsibleDropdownOpen(!isResponsibleDropdownOpen)}
-                >
-                  <input
-                    type="text"
-                    value={editingCard?.assignedTo ? 
-                      users.find(u => Number(u.id) === Number(editingCard.assignedTo))?.name || '' 
-                      : ''
-                    }
-                    readOnly
-                    placeholder="Selecione um responsável"
-                  />
-                  <FiChevronDown className={`dropdown-icon ${isResponsibleDropdownOpen ? 'open' : ''}`} />
-                </div>
-                {isResponsibleDropdownOpen && (
-                  <div className="contact-dropdown">
-                    <div 
-                      className="contact-option"
-                      onClick={() => {
-                        updateEditingCard('assignedTo', null);
-                        setResponsibleDropdownOpen(false);
-                      }}
-                    >
-                      Nenhum Responsável
+                      {tags.map(tag => (
+                        <div 
+                          key={tag.id}
+                          className="contact-option"
+                          onClick={() => {
+                            updateEditingCard('tagId', tag.id);
+                            setTagDropdownOpen(false);
+                          }}
+                        >
+                          {tag.name}
+                        </div>
+                      ))}
                     </div>
-                    {users.map(user => (
+                  )}
+                </div>
+              </div>
+              
+              <div className="form-group">
+                <label>Responsável</label>
+                <div className="contact-select">
+                  <div 
+                    className="select-input"
+                    onClick={() => setResponsibleDropdownOpen(!isResponsibleDropdownOpen)}
+                  >
+                    <input
+                      type="text"
+                      value={editingCard?.assignedTo ? 
+                        users.find(u => Number(u.id) === Number(editingCard.assignedTo))?.name || '' 
+                        : ''
+                      }
+                      readOnly
+                      placeholder="Selecione um responsável"
+                    />
+                    <FiChevronDown className={`dropdown-icon ${isResponsibleDropdownOpen ? 'open' : ''}`} />
+                  </div>
+                  {isResponsibleDropdownOpen && (
+                    <div className="contact-dropdown">
                       <div 
-                        key={user.id}
                         className="contact-option"
                         onClick={() => {
-                          updateEditingCard('assignedTo', Number(user.id));
+                          updateEditingCard('assignedTo', null);
                           setResponsibleDropdownOpen(false);
                         }}
                       >
-                        {user.name}
+                        Nenhum Responsável
                       </div>
-                    ))}
-                  </div>
-                )}
+                      {users.map(user => (
+                        <div 
+                          key={user.id}
+                          className="contact-option"
+                          onClick={() => {
+                            updateEditingCard('assignedTo', Number(user.id));
+                            setResponsibleDropdownOpen(false);
+                          }}
+                        >
+                          {user.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          // Modo de visualização
-          <>
-            <div className="card-sidebar-section">
-              <h3><FiUser /> Informações de Contato</h3>
-              <div className="card-sidebar-info">
-                {editingCard?.email ? (
-                  <div className="card-sidebar-info-item">
-                    <span className="info-label"><FiMail /> Email:</span>
-                    <span className="info-value">{editingCard.email}</span>
-                  </div>
-                ) : (
-                  <div className="card-sidebar-info-item empty">
-                    <span className="info-label"><FiMail /> Email:</span>
-                    <span className="info-value empty">Não informado</span>
-                  </div>
-                )}
-                {editingCard?.phone ? (
-                  <div className="card-sidebar-info-item">
-                    <span className="info-label"><FiPhone /> Telefone:</span>
-                    <span className="info-value">{editingCard.phone}</span>
-                  </div>
-                ) : (
-                  <div className="card-sidebar-info-item empty">
-                    <span className="info-label"><FiPhone /> Telefone:</span>
-                    <span className="info-value empty">Não informado</span>
-                  </div>
-                )}
+          ) : (
+            <>
+              <div className="card-sidebar-section">
+                <h3><FiUser /> Informações de Contato</h3>
+                <div className="card-sidebar-info">
+                  {editingCard?.email ? (
+                    <div className="card-sidebar-info-item">
+                      <span className="info-label"><FiMail /> Email:</span>
+                      <span className="info-value">{editingCard.email}</span>
+                    </div>
+                  ) : (
+                    <div className="card-sidebar-info-item empty">
+                      <span className="info-label"><FiMail /> Email:</span>
+                      <span className="info-value empty">Não informado</span>
+                    </div>
+                  )}
+                  {(editingCard?.phone || editingCard?.number) ? (
+                    <div className="card-sidebar-info-item">
+                      <span className="info-label"><FiPhone /> Telefone:</span>
+                      <span className="info-value">{editingCard.phone || editingCard.number}</span>
+                    </div>
+                  ) : (
+                    <div className="card-sidebar-info-item empty">
+                      <span className="info-label"><FiPhone /> Telefone:</span>
+                      <span className="info-value empty">Não informado</span>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            
-            <div className="card-sidebar-section">
-              <h3><FiInfo /> Status do Lead</h3>
-              <div className="card-sidebar-info">
-                {editingCard?.assignedTo ? (
-                  <div className="card-sidebar-info-item">
-                    <span className="info-label"><FiUser /> Responsável:</span>
-                    <span className="info-value">
-                      {users.find(u => Number(u.id) === Number(editingCard.assignedTo))?.name || 'Não encontrado'}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="card-sidebar-info-item empty">
-                    <span className="info-label"><FiUser /> Responsável:</span>
-                    <span className="info-value empty">Sem Responsável</span>
-                  </div>
-                )}
-                
-                {editingCard?.createdAt && (
-                  <div className="card-sidebar-info-item">
-                    <span className="info-label"><FiCalendar /> Criado em:</span>
-                    <span className="info-value">{formatDate(editingCard.createdAt)}</span>
-                  </div>
-                )}
-                {editingCard?.lastContact ? (
-                  <div className="card-sidebar-info-item">
-                    <span className="info-label"><FiClock /> Último contato:</span>
-                    <span className="info-value">{formatDate(editingCard.lastContact)}</span>
-                  </div>
-                ) : (
-                  <div className="card-sidebar-info-item empty">
-                    <span className="info-label"><FiClock /> Último contato:</span>
-                    <span className="info-value empty">Sem contato</span>
-                  </div>
-                )}
-                {editingCard?.priority ? (
-                  <div className="card-sidebar-info-item">
-                    <span className="info-label"><FiFlag /> Prioridade:</span>
-                    <span className={`info-value priority-label ${editingCard.priority}`}>
-                      {editingCard.priority === 'high' ? 'Alta' : 
-                       editingCard.priority === 'medium' ? 'Média' : 'Baixa'}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="card-sidebar-info-item empty">
-                    <span className="info-label"><FiFlag /> Prioridade:</span>
-                    <span className="info-value empty">Não definida</span>
-                  </div>
-                )}
+              
+              <div className="card-sidebar-section">
+                <h3><FiInfo /> {mode === 'chat' ? 'Status do Contato' : 'Status do Lead'}</h3>
+                <div className="card-sidebar-info">
+                  {editingCard?.assignedTo ? (
+                    <div className="card-sidebar-info-item">
+                      <span className="info-label"><FiUser /> Responsável:</span>
+                      <span className="info-value">
+                        {users.find(u => Number(u.id) === Number(editingCard.assignedTo))?.name || 'Não encontrado'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="card-sidebar-info-item empty">
+                      <span className="info-label"><FiUser /> Responsável:</span>
+                      <span className="info-value empty">Sem Responsável</span>
+                    </div>
+                  )}
+                  
+                  {editingCard?.createdAt && (
+                    <div className="card-sidebar-info-item">
+                      <span className="info-label"><FiCalendar /> Criado em:</span>
+                      <span className="info-value">{formatDate(editingCard.createdAt)}</span>
+                    </div>
+                  )}
+                  {editingCard?.lastContact ? (
+                    <div className="card-sidebar-info-item">
+                      <span className="info-label"><FiClock /> Último contato:</span>
+                      <span className="info-value">{formatDate(editingCard.lastContact)}</span>
+                    </div>
+                  ) : (
+                    <div className="card-sidebar-info-item empty">
+                      <span className="info-label"><FiClock /> Último contato:</span>
+                      <span className="info-value empty">Sem contato</span>
+                    </div>
+                  )}
+                  {mode === 'crm' && editingCard?.priority ? (
+                    <div className="card-sidebar-info-item">
+                      <span className="info-label"><FiFlag /> Prioridade:</span>
+                      <span className={`info-value priority-label ${editingCard.priority}`}>
+                        {editingCard.priority === 'high' ? 'Alta' : 
+                         editingCard.priority === 'medium' ? 'Média' : 'Baixa'}
+                      </span>
+                    </div>
+                  ) : mode === 'crm' && (
+                    <div className="card-sidebar-info-item empty">
+                      <span className="info-label"><FiFlag /> Prioridade:</span>
+                      <span className="info-value empty">Não definida</span>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>
 
-      <div className="card-sidebar-footer">
-        {isEditing || isNewCard ? (
-          <>
-            <button 
-              className="sidebar-button secondary"
-              onClick={cancelEditing}
-            >
-              Cancelar
-            </button>
-            <button 
-              className="sidebar-button primary"
-              onClick={saveChanges}
-            >
-              <FiSave /> {isNewCard ? "Criar Lead" : "Atualizar dados"}
-            </button>
-          </>
-        ) : (
-          <>
-            <button 
-              className="sidebar-button primary"
-              onClick={startEditing}
-            >
-              <FiEdit /> Editar
-            </button>
-            <button 
-              className="sidebar-button danger"
-              onClick={() => {
-                if (window.confirm("Tem certeza que deseja excluir este lead?")) {
-                  onClose();
-                }
-              }}
-            >
-              <FiTrash2 /> Excluir
-            </button>
-          </>
-        )}
+        <div className="card-sidebar-footer">
+          {isEditing || isNewCard ? (
+            <>
+              <button 
+                className="sidebar-button secondary"
+                onClick={cancelEditing}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="sidebar-button primary"
+                onClick={saveChanges}
+              >
+                <FiSave /> {isNewCard ? 
+                  (mode === 'chat' ? "Criar Contato" : "Criar Lead") : 
+                  "Atualizar dados"}
+              </button>
+            </>
+          ) : (
+            <>
+              <button 
+                className="sidebar-button primary"
+                onClick={startEditing}
+              >
+                <FiEdit /> Editar
+              </button>
+              <button 
+                className="sidebar-button danger"
+                onClick={() => {
+                  if (window.confirm(`Tem certeza que deseja excluir este ${mode === 'chat' ? 'contato' : 'lead'}?`)) {
+                    onClose();
+                  }
+                }}
+              >
+                <FiTrash2 /> Excluir
+              </button>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
