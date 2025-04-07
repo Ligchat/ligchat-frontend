@@ -338,9 +338,29 @@ const ChatNew: React.FC = () => {
   // Melhorar o comportamento do scroll
   useEffect(() => {
     if (messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // Adicionando um pequeno delay para garantir que o conteúdo foi renderizado
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'end'
+        });
+      }, 100);
     }
   }, [messages]);
+
+  // Função auxiliar para forçar o scroll para baixo
+  const scrollToBottom = () => {
+    const messagesContainer = document.querySelector('.chat-new-messages');
+    if (messagesContainer) {
+      const lastMessage = messagesContainer.lastElementChild;
+      if (lastMessage) {
+        lastMessage.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'end'
+        });
+      }
+    }
+  };
 
   // Selecionar um contato
   const handleContactSelect = (contact: ContactData) => {
@@ -432,6 +452,7 @@ const ChatNew: React.FC = () => {
 
     setMessages(prev => [...prev, newMessage]);
     setMessageInput('');
+    scrollToBottom();
 
     try {
       console.log('Enviando mensagem para a API', {
@@ -459,6 +480,7 @@ const ChatNew: React.FC = () => {
           ? { ...response, status: 'sent' }
           : msg
       ));
+      scrollToBottom();
 
       // Atualizar a última mensagem do contato na lista
       setContacts(prevContacts => prevContacts.map(contact => 
@@ -534,6 +556,7 @@ const ChatNew: React.FC = () => {
     };
 
     setMessages(prev => [...prev, newMessage]);
+    scrollToBottom();
 
     try {
       const base64 = await fileToBase64(file);
@@ -552,6 +575,7 @@ const ChatNew: React.FC = () => {
           ? { ...msg, id: response.id, status: 'sent' }
           : msg
       ));
+      scrollToBottom();
 
       // Atualizar a última mensagem do contato na lista
       const lastMessagePreview = isImage ? '📷 Imagem enviada' : '📎 Anexo enviado';
@@ -619,6 +643,7 @@ const ChatNew: React.FC = () => {
 
     // Adiciona a mensagem temporária ao estado
     setMessages(prev => [...prev, newMessage]);
+    scrollToBottom();
 
     try {
       const base64Audio = await fileToBase64(new File([audioBlob], `audio_${tempId}.webm`, { type: 'audio/webm' }));
@@ -644,6 +669,7 @@ const ChatNew: React.FC = () => {
             }
           : msg
       ));
+      scrollToBottom();
 
       // Atualizar a última mensagem do contato na lista
       setContacts(prevContacts => prevContacts.map(contact => 
@@ -894,10 +920,24 @@ const ChatNew: React.FC = () => {
         ...msg,
         status: msg.isSent ? 'sent' : undefined
       })));
+      // Adicionando um delay maior para garantir que as mensagens foram renderizadas
+      setTimeout(() => {
+        scrollToBottom();
+      }, 200);
     } catch (error) {
       console.error('Erro ao carregar mensagens:', error);
     }
   };
+
+  // Adicionar um useEffect específico para quando o selectedContact muda
+  useEffect(() => {
+    if (selectedContact) {
+      // Garantir que o scroll aconteça após a mudança de contato
+      setTimeout(() => {
+        scrollToBottom();
+      }, 200);
+    }
+  }, [selectedContact]);
 
   // Atualizar a renderização das mensagens
   const renderMessage = (message: Message) => {
@@ -1003,6 +1043,7 @@ const ChatNew: React.FC = () => {
       
       if (selectedContact && message.contactId === selectedContact.id) {
         setMessages(prev => [...prev, normalizedMessage]);
+        scrollToBottom();
       }
     } else {
       // Mensagem com WebSocket
@@ -1032,6 +1073,7 @@ const ChatNew: React.FC = () => {
           );
           
           if (!messageExists) {
+            scrollToBottom();
             return [...prevMessages, normalizedMessage];
           }
           return prevMessages;
