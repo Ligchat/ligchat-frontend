@@ -396,7 +396,6 @@
 }
 
 .contacts-list {
-  max-height: 200px;
   overflow-y: auto;
   background-color: #252525;
   border: 1px solid #333;

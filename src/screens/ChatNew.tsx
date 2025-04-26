@@ -1,25 +1,26 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import '../styles/Chat/ChatNew.css';
 import dayjs from 'dayjs';
-import Toast, { ToastContainer } from '../components/Toast';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import SessionService from '../services/SessionService';
 import { getContacts, updateContact } from '../services/ContactService';
-import { sendMessage, sendFile } from '../services/WhatsappService';
+import { sendMessage, sendFile, MessageResponse, sendAudioMessage } from '../services/MessageService';
 import { getSector, Sector } from '../services/SectorService';
-import { getMessagesByContactId, MessageResponse, MessageType } from '../services/MessageService';
+import { getMessagesByContactId } from '../services/MessageService';
 import { AudioMessage } from '../components/AudioMessage';
 import { AudioRecorder } from '../components/AudioRecorder';
-import { FiMail, FiPhone, FiX, FiSend, FiMoreVertical, FiUserPlus, FiTag } from 'react-icons/fi';
+import {  FiPhone, FiMoreVertical, FiUserPlus, FiTag } from 'react-icons/fi';
 import { getAllUsers, User } from '../services/UserService';
-import { WebSocketService } from '../services/WebSocketService';
 import { getTags, Tag } from '../services/LabelService';
+import { useLocation } from 'react-router-dom';
+import ChatWebSocketService from '../services/ChatWebSocketService';
+import { UserPlus } from 'lucide-react';
 
-// Componente de ícone para anexos
-const AttachmentIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M16.5 6V17.5C16.5 19.71 14.71 21.5 12.5 21.5C10.29 21.5 8.5 19.71 8.5 17.5V5C8.5 3.62 9.62 2.5 11 2.5C12.38 2.5 13.5 3.62 13.5 5V15.5C13.5 16.05 13.05 16.5 12.5 16.5C11.95 16.5 11.5 16.05 11.5 15.5V6H10V15.5C10 16.88 11.12 18 12.5 18C13.88 18 15 16.88 15 15.5V5C15 2.79 13.21 1 11 1C8.79 1 7 2.79 7 5V17.5C7 20.54 9.46 23 12.5 23C15.54 23 18 20.54 18 17.5V6H16.5Z" fill="currentColor"/>
-  </svg>
-);
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const MESSAGES_PAGE_SIZE = 5;
 
 const ImageIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -45,22 +46,10 @@ const SendIcon = () => (
   </svg>
 );
 
-const CheckIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z" fill="currentColor"/>
-  </svg>
-);
-
 // Novo componente de ícone para o botão voltar
 const BackIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M20 11H7.83L13.42 5.41L12 4L4 12L12 20L13.41 18.59L7.83 13H20V11Z" fill="currentColor"/>
-  </svg>
-);
-
-const EditIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25ZM20.71 7.04C21.1 6.65 21.1 6.02 20.71 5.63L18.37 3.29C17.98 2.9 17.35 2.9 16.96 3.29L15.13 5.12L18.88 8.87L20.71 7.04Z" fill="currentColor"/>
   </svg>
 );
 
@@ -70,95 +59,8 @@ const UserIcon = () => (
   </svg>
 );
 
-// Componente de visualização de ondas sonoras aprimorado
-const AudioWaveform = ({ duration = 30, isPlaying = false, isRecording = false }) => {
-  const bars = 40;
-  const [barHeights, setBarHeights] = useState<number[]>([]);
-  const animationRef = useRef<number | null>(null);
-  
-  // Gera alturas aleatórias para as barras com uma distribuição mais natural
-  const generateRandomHeights = useCallback(() => {
-    const heights = [];
-    let prevHeight = 20 + Math.random() * 30; // Começa com um valor médio
-    
-    for (let i = 0; i < bars; i++) {
-      // Cria uma variação suave entre barras adjacentes
-      const variation = Math.random() * 30 - 15; // Variação de -15 a +15
-      let newHeight = prevHeight + variation;
-      
-      // Mantém a altura dentro de limites razoáveis
-      newHeight = Math.max(5, Math.min(95, newHeight));
-      
-      heights.push(newHeight);
-      prevHeight = newHeight;
-    }
-    
-    return heights;
-  }, []);
-  
-  // Inicializa as alturas das barras
-  useEffect(() => {
-    setBarHeights(generateRandomHeights());
-  }, [generateRandomHeights]);
-  
-  // Atualiza as alturas das barras durante a gravação ou reprodução
-  useEffect(() => {
-    if (isRecording || isPlaying) {
-      const updateWaveform = () => {
-        // Durante a gravação, simula a captura de amplitude do microfone
-        if (isRecording) {
-          setBarHeights(prev => {
-            const newHeights = [...prev];
-            // Atualiza algumas barras aleatoriamente para simular atividade do microfone
-            for (let i = 0; i < 5; i++) {
-              const randomIndex = Math.floor(Math.random() * bars);
-              const variation = Math.random() * 40 - 20; // Variação maior durante gravação
-              let newHeight = newHeights[randomIndex] + variation;
-              newHeight = Math.max(5, Math.min(95, newHeight));
-              newHeights[randomIndex] = newHeight;
-            }
-            return newHeights;
-          });
-        } 
-        // Durante a reprodução, cria um efeito de onda mais suave
-        else if (isPlaying) {
-          setBarHeights(prev => {
-            const newHeights = [...prev];
-            // Desloca as alturas para criar um efeito de onda
-            const firstHeight = newHeights.shift() || 50;
-            newHeights.push(firstHeight);
-            return newHeights;
-          });
-        }
-        
-        animationRef.current = requestAnimationFrame(updateWaveform);
-      };
-      
-      animationRef.current = requestAnimationFrame(updateWaveform);
-      
-      return () => {
-        if (animationRef.current) {
-          cancelAnimationFrame(animationRef.current);
-        }
-      };
-    }
-  }, [isRecording, isPlaying, bars]);
-  
-  return (
-    <div className={`audio-waveform ${isPlaying ? 'playing' : ''} ${isRecording ? 'recording' : ''}`}>
-      {barHeights.map((height, index) => (
-        <div 
-          key={index} 
-          className="waveform-bar" 
-          style={{ height: `${height}%` }}
-        />
-      ))}
-    </div>
-  );
-};
-
 // Tipos
-interface ContactData {
+interface OriginalContactData {
   id: number;
   name: string;
   tagId: number | null;
@@ -172,12 +74,13 @@ interface ContactData {
   contactStatus: string;
   aiActive: number;
   assignedTo: number | null;
+  assignedToName?: string | null;
   createdAt: string;
-  // Campos adicionais para UI
   profilePicture?: string;
   lastMessage?: string;
   lastMessageTime?: string;
   unreadCount?: number;
+  is_viewed: boolean;
 }
 
 interface Message extends MessageResponse {
@@ -192,57 +95,120 @@ interface Message extends MessageResponse {
 
 // Adicionar função de formatação de telefone antes do componente ChatNew
 const formatPhoneNumber = (phone: string): string => {
-  // Remove todos os caracteres não numéricos
   const numbers = phone.replace(/\D/g, '');
   
-  // Verifica se é um número de celular brasileiro
-  if (numbers.length === 13 && numbers.startsWith('55')) { // Com DDI: +55 (XX) XXXXX-XXXX
-    return `+55 (${numbers.slice(2, 4)}) ${numbers.slice(4, 9)}-${numbers.slice(9)}`;
-  } else if (numbers.length === 11) { // Sem DDI: (XX) XXXXX-XXXX
-    return `+55 (${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
-  } else if (numbers.length === 10) { // Telefone fixo: (XX) XXXX-XXXX
-    return `+55 (${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+  let ddi = '';
+  let cleanNumber = numbers;
+  
+  if (numbers.startsWith('55')) {
+    ddi = '+55';
+    cleanNumber = numbers.slice(2);
   }
   
-  // Se o número já começar com +55, não adiciona novamente
-  if (phone.startsWith('+55')) {
-    return phone;
+  if (cleanNumber.length === 11) {
+    return `${ddi} (${cleanNumber.slice(0, 2)}) ${cleanNumber.slice(2, 7)}-${cleanNumber.slice(7)}`;
   }
   
-  // Para outros formatos, adiciona +55 no início
-  return `+55 ${phone}`;
+  if (cleanNumber.length === 10) {
+    return `${ddi} (${cleanNumber.slice(0, 2)}) ${cleanNumber.slice(2, 6)}-${cleanNumber.slice(6)}`;
+  }
+  
+  return phone;
 };
 
-const getAvatarUrl = (name: string, existingUrl: string | null) => {
-  if (existingUrl) return existingUrl;
-  // Usar o nome como seed para gerar uma cor consistente
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&seed=${encodeURIComponent(name)}`;
-};
+type ChatNewProps = {};
 
-const ChatNew: React.FC = () => {
+type ContactData = OriginalContactData;
+
+const ContactItem = React.memo(({ contact, selectedContactId, onSelect, tags }: { contact: ContactData, selectedContactId: number | null, onSelect: (c: ContactData) => void, tags: Tag[] }) => {
+  const initials = useMemo(() => contact.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2), [contact.name]);
+  return (
+    <div
+      className={`contact-item ${selectedContactId === contact.id ? 'selected' : ''}`}
+      onClick={() => onSelect(contact)}
+    >
+      <div className="contact-avatar">
+        {contact.avatarUrl ? (
+          <img 
+            src={contact.avatarUrl} 
+            alt={contact.name} 
+            className="avatar-image"
+            style={{
+              border: contact.tagId ? `3px solid ${tags.find(t => t.id === contact.tagId)?.color || 'transparent'}` : 'none',
+              borderRadius: '50%',
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover'
+            }}
+          />
+        ) : (
+          <div 
+            className="avatar-initials"
+            style={{
+              border: contact.tagId ? `3px solid ${tags.find(t => t.id === contact.tagId)?.color || 'transparent'}` : 'none'
+            }}
+          >
+            {initials}
+          </div>
+        )}
+      </div>
+      <div className="contact-info">
+        <div className="contact-header">
+          <div className="contact-name">{contact.name}</div>
+          {contact.lastMessageTime && (
+            <span className="message-time">
+              {dayjs(contact.lastMessageTime).format('HH:mm')}
+            </span>
+          )}
+        </div>
+        <div className="contact-number">{formatPhoneNumber(contact.number)}</div>
+      </div>
+    </div>
+  );
+});
+
+const RenderContacts = React.memo(({
+  contacts,
+  selectedContact,
+  onSelect,
+  tags
+}: {
+  contacts: ContactData[],
+  selectedContact: ContactData | null,
+  onSelect: (c: ContactData) => void,
+  tags: Tag[]
+}) => {
+  return (
+    <div className="contacts-list">
+      {contacts.map((contact) => (
+        <ContactItem 
+          key={contact.id} 
+          contact={contact} 
+          selectedContactId={selectedContact?.id ?? null} 
+          onSelect={onSelect}
+          tags={tags}
+        />
+      ))}
+    </div>
+  );
+});
+
+const ChatNew: React.FC<ChatNewProps> = () => {
+  const location = useLocation();
   const [selectedContact, setSelectedContact] = useState<ContactData | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
   const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [showAttachments, setShowAttachments] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
   const [contacts, setContacts] = useState<ContactData[]>([]);
-  const [isLoadingContacts, setIsLoadingContacts] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [playingAudioId, setPlayingAudioId] = useState<number | null>(null);
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
-  const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
@@ -251,53 +217,67 @@ const ChatNew: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [isTransferLoading, setIsTransferLoading] = useState(false);
   const [isTagLoading, setIsTagLoading] = useState(false);
+  const [isMicrophoneAvailable, setIsMicrophoneAvailable] = useState(false);
+  const [isCheckingMicrophone, setIsCheckingMicrophone] = useState(true);
+  const contactsRef = useRef<ContactData[]>(contacts);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isMessagesLoading, setIsMessagesLoading] = useState(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [scrollButtonLeft, setScrollButtonLeft] = useState<number | null>(null);
+  const [isContactsLoading, setIsContactsLoading] = useState(false);
+  const [selectedFilterUser, setSelectedFilterUser] = useState<number | null>(null);
+  const [selectedFilterTag, setSelectedFilterTag] = useState<number | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
-  const webSocketRef = useRef<WebSocketService | null>(null);
-
-  const [audioChunks, setAudioChunks] = useState<BlobPart[]>([]);
-
-  // Função para reproduzir/pausar áudio
-  const toggleAudioPlayback = (messageId: number) => {
-    if (playingAudioId === messageId) {
-      setPlayingAudioId(null);
-    } else {
-      setPlayingAudioId(messageId);
+  const loadMessages = useCallback(async (contactId: number, pageParam = 0, append = false) => {
+    console.log('🔄 loadMessages - Iniciando carregamento de mensagens', { contactId, pageParam, append });
+    if (append) setIsLoadingMore(true);
+    else setIsMessagesLoading(true);
+    try {
+      const offset = pageParam * MESSAGES_PAGE_SIZE;
+      console.log('📝 loadMessages - Chamando API getMessagesByContactId', { contactId, limit: MESSAGES_PAGE_SIZE, offset });
+      const response = await getMessagesByContactId(contactId, MESSAGES_PAGE_SIZE, offset);
+      console.log('✅ loadMessages - Resposta da API', { response, length: Array.isArray(response) ? response.length : 0 });
+      
+      const newMessages = Array.isArray(response) ? response : [];
+      newMessages.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
+      setHasMore(newMessages.length === MESSAGES_PAGE_SIZE);
+      if (append) {
+        setMessages(prev => [...newMessages, ...prev]);
+      } else {
+        setMessages(newMessages);
+      }
+    } catch (error) {
+      console.error('❌ loadMessages - Erro ao carregar mensagens:', error);
+    } finally {
+      if (append) setIsLoadingMore(false);
+      else setIsMessagesLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (selectedContact) {
+      console.log('🔄 useEffect [selectedContact] - Carregando mensagens para novo contato', { contactId: selectedContact.id });
+      setPage(0);
+      loadMessages(selectedContact.id, 0, false);
+    }
+  }, [selectedContact, loadMessages]);
 
   // Verificar se há um setor selecionado na sessão
   useEffect(() => {
     const checkSector = () => {
       const sectorId = SessionService.getSectorId();
-      console.log('SectorId da sessão:', sectorId);
-      
-      // Se não houver setor selecionado, tenta pegar do localStorage
-      if (!sectorId) {
-        const storedSectorId = localStorage.getItem('selectedSector');
-        if (storedSectorId) {
-          console.log('SectorId encontrado no localStorage:', storedSectorId);
-          SessionService.setSectorId(Number(storedSectorId));
-          setSelectedSectorId(storedSectorId);
-          return;
-        }
-      }
-
-      // Se houver setor na sessão, atualiza o estado
+      console.log('🔄 useEffect [checkSector] - Verificando setor na sessão', { sectorId, selectedSectorId });
       if (sectorId && String(sectorId) !== selectedSectorId) {
         setSelectedSectorId(String(sectorId));
-        SessionService.setSectorId(sectorId);
       }
     };
 
-    // Checa imediatamente
     checkSector();
-
-    // Configura o intervalo para checagem periódica
-    const intervalId = setInterval(checkSector, 5000); // Reduzido para 5 segundos
-
-    return () => {
-      clearInterval(intervalId);
-    };
   }, [selectedSectorId]);
 
   // Verificar se é dispositivo móvel
@@ -322,89 +302,78 @@ const ChatNew: React.FC = () => {
     }
   }, [selectedContact, isMobile]);
   
-  // Filtrar contatos com base no termo de pesquisa
-  const filteredContacts = contacts.filter(contact => 
-    contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.number.includes(searchTerm)
-  );
 
-  // Carregar mensagens quando um contato é selecionado
-  useEffect(() => {
-    if (selectedContact) {
-      loadMessages(selectedContact.id);
-    }
-  }, [selectedContact]);
 
   // Melhorar o comportamento do scroll
   useEffect(() => {
-    if (messages.length > 0) {
-      // Adicionando um pequeno delay para garantir que o conteúdo foi renderizado
+    if (!isLoadingMore && !isMessagesLoading && messages.length > 0 && page === 0) {
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ 
-          behavior: 'smooth',
-          block: 'end'
-        });
+        const container = messagesContainerRef.current;
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+          setShowScrollToBottom(false);
+        }
       }, 100);
     }
-  }, [messages]);
+  }, [messages.length, isLoadingMore, isMessagesLoading, page]);
 
   // Função auxiliar para forçar o scroll para baixo
   const scrollToBottom = () => {
     const messagesContainer = document.querySelector('.chat-new-messages');
     if (messagesContainer) {
-      const lastMessage = messagesContainer.lastElementChild;
-      if (lastMessage) {
-        lastMessage.scrollIntoView({ 
-          behavior: 'smooth',
-          block: 'end'
-        });
-      }
+      messagesContainer.scrollTo({
+        top: messagesContainer.scrollHeight,
+        behavior: 'smooth'
+      });
     }
   };
 
-  // Selecionar um contato
-  const handleContactSelect = (contact: ContactData) => {
-    if (!selectedSectorId) return; // Não permite selecionar contato sem setor
-    setSelectedContact(contact);
-    
-    // Em dispositivos móveis, esconder a sidebar após selecionar um contato
+  // Troca de contato: mostra loading, só troca mensagens quando carregar
+  const handleContactSelect = useCallback(async (contact: ContactData) => {
+    console.log('🔄 handleContactSelect - Iniciando seleção de contato', { contactId: contact.id, contact });
+    if (!selectedSectorId) {
+      console.log('❌ handleContactSelect - Sem setor selecionado, abortando');
+      return;
+    }
+    localStorage.setItem('openContactId', contact.id.toString());
+    try {
+      setContacts(prevContacts => prevContacts.map(c =>
+        c.id === contact.id
+          ? { ...c, is_viewed: true }
+          : c
+      ));
+      setPage(0);
+      setSelectedContact({ ...contact});
+      console.log('✅ handleContactSelect - Contato selecionado com sucesso', { contactId: contact.id });
+    } catch (error) {
+      console.error('❌ handleContactSelect - Erro ao selecionar contato:', error);
+    }
     if (isMobile) {
       setShowSidebar(false);
     }
-  };
+  }, [selectedSectorId, isMobile]);
 
   // Voltar para a lista de contatos (apenas mobile)
   const handleBackToContacts = () => {
     setShowSidebar(true);
   };
 
-  const showToast = (message: string, type: 'success' | 'error' | 'info') => {
-    const id = Date.now();
-    setTimeout(() => {
-    }, 5000);
-  };
 
-  const removeToast = (id: number) => {
-  };
 
   useEffect(() => {
     const fetchSelectedSector = async () => {
       if (!selectedSectorId) {
-        console.log('Sem selectedSectorId, não buscando setor');
+        console.log('❌ fetchSelectedSector - Sem selectedSectorId, não buscando setor');
         return;
       }
 
       try {
-        console.log('Buscando setor:', selectedSectorId);
+        console.log('🔄 fetchSelectedSector - Buscando setor:', selectedSectorId);
         const sector = await getSector(Number(selectedSectorId));
-        console.log('Setor retornado:', sector);
-        if (!sector?.phoneNumberId) {
-          console.error('Setor não tem phoneNumberId:', sector);
-          return;
-        }
+        console.log('✅ fetchSelectedSector - Setor retornado:', sector);
         setSelectedSector(sector);
       } catch (error) {
-        console.error('Erro ao buscar setor:', error);
+        console.error('❌ fetchSelectedSector - Erro ao buscar setor:', error);
       }
     };
 
@@ -412,29 +381,21 @@ const ChatNew: React.FC = () => {
   }, [selectedSectorId]);
 
   const handleSendMessage = async () => {
-    console.log('handleSendMessage chamado', {
+    console.log('🔄 handleSendMessage - Iniciando envio de mensagem', {
       messageInput,
       selectedContact,
       selectedSectorId,
       selectedSector
     });
 
-    if (!messageInput.trim()) {
-      console.log('Mensagem vazia');
-      return;
-    }
-    
-    if (!selectedContact) {
-      console.log('Nenhum contato selecionado');
-      return;
-    }
-    
-    if (!selectedSectorId || !selectedSector?.phoneNumberId) {
-      console.log('Setor não selecionado ou phoneNumberId não disponível');
+    if (!messageInput.trim() || !selectedContact || !selectedSectorId) {
+      console.log('❌ handleSendMessage - Dados inválidos para envio');
       return;
     }
 
     const tempId = Date.now();
+    const contactId = selectedContact.id;
+
     const newMessage: Message = {
       id: tempId,
       content: messageInput,
@@ -443,60 +404,47 @@ const ChatNew: React.FC = () => {
       fileName: null,
       mimeType: null,
       sectorId: Number(selectedSectorId),
-      contactID: selectedContact.id,
+      contactID: contactId,
       sentAt: new Date().toISOString(),
       isSent: true,
       isRead: false,
       status: 'sending'
     };
 
-    setMessages(prev => [...prev, newMessage]);
+    // Atualizar mensagens mantendo apenas as do contato atual
+    setMessages(prev => [...prev.filter(msg => msg.contactID === contactId), newMessage]);
     setMessageInput('');
-    scrollToBottom();
 
     try {
-      console.log('Enviando mensagem para a API', {
-        message: messageInput,
+      console.log('🔄 handleSendMessage - Enviando mensagem para a API', {
+        text: messageInput,
         to: selectedContact.number,
-        recipientNumber: selectedSector.phoneNumberId,
-        contactId: selectedContact.id,
+        recipientPhone: selectedContact.number,
+        contactId: contactId,
         sectorId: Number(selectedSectorId)
       });
 
       const response = await sendMessage({
-        message: messageInput,
-        to: selectedContact.number,
-        recipientNumber: selectedSector.phoneNumberId,
         text: messageInput,
-        contactId: selectedContact.id,
-        sectorId: Number(selectedSectorId),
-        isHuman: true
+        to: selectedContact.number,
+        recipientPhone: selectedContact.number,
+        contactId: contactId,
+        sectorId: Number(selectedSectorId)
       });
 
-      console.log('Resposta da API:', response);
+      console.log('✅ handleSendMessage - Resposta da API:', response);
 
+      // Atualizar mensagem com resposta da API
       setMessages(prev => prev.map(msg => 
-        msg.id === tempId 
-          ? { ...response, status: 'sent' }
+        msg.id === tempId && msg.contactID === contactId
+          ? { ...response, status: 'sent', contactID: contactId }
           : msg
-      ));
-      scrollToBottom();
-
-      // Atualizar a última mensagem do contato na lista
-      setContacts(prevContacts => prevContacts.map(contact => 
-        contact.id === selectedContact.id
-          ? {
-              ...contact,
-              lastMessage: messageInput,
-              lastMessageTime: new Date().toISOString()
-            }
-          : contact
       ));
 
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
+      console.error('❌ handleSendMessage - Erro ao enviar mensagem:', error);
       setMessages(prev => prev.map(msg => 
-        msg.id === tempId 
+        msg.id === tempId && msg.contactID === contactId
           ? { ...msg, status: 'error' }
           : msg
       ));
@@ -513,16 +461,12 @@ const ChatNew: React.FC = () => {
     }
   };
 
-  const handleAttachmentClick = () => {
-    setShowAttachments(!showAttachments);
-  };
 
   const handleImageUpload = () => {
     if (fileInputRef.current) {
       fileInputRef.current.accept = 'image/*';
       fileInputRef.current.click();
     }
-    setShowAttachments(false);
   };
 
   const handleDocumentUpload = () => {
@@ -530,7 +474,6 @@ const ChatNew: React.FC = () => {
       fileInputRef.current.accept = '.pdf,.doc,.docx,.xls,.xlsx,.txt';
       fileInputRef.current.click();
     }
-    setShowAttachments(false);
   };
 
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -555,7 +498,7 @@ const ChatNew: React.FC = () => {
       status: 'sending'
     };
 
-    setMessages(prev => [...prev, newMessage]);
+    setMessages(prev => [...prev.filter(msg => msg.contactID === selectedContact.id), newMessage]);
     scrollToBottom();
 
     try {
@@ -566,18 +509,18 @@ const ChatNew: React.FC = () => {
         fileName: file.name,
         caption: '',
         recipient: selectedContact.number,
+        recipientPhone: selectedContact.number,
         contactId: selectedContact.id,
         sectorId: Number(selectedSectorId)
       });
 
       setMessages(prev => prev.map(msg => 
-        msg.id === tempId 
+        msg.id === tempId && msg.contactID === selectedContact.id
           ? { ...msg, id: response.id, status: 'sent' }
           : msg
       ));
       scrollToBottom();
 
-      // Atualizar a última mensagem do contato na lista
       const lastMessagePreview = isImage ? '📷 Imagem enviada' : '📎 Anexo enviado';
       setContacts(prevContacts => prevContacts.map(contact => 
         contact.id === selectedContact.id
@@ -590,9 +533,9 @@ const ChatNew: React.FC = () => {
       ));
 
     } catch (error) {
-      console.error('Erro ao enviar arquivo:', error);
+      console.error('❌ handleFileSelected - Erro ao enviar arquivo:', error);
       setMessages(prev => prev.map(msg => 
-        msg.id === tempId 
+        msg.id === tempId && msg.contactID === selectedContact.id
           ? { ...msg, status: 'error' }
           : msg
       ));
@@ -631,8 +574,8 @@ const ChatNew: React.FC = () => {
       content: '',
       mediaType: 'audio',
       mediaUrl: audioUrl,
-      fileName: `audio_${tempId}.webm`,
-      mimeType: 'audio/webm',
+      fileName: `audio_${tempId}.wav`, // Mudado para .wav já que será convertido
+      mimeType: 'audio/wav',
       sectorId: Number(selectedSectorId),
       contactID: selectedContact.id,
       sentAt: new Date().toISOString(),
@@ -646,25 +589,20 @@ const ChatNew: React.FC = () => {
     scrollToBottom();
 
     try {
-      const base64Audio = await fileToBase64(new File([audioBlob], `audio_${tempId}.webm`, { type: 'audio/webm' }));
-      const response = await sendFile({
-        base64File: base64Audio,
-        mediaType: 'audio/webm',
-        fileName: `audio_${tempId}.webm`,
-        caption: '',
-        recipient: selectedContact.number,
-        contactId: selectedContact.id,
-        sectorId: Number(selectedSectorId)
-      });
+      // Usar sendAudioMessage em vez de sendFile
+      const response = await sendAudioMessage(
+        audioBlob,
+        selectedContact.number,
+        selectedContact.id,
+        Number(selectedSectorId)
+      );
 
-      // Atualiza a mensagem temporária com os dados do servidor, mantendo o tipo como audio/webm
+      // Atualiza a mensagem temporária com os dados do servidor
       setMessages(prev => prev.map(msg => 
         msg.id === tempId 
           ? { 
-              ...response, 
-              mediaUrl: audioUrl, 
-              mediaType: 'audio',
-              mimeType: 'audio/webm',
+              ...response,
+              mediaUrl: audioUrl,
               status: 'sent' 
             }
           : msg
@@ -683,7 +621,7 @@ const ChatNew: React.FC = () => {
       ));
 
     } catch (error) {
-      console.error('Erro ao enviar áudio:', error);
+      console.error('❌ handleSendAudio - Erro ao enviar áudio:', error);
       setMessages(prev => prev.map(msg => 
         msg.id === tempId 
           ? { ...msg, status: 'error' }
@@ -694,252 +632,170 @@ const ChatNew: React.FC = () => {
 
   // Atualizar o useEffect que monitora o selectedSectorId
   useEffect(() => {
-    const fetchContacts = async () => {
+    const initializeData = async () => {
+      console.log('🔄 initializeData - Iniciando carregamento de dados', { selectedSectorId });
       if (!selectedSectorId) {
+        console.log('❌ initializeData - Sem setor selecionado, limpando contatos');
         setContacts([]);
         return;
       }
-
-      setIsLoadingContacts(true);
-      setError(null);
-
+      setIsContactsLoading(true);
       try {
-        const [contactsResponse, usersData] = await Promise.all([
-          getContacts(Number(selectedSectorId)),
-          getAllUsers()
-        ]);
-        
-        console.log('Contatos recebidos:', contactsResponse);
-        setUsers(usersData);
-
-        // Processar cada contato com suas mensagens mais recentes
-        const contactsWithMessages = await Promise.all(
-          contactsResponse.data.map(async (contact: ContactData) => {
-            try {
-              const messages = await getMessagesByContactId(contact.id);
-              const lastMessage = messages[messages.length - 1];
-              
-              let lastMessagePreview = '';
-              let lastMessageTime = contact.createdAt;
-              
-              if (lastMessage) {
-                lastMessageTime = lastMessage.sentAt;
-                
-                switch (lastMessage.mediaType?.toLowerCase()) {
-                  case 'image':
-                    lastMessagePreview = lastMessage.isSent ? '📷 Imagem enviada' : '📷 Imagem recebida';
-                    break;
-                  case 'document':
-                    lastMessagePreview = lastMessage.isSent ? '📎 Anexo enviado' : '📎 Anexo recebido';
-                    break;
-                  case 'audio':
-                  case 'voice':
-                    lastMessagePreview = lastMessage.isSent ? '🎤 Áudio enviado' : '🎤 Áudio recebido';
-                    break;
-                  default:
-                    lastMessagePreview = lastMessage.content || '';
-                }
-              }
-
-              return {
-                ...contact,
-                profilePicture: getAvatarUrl(contact.name, contact.avatarUrl),
-                lastMessage: lastMessagePreview,
-                lastMessageTime: lastMessageTime,
-                phoneNumber: contact.number
-              };
-            } catch (error) {
-              console.error(`Erro ao buscar mensagens para o contato ${contact.id}:`, error);
-              return {
-                ...contact,
-                profilePicture: getAvatarUrl(contact.name, contact.avatarUrl),
-                lastMessage: 'Erro ao carregar mensagens',
-                lastMessageTime: contact.createdAt,
-                phoneNumber: contact.number
-              };
-            }
+        console.log('🔄 initializeData - Buscando usuários, tags e contatos');
+        const [users, tagsResponse, contactsResponse] = await Promise.all([
+          getAllUsers().catch(error => {
+            console.error('❌ initializeData - Erro ao buscar usuários:', error);
+            return [];
+          }),
+          getTags(Number(selectedSectorId)).catch(error => {
+            console.error('❌ initializeData - Erro ao buscar tags:', error);
+            return { data: [] };
+          }),
+          getContacts(Number(selectedSectorId)).catch(error => {
+            console.error('❌ initializeData - Erro ao buscar contatos:', error);
+            return null;
           })
-        );
+        ]);
 
-        // Ordenar contatos por data da última mensagem (mais recentes primeiro)
-        const sortedContacts = contactsWithMessages.sort((a: ContactData, b: ContactData) => {
-          const dateA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
-          const dateB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
-          return dateB - dateA;
-        });
+        console.log('✅ initializeData - Usuários obtidos:', users);
+        setUsers(users || []);
 
-        console.log('Contatos processados:', sortedContacts);
-        setContacts(sortedContacts);
-      } catch (err) {
-        console.error('Erro ao buscar contatos:', err);
-        setError('Erro ao carregar contatos. Tente novamente.');
+        // Atualizar tags garantindo que temos a estrutura correta
+        console.log('✅ initializeData - Tags obtidas:', tagsResponse);
+        if (tagsResponse?.data && Array.isArray(tagsResponse.data)) {
+          setTags(tagsResponse.data);
+        } else {
+          console.log('⚠️ initializeData - Formato de resposta inválido para tags');
+          setTags([]);
+        }
+
+        console.log('✅ initializeData - Contatos obtidos:', contactsResponse);
+        if (contactsResponse?.data && Array.isArray(contactsResponse.data)) {
+          const currentContactsMap = new Map(contactsRef.current.map(contact => [contact.id, contact]));
+          
+          // Obtém o ID do usuário atual
+          const token = SessionService.getToken();
+          const decodedToken = token ? SessionService.decodeToken(token) : null;
+          const userId = decodedToken ? decodedToken.userId : null;
+          console.log('🔄 initializeData - Usuário atual:', { userId });
+          
+          // Converter userId para número para garantir uma comparação correta
+          const currentUserIdNum = userId ? Number(userId) : null;
+          console.log('🔄 initializeData - Usuário atual (número):', { currentUserIdNum });
+          
+          const updatedContacts = contactsResponse.data.map(contact => {
+            console.log('🔍 Verificando contato:', { 
+              contactId: contact.id, 
+              assignedTo: contact.assignedTo, 
+              currentUserIdNum,
+              isEqual: contact.assignedTo === currentUserIdNum
+            });
+            
+            // Se o contato estiver atribuído ao usuário atual, definir assignedToName como "Delegado para mim"
+            const assignedToName = contact.assignedTo === currentUserIdNum
+              ? "Delegado para mim" 
+              : (contact as any).assignedToName || null;
+              
+            return {
+              ...contact,
+              lastMessage: currentContactsMap.get(contact.id)?.lastMessage || '',
+              lastMessageTime: currentContactsMap.get(contact.id)?.lastMessageTime || '',
+              unreadCount: currentContactsMap.get(contact.id)?.unreadCount || 0,
+              is_viewed: true,
+              assignedToName
+            };
+          });
+          
+          console.log('✅ initializeData - Contatos atualizados:', updatedContacts);
+          setContacts(updatedContacts);
+          
+          // Se já tiver um contato selecionado, atualizar seu assignedToName também
+          if (selectedContact) {
+            console.log('🔄 initializeData - Atualizando contato selecionado');
+            const updatedSelectedContact = updatedContacts.find(c => c.id === selectedContact.id);
+            if (updatedSelectedContact) {
+              setSelectedContact(updatedSelectedContact);
+            }
+          }
+          
+        } else {
+          console.log('⚠️ initializeData - Formato de resposta inválido para contatos');
+          setContacts([]);
+        }
+      } catch (error) {
+        console.error('❌ initializeData - Erro ao carregar dados iniciais:', error);
         setContacts([]);
+        setTags([]);
       } finally {
-        setIsLoadingContacts(false);
+        setIsContactsLoading(false);
       }
     };
 
-    fetchContacts();
+    initializeData();
   }, [selectedSectorId]);
 
-  // Atualizar o render da lista de contatos
-  const renderContacts = () => {
-    if (!selectedSectorId) {
-      return (
-        <div className="chat-new-no-sector">
-          <div className="chat-new-no-sector-icon">🔒</div>
-          <p>Selecione um setor no menu principal para ver os contatos</p>
-        </div>
-      );
-    }
-
-    if (isLoadingContacts) {
-      return (
-        <div className="chat-new-loading">
-          <div className="chat-new-loading-spinner"></div>
-          <p>Carregando contatos...</p>
-        </div>
-      );
-    }
-
-    if (error) {
-      return (
-        <div className="chat-new-error">
-          <div className="chat-new-error-icon">⚠️</div>
-          <p>{error}</p>
-          <button onClick={() => window.location.reload()}>Tentar novamente</button>
-        </div>
-      );
-    }
-
-    if (contacts.length === 0) {
-      return (
-        <div className="chat-new-no-contacts">
-          <div className="chat-new-no-contacts-icon">👥</div>
-          <p>Nenhum contato encontrado neste setor</p>
-        </div>
-      );
-    }
-
-    return filteredContacts.map(contact => {
-      // Encontrar o usuário responsável
-      const assignedUser = users.find(u => u.id === contact.assignedTo);
-      const assigneeInitials = assignedUser?.name ? (() => {
-        const nameParts = assignedUser.name.split(' ');
-        if (nameParts.length >= 2) {
-          return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
-        }
-        return nameParts[0].substring(0, 2).toUpperCase();
-      })() : null;
-
-      // Encontrar a tag do contato
-      const tag = tags.find(t => t.id === Number(contact.tagId));
-
-      return (
-        <div
-          key={contact.id}
-          className={`chat-new-contact ${selectedContact?.id === contact.id ? 'selected' : ''}`}
-          onClick={() => handleContactSelect(contact)}
-        >
-          <div className="chat-new-contact-avatar">
-            <img 
-              src={getAvatarUrl(contact.name, contact.avatarUrl)}
-              alt={contact.name}
-              style={tag ? {
-                borderColor: tag.color
-              } : undefined}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.src = getAvatarUrl(contact.name, null);
-              }}
-            />
-            {assigneeInitials && (
-              <div className="chat-new-contact-assignee">
-                <span 
-                  className="assignee-initials" 
-                  title={assignedUser?.name}
-                >
-                  {assigneeInitials}
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="chat-new-contact-info">
-            <div className="chat-new-contact-header">
-              <span className="chat-new-contact-name">{contact.name}</span>
-              <span className="chat-new-contact-time">
-                {contact.lastMessageTime ? dayjs(contact.lastMessageTime).format('HH:mm') : ''}
-              </span>
-            </div>
-            <div className="chat-new-contact-message">
-              <span className="chat-new-message-preview">
-                {contact.lastMessage || 'Nenhuma mensagem'}
-              </span>
-              {contact.unreadCount && contact.unreadCount > 0 && (
-                <span className="chat-new-unread-badge">{contact.unreadCount}</span>
-              )}
-            </div>
-            <div className="chat-new-contact-details">
-              {contact.email && (
-                <span className="chat-new-contact-email" title={contact.email}>
-                  <FiMail size={12} />
-                  {contact.email}
-                </span>
-              )}
-              {contact.number && (
-                <span className="chat-new-contact-phone">
-                  <FiPhone size={12} />
-                  {formatPhoneNumber(contact.number)}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      );
-    });
-  };
-
-  // Atualizar o componente de mensagem para mostrar os estados
   const renderMessageStatus = (message: Message) => {
     if (message.status === 'sending') {
       return <span className="chat-new-message-status sending">✓</span>;
     } else if (message.status === 'error') {
       return <span className="chat-new-message-status error">⚠️</span>;
-    } else if (message.status === 'sent') {
+    } else if (message.isSent) {
       return <span className="chat-new-message-status">✓✓</span>;
     } else {
       return <span className="chat-new-message-status">✓</span>;
     }
   };
 
-  // Adicionar função para carregar mensagens
-  const loadMessages = async (contactId: number) => {
-    try {
-      const fetchedMessages = await getMessagesByContactId(contactId);
-      setMessages(fetchedMessages.map(msg => ({
-        ...msg,
-        status: msg.isSent ? 'sent' : undefined
-      })));
-      // Adicionando um delay maior para garantir que as mensagens foram renderizadas
-      setTimeout(() => {
-        scrollToBottom();
-      }, 200);
-    } catch (error) {
-      console.error('Erro ao carregar mensagens:', error);
+  // Substituir o useEffect que faz polling de mensagens por um que só carrega ao selecionar contato
+  useEffect(() => {
+    const isInChatPage = location.pathname === '/chat';
+    console.log('🔄 useEffect [location] - Verificando localização', { 
+      isInChatPage, 
+      pathname: location.pathname, 
+      selectedContactId: selectedContact?.id 
+    });
+    if (selectedContact && isInChatPage) {
+      console.log('🔄 useEffect [location] - Carregando mensagens na página de chat');
+      loadMessages(selectedContact.id, 0, false);
+    }
+    // Remover o setInterval de loadMessages
+    return () => {};
+  }, [selectedContact, location.pathname, loadMessages]);
+
+  useEffect(() => {
+    contactsRef.current = contacts;
+  }, [contacts]);
+
+  
+
+  const handleLoadMore = () => {
+    console.log('🔄 handleLoadMore - Carregando mais mensagens', { 
+      selectedContactId: selectedContact?.id, 
+      hasMore, 
+      isMessagesLoading, 
+      isLoadingMore,
+      currentPage: page 
+    });
+    if (selectedContact && hasMore && !isMessagesLoading && !isLoadingMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadMessages(selectedContact.id, nextPage, true);
     }
   };
 
-  // Adicionar um useEffect específico para quando o selectedContact muda
   useEffect(() => {
-    if (selectedContact) {
-      // Garantir que o scroll aconteça após a mudança de contato
-      setTimeout(() => {
-        scrollToBottom();
-      }, 200);
-    }
-  }, [selectedContact]);
+    const messagesContainer = document.querySelector('.chat-new-messages');
+    if (!messagesContainer) return;
+    const handleScroll = () => {
+      setShowScrollToBottom(
+        messagesContainer.scrollTop < messagesContainer.scrollHeight - messagesContainer.clientHeight - 120
+      );
+    };
+    handleScroll();
+    messagesContainer.addEventListener('scroll', handleScroll);
+    return () => messagesContainer.removeEventListener('scroll', handleScroll);
+  }, [messages]);
 
-  // Atualizar a renderização das mensagens
   const renderMessage = (message: Message) => {
     const renderMediaContent = () => {
       if (!message.mediaUrl) {
@@ -999,8 +855,9 @@ const ChatNew: React.FC = () => {
       }
     };
 
-    // Determinar se a mensagem deve ser exibida como enviada
-    // Agora considera APENAS o isSent para determinar se a mensagem foi enviada
+    // Garantir que sentAt está em formato ISO para o dayjs
+    const sentAt = dayjs(message.sentAt).isValid() ? dayjs(message.sentAt).toISOString() : new Date().toISOString();
+
     const shouldRenderAsSent = message.isSent;
 
     return (
@@ -1011,195 +868,13 @@ const ChatNew: React.FC = () => {
         {renderMediaContent()}
         <div className="chat-new-message-info">
           <span className="chat-new-message-time">
-            {dayjs(message.sentAt).format('HH:mm')}
+            {dayjs(sentAt).tz('America/Sao_Paulo').format('HH:mm')}
           </span>
           {shouldRenderAsSent && renderMessageStatus(message)}
         </div>
       </div>
     );
   };
-
-  // Definir o handler de mensagens como useCallback para acessar o selectedContact atual
-  const messageHandler = useCallback((message: any) => {
-    console.log('Mensagem recebida no ChatNew:', message);
-    
-    // Normalizar mensagem do WebSocket
-    if (message.type === 'message') {
-      // Mensagem sem WebSocket
-      const normalizedMessage: Message = {
-        id: Date.now(),
-        content: message.content,
-        mediaType: 'text',
-        mediaUrl: null,
-        fileName: null,
-        mimeType: null,
-        sectorId: message.sectorId,
-        contactID: message.contactId,
-        sentAt: message.sentAt,
-        isSent: message.isAgent || false,
-        isRead: false,
-        status: 'sent'
-      };
-      
-      if (selectedContact && message.contactId === selectedContact.id) {
-        setMessages(prev => [...prev, normalizedMessage]);
-        scrollToBottom();
-      }
-    } else {
-      // Mensagem com WebSocket
-      const contactId = message.contactID || message.contactId;
-      const normalizedMessage: Message = {
-        id: message.id || Date.now(),
-        content: message.content || '',
-        mediaType: message.mediaType || 'text',
-        mediaUrl: message.mediaUrl || null,
-        fileName: message.fileName || null,
-        mimeType: message.mimeType || null,
-        sectorId: message.sectorId,
-        contactID: contactId,
-        sentAt: message.sentAt || new Date().toISOString(),
-        isSent: message.isAgent || false,
-        isRead: false,
-        status: 'sent'
-      };
-
-      // Verificar se a mensagem é para o contato atual e atualizar o estado
-      if (selectedContact && (Number(normalizedMessage.contactID) === selectedContact.id)) {
-        setMessages(prevMessages => {
-          // Verificar se a mensagem já existe ou se é uma mensagem de áudio que já está sendo enviada
-          const messageExists = prevMessages.some(m => 
-            m.id === normalizedMessage.id || 
-            (m.mediaType === 'audio' && m.status === 'sending' && normalizedMessage.mediaType === 'audio')
-          );
-          
-          if (!messageExists) {
-            scrollToBottom();
-            return [...prevMessages, normalizedMessage];
-          }
-          return prevMessages;
-        });
-      }
-    }
-    
-    // Atualizar lista de contatos
-    const updateContacts = async () => {
-      try {
-        const sectorId = SessionService.getSectorId();
-        if (!sectorId) return;
-
-        const contactsResponse = await getContacts(sectorId);
-        if (!contactsResponse?.data) return;
-
-        const currentContactsMap = new Map(contacts.map(contact => [contact.id, contact]));
-        
-        const contactId = message.contactID || message.contactId;
-        let messagePreview = '';
-        
-        if (message.mediaType) {
-          switch (message.mediaType.toLowerCase()) {
-            case 'image':
-              messagePreview = message.isSent ? '📷 Imagem enviada' : '📷 Imagem recebida';
-              break;
-            case 'document':
-              messagePreview = message.isSent ? '📎 Anexo enviado' : '📎 Anexo recebido';
-              break;
-            case 'audio':
-            case 'voice':
-              messagePreview = message.isSent ? '🎤 Áudio enviado' : '🎤 Áudio recebido';
-              break;
-            default:
-              messagePreview = message.content || 'Nova mensagem';
-          }
-        } else {
-          messagePreview = message.content || 'Nova mensagem';
-        }
-
-        const formattedContacts = contactsResponse.data.map(contact => {
-          const existingContact = currentContactsMap.get(contact.id);
-          if (contact.id === contactId) {
-            return {
-              ...contact,
-              profilePicture: getAvatarUrl(contact.name, contact.avatarUrl),
-              lastMessage: messagePreview,
-              lastMessageTime: new Date().toISOString()
-            };
-          }
-          return {
-            ...contact,
-            profilePicture: getAvatarUrl(contact.name, contact.avatarUrl),
-            lastMessage: existingContact?.lastMessage || 'Nenhuma mensagem',
-            lastMessageTime: existingContact?.lastMessageTime || contact.createdAt
-          };
-        });
-
-        const sortedContacts = formattedContacts.sort((a, b) => {
-          const dateA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
-          const dateB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
-          return dateB - dateA;
-        });
-
-        setContacts(sortedContacts);
-      } catch (error) {
-        console.error('Erro ao atualizar contatos:', error);
-      }
-    };
-
-    updateContacts();
-  }, [selectedContact, contacts]);
-
-  // Atualizar inicialização do WebSocket
-  useEffect(() => {
-    const sectorId = SessionService.getSectorId();
-    if (!sectorId) return;
-
-    console.log('Inicializando WebSocket para o setor:', sectorId);
-    
-    const ws = new WebSocketService();
-    webSocketRef.current = ws;
-    
-    ws.connect(sectorId.toString());
-    ws.addMessageHandler(messageHandler);
-    
-    return () => {
-      console.log('Desconectando WebSocket');
-      if (webSocketRef.current) {
-        webSocketRef.current.removeMessageHandler(messageHandler);
-        webSocketRef.current.disconnect();
-        webSocketRef.current = null;
-      }
-    };
-  }, [messageHandler, selectedContact]);
-
-  const fetchInitialData = async () => {
-    setIsLoading(true);
-    try {
-      const sectorId = SessionService.getSectorId();
-      if (!sectorId) {
-        setMessages([]);
-        setTags([]);
-        setContacts([]);
-        return;
-      }
-
-      // Buscar tags e contatos primeiro
-      const [tagsResponse, contactsResponse] = await Promise.all([
-        getTags(sectorId),
-        getContacts(sectorId)
-      ]);
-
-      // Definir tags e contatos
-      setTags(tagsResponse.data || []);
-      setContacts(contactsResponse.data || []);
-    } catch (error) {
-      console.error('Erro ao buscar dados iniciais:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchInitialData();
-  }, [selectedSectorId]);
 
   // Fechar menu quando clicar fora
   useEffect(() => {
@@ -1232,16 +907,30 @@ const ChatNew: React.FC = () => {
         avatarUrl: selectedContact.avatarUrl
       });
 
+      // Atualizar com nome apropriado dependendo se é o usuário atual ou outro
+      let userName;
+      if (selectedUserId === currentUserId) {
+        // Se for o próprio usuário atual, usar "Delegado para mim" para consistência
+        userName = "Delegado para mim";
+      } else {
+        // Se for outro usuário, usar o nome do usuário selecionado
+        const selectedUser = users.find(u => u.id === selectedUserId);
+        userName = selectedUser?.name || 'Usuário';
+      }
+
+      // Atualizar o contato selecionado e a lista de contatos com o nome do usuário
+      const updatedContact = {
+        ...selectedContact,
+        assignedTo: selectedUserId,
+        assignedToName: userName
+      };
+      setSelectedContact(updatedContact);
       setContacts(prevContacts => prevContacts.map(contact => 
-        contact.id === selectedContact.id
-          ? { ...contact, assignedTo: selectedUserId }
-          : contact
+        contact.id === selectedContact.id ? updatedContact : contact
       ));
 
-      showToast('Contato transferido com sucesso', 'success');
     } catch (error) {
-      console.error('Erro ao transferir contato:', error);
-      showToast('Erro ao transferir contato', 'error');
+      console.error('❌ handleTransferContact - Erro ao transferir contato:', error);
     } finally {
       setIsTransferLoading(false);
       setShowTransferModal(false);
@@ -1254,6 +943,170 @@ const ChatNew: React.FC = () => {
 
     setIsTagLoading(true);
     try {
+      // Atualizar o contato selecionado e a lista de contatos
+      const updatedContactData = {
+        ...selectedContact,
+        tagId: selectedTagId || null
+      };
+
+      setSelectedContact(updatedContactData);
+      setContacts(prevContacts => prevContacts.map(contact => 
+        contact.id === selectedContact.id
+          ? updatedContactData
+          : contact
+      ));
+
+    } catch (error) {
+      console.error('❌ handleChangeTag - Erro ao alterar tag:', error);
+    } finally {
+      setIsTagLoading(false);
+      setShowTagModal(false);
+      setSelectedTagId(null);
+    }
+  };
+
+  // Adicionar useEffect para verificar disponibilidade do microfone
+  useEffect(() => {
+    const checkMicrophoneAvailability = async () => {
+      try {
+        setIsCheckingMicrophone(true);
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const hasAudioInput = devices.some(device => device.kind === 'audioinput');
+        setIsMicrophoneAvailable(hasAudioInput);
+      } catch (error) {
+        console.error('❌ Error checking microphone:', error);
+        setIsMicrophoneAvailable(false);
+      } finally {
+        setIsCheckingMicrophone(false);
+      }
+    };
+
+    // Verificar inicialmente
+    checkMicrophoneAvailability();
+
+    // Adicionar listener para mudanças nos dispositivos
+    navigator.mediaDevices.addEventListener('devicechange', checkMicrophoneAvailability);
+
+    return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', checkMicrophoneAvailability);
+    };
+  }, []);
+
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = ``;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  useEffect(() => {
+    const updateButtonPosition = () => {
+      if (messagesContainerRef.current) {
+        const rect = messagesContainerRef.current.getBoundingClientRect();
+        setScrollButtonLeft(rect.left + rect.width / 2);
+      }
+    };
+    updateButtonPosition();
+    window.addEventListener('resize', updateButtonPosition);
+    window.addEventListener('scroll', updateButtonPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateButtonPosition);
+      window.removeEventListener('scroll', updateButtonPosition, true);
+    };
+  }, []);
+
+  useEffect(() => {
+    const token = SessionService.getToken?.() || '';
+    console.log('🔄 useEffect [WebSocket] - Configurando WebSocket', { hasToken: !!token });
+    if (!token) return;
+    
+    const handleWebSocketMessage = (msg: any) => {
+      console.log('📩 WebSocket - Mensagem recebida', { 
+        message: msg, 
+        selectedContactId: selectedContact?.id 
+      });
+      
+      if (!selectedContact || msg.contactID !== selectedContact.id) {
+        console.log('🔄 WebSocket - Mensagem ignorada, não é para o contato selecionado');
+        return;
+      }
+      
+      console.log('✅ WebSocket - Adicionando mensagem recebida ao estado');
+      setMessages((prev) => [
+        ...prev,
+        {
+          ...msg,
+          fileName: msg.fileName ?? null,
+          mimeType: msg.mimeType ?? null
+        } as Message
+      ]);
+    };
+    
+    console.log('🔄 WebSocket - Conectando ao serviço de WebSocket');
+    ChatWebSocketService.connect(token, handleWebSocketMessage);
+    
+    return () => {
+      console.log('🔄 WebSocket - Desconectando do serviço de WebSocket');
+      ChatWebSocketService.disconnect();
+    };
+  }, [selectedContact]);
+
+  const filteredContacts = useMemo(() => {
+    return contacts.filter(contact => {
+      // Filtro por nome/número
+      const searchMatch = searchTerm.toLowerCase().trim() === '' ||
+        contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contact.number.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Filtro por responsável
+      const userMatch = !selectedFilterUser || contact.assignedTo === selectedFilterUser;
+
+      // Filtro por tag
+      const tagMatch = !selectedFilterTag || contact.tagId === selectedFilterTag;
+
+      // Filtro por status de visualização
+      const statusMatch = selectedStatus === 'all' || 
+        (selectedStatus === 'unread' && !contact.is_viewed) ||
+        (selectedStatus === 'read' && contact.is_viewed);
+
+      return searchMatch && userMatch && tagMatch && statusMatch;
+    });
+  }, [contacts, searchTerm, selectedFilterUser, selectedFilterTag, selectedStatus]);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      console.log('🔄 fetchUserData - Iniciando busca de dados do usuário');
+      try {
+        const token = SessionService.getToken();
+        const decodedToken = token ? SessionService.decodeToken(token) : null;
+        const userId = decodedToken ? decodedToken.userId : null;
+        console.log('✅ fetchUserData - ID do usuário obtido:', userId);
+
+        if (!userId) {
+          console.log('❌ fetchUserData - Sem ID de usuário disponível');
+          return;
+        }
+
+        const userIdNum = Number(userId);
+        setCurrentUserId(userIdNum);
+        
+        // Configurar o filtro para mostrar apenas contatos delegados para o usuário atual por padrão
+        setSelectedFilterUser(userIdNum);
+        console.log('🔄 fetchUserData - Configurando filtro para mostrar apenas contatos delegados para:', userIdNum);
+      } catch (error) {
+        console.error('❌ fetchUserData - Erro ao buscar dados do usuário:', error);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  const handleAssignToMe = async () => {
+    if (!selectedContact || !currentUserId) return;
+
+    try {
       await updateContact(selectedContact.id, {
         name: selectedContact.name,
         email: selectedContact.email,
@@ -1263,25 +1116,25 @@ const ChatNew: React.FC = () => {
         isActive: selectedContact.isActive,
         priority: selectedContact.priority,
         aiActive: selectedContact.aiActive,
-        assignedTo: selectedContact.assignedTo,
-        tagId: selectedTagId || null,
+        assignedTo: Number(currentUserId),
+        tagId: selectedContact.tagId,
         avatarUrl: selectedContact.avatarUrl
       });
 
+      // Sempre usar "Delegado para mim" para consistência
+      const updatedContact = { 
+        ...selectedContact, 
+        assignedTo: Number(currentUserId),
+        assignedToName: "Delegado para mim" 
+      };
+      
+      setSelectedContact(updatedContact);
       setContacts(prevContacts => prevContacts.map(contact => 
-        contact.id === selectedContact.id
-          ? { ...contact, tagId: selectedTagId || null }
-          : contact
+        contact.id === selectedContact.id ? updatedContact : contact
       ));
 
-      showToast(selectedTagId ? 'Tag alterada com sucesso' : 'Tag removida com sucesso', 'success');
     } catch (error) {
-      console.error('Erro ao alterar tag:', error);
-      showToast('Erro ao alterar tag', 'error');
-    } finally {
-      setIsTagLoading(false);
-      setShowTagModal(false);
-      setSelectedTagId(null);
+      console.error('❌ handleAssignToMe - Erro ao delegar contato:', error);
     }
   };
 
@@ -1296,9 +1149,68 @@ const ChatNew: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          <div className="chat-new-filters">
+            <select 
+              value={selectedFilterUser || ''} 
+              onChange={(e) => setSelectedFilterUser(e.target.value ? Number(e.target.value) : null)}
+              className="filter-select"
+            >
+              <option value="">Todos os responsáveis</option>
+              <option value={Number(currentUserId)} selected={selectedFilterUser === Number(currentUserId)}>
+                Delegados para mim
+              </option>
+              {users.filter(user => user.id !== Number(currentUserId)).map(user => (
+                <option key={user.id} value={user.id}>
+                  {user.name}
+                </option>
+              ))}
+            </select>
+
+            <select 
+              value={selectedFilterTag || ''} 
+              onChange={(e) => setSelectedFilterTag(e.target.value ? Number(e.target.value) : null)}
+              className="filter-select"
+            >
+              <option value="">Todas as tags</option>
+              {tags.map(tag => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="filter-select"
+            >
+              <option value="all">Todos os status</option>
+              <option value="unread">Não visualizados</option>
+              <option value="read">Visualizados</option>
+            </select>
+          </div>
         </div>
         <div className="chat-new-contacts">
-          {renderContacts()}
+          {isContactsLoading ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              minHeight: 200
+            }}>
+              <div className="chat-new-loading-spinner" style={{ marginBottom: 16 }} />
+              <span style={{ color: '#bbb', fontSize: 16 }}>Carregando contatos...</span>
+            </div>
+          ) : (
+            <RenderContacts
+              contacts={filteredContacts}
+              selectedContact={selectedContact}
+              onSelect={handleContactSelect}
+              tags={tags}
+            />
+          )}
         </div>
       </div>
 
@@ -1318,13 +1230,33 @@ const ChatNew: React.FC = () => {
               )}
               <div className="chat-new-header-contact">
                 <div className="chat-new-header-avatar">
-                  <img 
-                    src={selectedContact.profilePicture} 
-                    alt={selectedContact.name}
-                    style={selectedContact.tagId ? {
-                      borderColor: tags.find(t => t.id === selectedContact.tagId)?.color
-                    } : undefined}
-                  />
+                  {selectedContact.avatarUrl ? (
+                    <img
+                      src={selectedContact.avatarUrl}
+                      alt={selectedContact.name}
+                      style={{
+                        border: selectedContact.tagId ? `3px solid ${tags.find(t => t.id === selectedContact.tagId)?.color || 'transparent'}` : 'none',
+                        borderRadius: '50%',
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                    />
+                  ) : (
+                    <div 
+                      className="avatar-initials"
+                      style={{
+                        border: selectedContact.tagId ? `3px solid ${tags.find(t => t.id === selectedContact.tagId)?.color || 'transparent'}` : 'none'
+                      }}
+                    >
+                      {selectedContact.name
+                        .split(' ')
+                        .map(n => n[0])
+                        .join('')
+                        .toUpperCase()
+                        .slice(0, 2)}
+                    </div>
+                  )}
                 </div>
                 <div className="chat-new-header-info">
                   <div className="chat-new-header-group">
@@ -1340,22 +1272,23 @@ const ChatNew: React.FC = () => {
                       )}
                     </div>
                     <div className="chat-new-header-right">
-                      {selectedContact.tagId && (
-                        <span 
-                          className="chat-new-header-tag"
-                          style={{
-                            backgroundColor: tags.find(t => t.id === selectedContact.tagId)?.color,
-                            color: '#fff'
-                          }}
-                        >
-                          {tags.find(t => t.id === selectedContact.tagId)?.name}
-                        </span>
-                      )}
-                      {selectedContact.assignedTo && (
+                      {selectedContact.assignedTo ? (
                         <span className="chat-new-header-assigned">
                           <UserIcon />
-                          <span>{users.find(u => u.id === selectedContact.assignedTo)?.name}</span>
+                          <span>
+                            {selectedContact.assignedTo === Number(currentUserId) 
+                              ? "Delegado para mim" 
+                              : (selectedContact.assignedToName || users.find(u => u.id === selectedContact.assignedTo)?.name)}
+                          </span>
                         </span>
+                      ) : (
+                        <button 
+                          className="chat-new-header-button assign"
+                          onClick={handleAssignToMe}
+                        >
+                          <UserPlus />
+                          Delegar para mim
+                        </button>
                       )}
                     </div>
                   </div>
@@ -1389,6 +1322,7 @@ const ChatNew: React.FC = () => {
                       className="chat-new-header-menu-item"
                       onClick={(e) => {
                         e.stopPropagation();
+                        setSelectedTagId(selectedContact.tagId);
                         setShowTagModal(true);
                         setShowMenu(false);
                       }}
@@ -1402,9 +1336,78 @@ const ChatNew: React.FC = () => {
             </div>
 
             {/* Área de mensagens */}
-            <div className="chat-new-messages">
+            <div
+              className="chat-new-messages"
+              ref={messagesContainerRef}
+              style={{ position: 'relative', overflowY: 'auto', height: '100%', maxHeight: '100%' }}
+            >
+              {hasMore && !isMessagesLoading && (
+                <button className="chat-new-load-more" onClick={handleLoadMore} disabled={isLoadingMore || isMessagesLoading} style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 3 }}>
+                  {isLoadingMore && !isMessagesLoading ? (
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                      <div className="chat-new-loading-spinner" style={{ margin: '0 auto', borderColor: '#fff transparent #fff transparent' }} />
+                    </span>
+                  ) : (
+                    <>
+                      <span className="chat-new-load-more-icon" aria-hidden="true">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 8l6 6H6l6-6z" fill="currentColor"/></svg>
+                      </span>
+                      Ver mais mensagens
+                    </>
+                  )}
+                </button>
+              )}
+              {isMessagesLoading && (
+                <div className="chat-new-messages-loading" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.05)', zIndex: 2, flexDirection: 'column' }}>
+                  <div className="chat-new-loading-spinner" style={{ marginBottom: 12, borderColor: '#fff transparent #fff transparent' }}></div>
+                  <span style={{ color: '#fff', fontWeight: 500, fontSize: 16 }}>Carregando mensagens</span>
+                </div>
+              )}
+              {messages.length === 0 && !isMessagesLoading && (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  color: '#bbb',
+                  fontSize: 16,
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  pointerEvents: 'none'
+                }}>
+                  Nenhuma mensagem encontrada
+                </div>
+              )}
               {messages.map(renderMessage)}
               <div ref={messagesEndRef} />
+              {showScrollToBottom && scrollButtonLeft !== null && (
+                <button
+                  className="chat-new-scroll-to-bottom"
+                  style={{
+                    position: 'fixed',
+                    left: scrollButtonLeft,
+                    transform: 'translateX(-50%)',
+                    bottom: 222,
+                    zIndex: 1000,
+                    pointerEvents: 'auto'
+                  }}
+                  onClick={() => {
+                    const messagesContainer = document.querySelector('.chat-new-messages');
+                    if (messagesContainer) {
+                      messagesContainer.scrollTo({
+                        top: messagesContainer.scrollHeight,
+                        behavior: 'smooth'
+                      });
+                    }
+                  }}
+                  aria-label="Descer para a última mensagem"
+                >
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 16l-6-6h12l-6 6z" fill="currentColor"/></svg>
+                </button>
+              )}
             </div>
 
             {/* Área de input */}
@@ -1449,9 +1452,17 @@ const ChatNew: React.FC = () => {
                       
                       <button 
                         className="chat-new-input-button" 
-                        title="Gravar áudio"
-                        onClick={() => setIsRecording(true)}
-                        disabled={!selectedSectorId}
+                        title={isCheckingMicrophone 
+                          ? "Verificando microfone..." 
+                          : isMicrophoneAvailable 
+                            ? "Gravar áudio" 
+                            : "Microfone não disponível"}
+                        onClick={() => isMicrophoneAvailable && setIsRecording(true)}
+                        disabled={!selectedSectorId || !isMicrophoneAvailable || isCheckingMicrophone}
+                        style={{
+                          opacity: (!selectedSectorId || !isMicrophoneAvailable || isCheckingMicrophone) ? 0.5 : 1,
+                          cursor: (!selectedSectorId || !isMicrophoneAvailable || isCheckingMicrophone) ? 'not-allowed' : 'pointer'
+                        }}
                       >
                         <MicIcon />
                       </button>

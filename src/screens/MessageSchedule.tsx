@@ -7,14 +7,14 @@ import {
   deleteMessageScheduling,
   getMessageSchedulings,
   updateMessageScheduling,
+  getMessageScheduling
 } from '../services/MessageSchedulingsService';
 import { getTags, Tag } from '../services/LabelService';
 import { getContacts, Contact } from '../services/ContactService';
 import SessionService from '../services/SessionService';
-import { getFlows } from '../services/FlowService';
-import { getSector } from '../services/SectorService';
 import './MessageSchedule.css';
 import Toast from '../components/Toast';
+import { useNavigate } from 'react-router-dom';
 
 declare global {
   interface Window {
@@ -25,6 +25,36 @@ declare global {
 
 const google = window.google;
 const gapi = window.gapi;
+
+const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(blob);
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result.split(',')[1]);
+      } else {
+        reject('Failed to convert blob to base64');
+      }
+    };
+    reader.onerror = error => reject(error);
+  });
+};
+
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result.split(',')[1]);
+      } else {
+        reject('Failed to convert file to base64');
+      }
+    };
+    reader.onerror = error => reject(error);
+  });
+};
 
 const Icons = {
   Plus: () => (
@@ -65,12 +95,12 @@ const Icons = {
       <polyline points="21 15 16 10 5 21"></polyline>
     </svg>
   ),
-  Smile: () => (
+  Mic: () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10"></circle>
-      <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-      <line x1="9" y1="9" x2="9.01" y2="9"></line>
-      <line x1="15" y1="9" x2="15.01" y2="9"></line>
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+      <line x1="12" y1="19" x2="12" y2="23"></line>
+      <line x1="8" y1="23" x2="16" y2="23"></line>
     </svg>
   ),
 };
@@ -83,13 +113,481 @@ interface Message {
   labels: string[];
   contactId: number | null;
   contact: Contact;
+  attachments?: BackendAttachment[];
 }
 
 const SCOPES = 'https://www.googleapis.com/auth/calendar';
 
-const MessageSchedule: React.FC = () => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
+interface MessageScheduleProps {
+  visible: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  contactId: number;
+  addToast: (message: string, type: 'success' | 'error' | 'info') => void;
+}
+
+interface BackendAttachment {
+  type: string;
+  data: string;
+  name: string;
+  preview?: string;
+  duration?: number;
+}
+
+interface Attachment {
+  fileType: 'image' | 'audio' | 'file';
+  data: string;
+  name: string;
+  preview?: string;
+  duration?: number;
+  mimeType: string;
+}
+
+export const MessageSchedule: React.FC<MessageScheduleProps & {
+  initialData?: {
+    messageText: string;
+    selectedDate: dayjs.Dayjs | null;
+    selectedTime: dayjs.Dayjs | null;
+    selectedContactId: number | null;
+    attachments: Attachment[];
+  }
+}> = ({
+  visible,
+  onClose,
+  onSave,
+  contactId,
+  addToast,
+  initialData
+}) => {
+  const [messageText, setMessageText] = useState('');
+  const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs | null>(null);
+  const [selectedTime, setSelectedTime] = useState<dayjs.Dayjs | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
+  const [audioURL, setAudioURL] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'error' | 'info' }[]>([]);
+  const [isSavingAudio, setIsSavingAudio] = useState(false);
+  const audioChunks = useRef<Blob[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedContactId, setSelectedContactId] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (visible && initialData) {
+      setMessageText(initialData.messageText);
+      setSelectedDate(initialData.selectedDate);
+      setSelectedTime(initialData.selectedTime);
+      setSelectedContactId(initialData.selectedContactId);
+      setAttachments(initialData.attachments);
+    }
+  }, [visible, initialData]);
+
+  const removeToast = (id: number) => {
+    setToasts(current => current.filter(toast => toast.id !== id));
+  };
+
+  useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        const sectorId = SessionService.getSectorId();
+        if (!sectorId) {
+          addToast('Nenhum setor selecionado', 'error');
+          return;
+        }
+        const response = await getContacts(sectorId);
+        setContacts(response.data || []);
+      } catch (error) {
+        console.error('Erro ao carregar contatos:', error);
+        addToast('Erro ao carregar contatos', 'error');
+      }
+    };
+
+    if (visible) {
+      fetchContacts();
+    }
+  }, [visible, addToast]);
+
+  useEffect(() => {
+    if (contactId) {
+      setSelectedContactId(contactId);
+    }
+  }, [contactId]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      setMediaRecorder(recorder);
+      audioChunks.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunks.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks.current, { type: 'audio/wav' });
+        const url = URL.createObjectURL(audioBlob);
+        setRecordedAudio(audioBlob);
+        setAudioURL(url);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      addToast('Erro ao iniciar gravação', 'error');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+    }
+  };
+
+  const handleAudioRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'document') => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const base64Data = await fileToBase64(file);
+      const newAttachment: Attachment = {
+        fileType: type === 'document' ? 'file' : type,
+        data: base64Data,
+        name: file.name,
+        preview: type === 'image' ? URL.createObjectURL(file) : undefined,
+        mimeType: file.type
+      };
+
+      setAttachments(prev => [...prev, newAttachment]);
+    } catch (error) {
+      console.error('Error processing file:', error);
+      addToast('Erro ao processar arquivo', 'error');
+    }
+  };
+
+  const handleSaveAudio = async () => {
+    if (!recordedAudio) return;
+
+    try {
+      setIsSavingAudio(true);
+      const base64Audio = await blobToBase64(recordedAudio);
+      const newAttachment: Attachment = {
+        fileType: 'audio',
+        data: base64Audio,
+        name: 'recorded_audio.wav',
+        mimeType: 'audio/wav'
+      };
+
+      setAttachments(prev => [...prev, newAttachment]);
+      setRecordedAudio(null);
+      setAudioURL(null);
+    } catch (error) {
+      console.error('Error saving audio:', error);
+      addToast('Erro ao salvar áudio', 'error');
+    } finally {
+      setIsSavingAudio(false);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const renderAttachmentsPreview = () => {
+    if (!attachments.length) {
+      return <div className="no-attachments">Nenhum anexo adicionado</div>;
+    }
+
+    const images = attachments.filter(att => att.fileType === 'image');
+    const audios = attachments.filter(att => att.fileType === 'audio');
+    const documents = attachments.filter(att => att.fileType === 'file');
+
+    return (
+      <div className="attachments-preview">
+        {images.length > 0 && (
+          <div className="attachment-section">
+            <h4>Imagens ({images.length})</h4>
+            <div className="attachment-list">
+              {images.map((att, index) => (
+                <div key={index} className="attachment-item">
+                  <span className="attachment-name">{att.name}</span>
+                  <button onClick={() => removeAttachment(attachments.indexOf(att))} className="remove-attachment">
+                    <Icons.Delete />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {audios.length > 0 && (
+          <div className="attachment-section">
+            <h4>Áudios ({audios.length})</h4>
+            <div className="attachment-list">
+              {audios.map((att, index) => (
+                <div key={index} className="attachment-item">
+                  <span className="attachment-name">{att.name}</span>
+                  <button onClick={() => removeAttachment(attachments.indexOf(att))} className="remove-attachment">
+                    <Icons.Delete />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {documents.length > 0 && (
+          <div className="attachment-section">
+            <h4>Documentos ({documents.length})</h4>
+            <div className="attachment-list">
+              {documents.map((att, index) => (
+                <div key={index} className="attachment-item">
+                  <span className="attachment-name">{att.name}</span>
+                  <button onClick={() => removeAttachment(attachments.indexOf(att))} className="remove-attachment">
+                    <Icons.Delete />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const handleSave = async () => {
+    if (!selectedDate || !selectedTime) {
+      addToast('Selecione data e hora para o agendamento', 'error');
+      return;
+    }
+
+    if (!messageText && attachments.length === 0) {
+      addToast('Adicione uma mensagem ou anexo', 'error');
+      return;
+    }
+
+    if (!selectedContactId) {
+      addToast('Selecione um contato', 'error');
+      return;
+    }
+
+    const sectorId = SessionService.getSectorId();
+    if (!sectorId) {
+      addToast('Nenhum setor selecionado', 'error');
+      return;
+    }
+
+    const scheduledAt = selectedDate
+      .hour(selectedTime.hour())
+      .minute(selectedTime.minute())
+      .second(0)
+      .format('YYYY-MM-DD HH:mm:ss');
+
+    try {
+      setIsSaving(true);
+      const attachmentsForBackend = attachments.map(attachment => ({
+        type: attachment.fileType as 'image' | 'audio' | 'file',
+        data: attachment.data,
+        name: attachment.name,
+        mimeType: attachment.mimeType
+      }));
+
+      const messageData: CreateMessageSchedulingDTO = {
+        name: messageText.substring(0, 50),
+        messageText: messageText,
+        sendDate: scheduledAt, 
+        contactId: selectedContactId,
+        sectorId: sectorId,
+        status: true,
+        tagIds: '',
+        attachments: attachmentsForBackend
+      };
+
+      await createMessageScheduling(messageData);
+
+      addToast('Mensagem agendada com sucesso', 'success');
+      setMessageText('');
+      setSelectedDate(null);
+      setSelectedTime(null);
+      setAttachments([]);
+      onSave();
+      onClose();
+    } catch (error) {
+      addToast('Erro ao agendar mensagem', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const renderDrawer = () => {
+    if (!visible) return null;
+
+    return (
+      <div className="drawer">
+        <div className="ms-drawer-overlay" onClick={onClose}></div>
+        <div className="drawer-content">
+          <div className="drawer-header">
+            <h2>Agendar Mensagem</h2>
+            <button className="close-button" onClick={onClose}>×</button>
+          </div>
+          
+          <div className="drawer-body">
+            <div className="form-group">
+              <label>Contato</label>
+              <select 
+                className="form-input"
+                value={selectedContactId || ''}
+                onChange={(e) => setSelectedContactId(Number(e.target.value))}
+              >
+                <option value="">Selecione um contato</option>
+                {contacts.map(contact => (
+                  <option key={contact.id} value={contact.id}>
+                    {contact.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <textarea
+              className="message-textarea"
+              rows={4}
+              placeholder="Digite sua mensagem..."
+              value={messageText}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMessageText(e.target.value)}
+            />
+
+            <div className="attachment-tools">
+              <div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleFileSelect(e, 'image')}
+                  style={{ display: 'none' }}
+                  id="image-upload"
+                />
+                <button 
+                  className="tool-button"
+                  onClick={() => document.getElementById('image-upload')?.click()}
+                >
+                  <Icons.Picture />
+                  <span>Imagem</span>
+                </button>
+              </div>
+
+              <div>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
+                  onChange={(e) => handleFileSelect(e, 'document')}
+                  style={{ display: 'none' }}
+                  id="document-upload"
+                />
+                <button 
+                  className="tool-button"
+                  onClick={() => document.getElementById('document-upload')?.click()}
+                >
+                  <Icons.Paperclip />
+                  <span>Documento</span>
+                </button>
+              </div>
+
+              <button
+                className={`tool-button ${isRecording ? 'recording' : ''}`}
+                onClick={handleAudioRecording}
+              >
+                <Icons.Mic />
+                <span>{isRecording ? 'Parar' : 'Áudio'}</span>
+              </button>
+
+              {recordedAudio && (
+                <button
+                  className={`tool-button ${isSavingAudio ? 'loading' : ''}`}
+                  onClick={handleSaveAudio}
+                  disabled={isSavingAudio}
+                >
+                  {isSavingAudio ? (
+                    <div className="button-spinner" />
+                  ) : (
+                    'Salvar Áudio'
+                  )}
+                </button>
+              )}
+            </div>
+
+            {renderAttachmentsPreview()}
+
+            <div className="form-group">
+              <label>Data</label>
+              <input
+                type="date"
+                className="form-input"
+                value={selectedDate ? selectedDate.format('YYYY-MM-DD') : ''}
+                onChange={(e) => setSelectedDate(dayjs(e.target.value))}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Hora</label>
+              <input
+                type="time"
+                className="form-input"
+                value={selectedTime ? selectedTime.format('HH:mm') : ''}
+                onChange={(e) => setSelectedTime(dayjs(`2000-01-01 ${e.target.value}`))}
+              />
+            </div>
+
+            <div className="drawer-footer">
+              <button
+                type="button"
+                className="tool-button secondary"
+                onClick={onClose}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={`tool-button ${isSaving ? 'loading' : ''}`}
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <div className="button-spinner" />
+                ) : (
+                  'Agendar'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return renderDrawer();
+};
+
+const MessageScheduleScreen: React.FC = () => {
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
+  const [audioURL, setAudioURL] = useState<string | null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const audioChunks = useRef<Blob[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
@@ -97,6 +595,11 @@ const MessageSchedule: React.FC = () => {
   const [currentMessageIndex, setCurrentMessageIndex] = useState<number | null>(null);
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null);
   const [flows, setFlows] = useState([]);
+  const [selectedSector, setSelectedSector] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [previewURL, setPreviewURL] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState<Message>({
     title: '',
     date: null,
@@ -105,19 +608,202 @@ const MessageSchedule: React.FC = () => {
     contactId: null,
     contact: {} as Contact
   });
-  const [selectedSector, setSelectedSector] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [tokenClient, setTokenClient] = useState<any>(null);
-  const [isGeneratingMeetLink, setIsGeneratingMeetLink] = useState(false);
-  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
-  const [googleApiKey, setGoogleApiKey] = useState<string | null>(null);
-  const [isApiKeyValid, setIsApiKeyValid] = useState<boolean>(true);
   const [dateInputValue, setDateInputValue] = useState('');
   const [isTagsDropdownOpen, setIsTagsDropdownOpen] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [errors, setErrors] = useState<{ [key: string]: string | null }>({});
   const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'error' | 'info' }[]>([]);
+  const [isSavingAudio, setIsSavingAudio] = useState(false);
+  const [drawerInitialData, setDrawerInitialData] = useState<any>(undefined);
+  const navigate = useNavigate();
+
+  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Date.now();
+    setToasts(current => [...current, { id, message, type }]);
+    setTimeout(() => removeToast(id), 3000);
+  };
+
+  const removeToast = (id: number) => {
+    setToasts(current => current.filter(toast => toast.id !== id));
+  };
+
+  const renderDrawer = () => {
+    if (!isDrawerVisible) return null;
+    return (
+      <MessageSchedule
+        visible={isDrawerVisible}
+        onClose={() => setIsDrawerVisible(false)}
+        onSave={() => {
+          setIsDrawerVisible(false);
+          fetchInitialData();
+        }}
+        contactId={newMessage.contactId || 0}
+        addToast={addToast}
+        initialData={drawerInitialData}
+      />
+    );
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      setMediaRecorder(recorder);
+      audioChunks.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunks.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks.current, { type: 'audio/wav' });
+        const url = URL.createObjectURL(audioBlob);
+        setRecordedAudio(audioBlob);
+        setAudioURL(url);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      addToast('Erro ao iniciar gravação', 'error');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+    }
+  };
+
+  const handleAudioRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'document') => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const base64Data = await fileToBase64(file);
+      const newAttachment: Attachment = {
+        fileType: type === 'document' ? 'file' : type,
+        data: base64Data,
+        name: file.name,
+        preview: type === 'image' ? URL.createObjectURL(file) : undefined,
+        mimeType: file.type
+      };
+
+      setAttachments(prev => [...prev, newAttachment]);
+    } catch (error) {
+      console.error('Error processing file:', error);
+      addToast('Erro ao processar arquivo', 'error');
+    }
+  };
+
+  const handleSaveAudio = async () => {
+    if (!recordedAudio) return;
+
+    try {
+      setIsSavingAudio(true);
+      const base64Audio = await blobToBase64(recordedAudio);
+      const newAttachment: Attachment = {
+        fileType: 'audio',
+        data: base64Audio,
+        name: 'recorded_audio.wav',
+        mimeType: 'audio/wav'
+      };
+
+      setAttachments(prev => [...prev, newAttachment]);
+      setRecordedAudio(null);
+      setAudioURL(null);
+    } catch (error) {
+      console.error('Error saving audio:', error);
+      addToast('Erro ao salvar áudio', 'error');
+    } finally {
+      setIsSavingAudio(false);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const renderAttachmentsPreview = () => {
+    if (!attachments.length) {
+      return <div className="no-attachments">Nenhum anexo adicionado</div>;
+    }
+
+    const images = attachments.filter(att => att.fileType === 'image');
+    const audios = attachments.filter(att => att.fileType === 'audio');
+    const documents = attachments.filter(att => att.fileType === 'file');
+
+    return (
+      <div className="attachments-preview">
+        {images.length > 0 && (
+          <div className="attachment-section">
+            <h4>Imagens ({images.length})</h4>
+            <div className="attachment-list">
+              {images.map((att, index) => (
+                <div key={index} className="attachment-item">
+                  <span className="attachment-name">{att.name}</span>
+                  <button onClick={() => removeAttachment(attachments.indexOf(att))} className="remove-attachment">
+                    <Icons.Delete />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {audios.length > 0 && (
+          <div className="attachment-section">
+            <h4>Áudios ({audios.length})</h4>
+            <div className="attachment-list">
+              {audios.map((att, index) => (
+                <div key={index} className="attachment-item">
+                  <span className="attachment-name">{att.name}</span>
+                  <button onClick={() => removeAttachment(attachments.indexOf(att))} className="remove-attachment">
+                    <Icons.Delete />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {documents.length > 0 && (
+          <div className="attachment-section">
+            <h4>Documentos ({documents.length})</h4>
+            <div className="attachment-list">
+              {documents.map((att, index) => (
+                <div key={index} className="attachment-item">
+                  <span className="attachment-name">{att.name}</span>
+                  <button onClick={() => removeAttachment(attachments.indexOf(att))} className="remove-attachment">
+                    <Icons.Delete />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const fetchInitialData = async () => {
     setIsLoading(true);
@@ -158,7 +844,8 @@ const MessageSchedule: React.FC = () => {
             description: msg.messageText,
             labels: msg.tagIds ? msg.tagIds.split(',') : [],
             contactId: defaultContact?.id || null,
-            contact: defaultContact
+            contact: defaultContact,
+            attachments: msg.attachments || []
           };
         });
 
@@ -196,16 +883,6 @@ const MessageSchedule: React.FC = () => {
       window.removeEventListener('sectorChanged', handleSectorChange);
     };
   }, []);
-
-  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    const id = Date.now();
-    setToasts(current => [...current, { id, message, type }]);
-    setTimeout(() => removeToast(id), 3000);
-  };
-
-  const removeToast = (id: number) => {
-    setToasts(current => current.filter(toast => toast.id !== id));
-  };
 
   const validateForm = () => {
     const newErrors: { [key: string]: string | null } = {};
@@ -245,6 +922,13 @@ const MessageSchedule: React.FC = () => {
         return;
       }
 
+      const attachmentsForBackend = attachments.map(attachment => ({
+        type: attachment.fileType as 'image' | 'audio' | 'file',
+        data: attachment.data,
+        name: attachment.name,
+        mimeType: attachment.mimeType
+      }));
+
       const messageData: CreateMessageSchedulingDTO = {
         name: newMessage.title,
         messageText: newMessage.description,
@@ -252,15 +936,14 @@ const MessageSchedule: React.FC = () => {
         contactId: newMessage.contactId!,
         sectorId: sectorId,
         status: true,
-        tagIds: newMessage.labels.length > 0 ? newMessage.labels.join(',') : ''
+        tagIds: '',
+        attachments: attachmentsForBackend
       };
 
       if (currentMessageIndex !== null && newMessage.id) {
-        // Atualizar mensagem existente
         await updateMessageScheduling(newMessage.id, messageData);
         addToast('Mensagem atualizada com sucesso', 'success');
       } else {
-        // Criar nova mensagem
         await createMessageScheduling(messageData);
         addToast('Mensagem agendada com sucesso', 'success');
       }
@@ -293,19 +976,62 @@ const MessageSchedule: React.FC = () => {
     }
   };
 
-  const showDrawer = (index: number | null = null) => {
+  const showDrawer = async (index: number | null = null) => {
     if (index !== null) {
       const message = messages[index];
       setCurrentMessageIndex(index);
-      setNewMessage({
-        id: message.id,
-        title: message.title,
-        date: message.date,
-        description: message.description,
-        labels: message.labels,
-        contactId: message.contactId,
-        contact: message.contact,
-      });
+      setIsLoading(true);
+      try {
+        const data = await getMessageScheduling(message.id!);
+        const dateObj = dayjs(data.sendDate);
+        setNewMessage({
+          id: data.id,
+          title: data.name,
+          date: dateObj.valueOf(),
+          description: data.messageText,
+          labels: data.tagIds ? data.tagIds.split(',') : [],
+          contactId: data.contactId ?? data.contact_id ?? null,
+          contact: contacts.find(c => c.id === (data.contactId ?? data.contact_id)) || {} as Contact,
+        });
+        setAttachments(
+          (data.attachments || []).map((att: any) => ({
+            fileType: att.type === 'image' ? 'image' : att.type === 'audio' ? 'audio' : 'file',
+            data: att.s3Url || '',
+            name: att.fileName,
+            preview: att.type === 'image' ? att.s3Url : undefined,
+            mimeType: att.type === 'image' ? 'image/*' : att.type === 'audio' ? 'audio/wav' : 'application/pdf'
+          }))
+        );
+        setIsDrawerVisible(true); 
+        setDrawerInitialData({
+          messageText: data.messageText,
+          selectedDate: dateObj,
+          selectedTime: dateObj,
+          selectedContactId: data.contactId ?? data.contact_id,
+          attachments: (data.attachments || []).map((att: any) => ({
+            fileType: att.type === 'image' ? 'image' : att.type === 'audio' ? 'audio' : 'file',
+            data: att.s3Url || '',
+            name: att.fileName,
+            preview: att.type === 'image' ? att.s3Url : undefined,
+            mimeType: att.type === 'image' ? 'image/*' : att.type === 'audio' ? 'audio/wav' : 'application/pdf'
+          }))
+        });
+      } catch (error) {
+        setNewMessage({
+          id: message.id,
+          title: message.title,
+          date: message.date,
+          description: message.description,
+          labels: message.labels,
+          contactId: message.contactId,
+          contact: message.contact,
+        });
+        setAttachments([]);
+        setDrawerInitialData(undefined);
+        setIsDrawerVisible(true);
+      } finally {
+        setIsLoading(false);
+      }
     } else {
       setNewMessage({
         title: '',
@@ -315,8 +1041,10 @@ const MessageSchedule: React.FC = () => {
         contactId: null,
         contact: {} as Contact
       });
+      setAttachments([]);
+      setDrawerInitialData(undefined);
+      setIsDrawerVisible(true);
     }
-    setIsDrawerVisible(true);
   };
 
   const closeDrawer = () => {
@@ -419,143 +1147,28 @@ const MessageSchedule: React.FC = () => {
           {message.description}
         </p>
         
-        <div className="message-schedule-labels-section">
-          <div className="message-schedule-labels-title">Etiquetas do usuário</div>
-          <div className="message-schedule-labels-container">
-            {message.labels.length > 0 ? (
-              (() => {
-                const tag = tags.find(t => t.id === Number(message.labels[0]));
-                return tag ? (
-                  <span key={tag.id} className="message-schedule-label-tag">
-                    {tag.name}
-                  </span>
-                ) : null;
-              })()
-            ) : (
-              <span className="message-schedule-label-tag no-tags">Não definido</span>
+        {message.attachments && message.attachments.length > 0 && (
+          <div className="message-schedule-attachments">
+            {message.attachments.filter(att => att.type === 'image').length > 0 && (
+              <div className="attachment-count">
+                <Icons.Picture />
+                <span>{message.attachments.filter(att => att.type === 'image').length}</span>
+              </div>
+            )}
+            {message.attachments.filter(att => att.type === 'audio').length > 0 && (
+              <div className="attachment-count">
+                <Icons.Mic />
+                <span>{message.attachments.filter(att => att.type === 'audio').length}</span>
+              </div>
+            )}
+            {message.attachments.filter(att => att.type === 'file').length > 0 && (
+              <div className="attachment-count">
+                <Icons.Paperclip />
+                <span>{message.attachments.filter(att => att.type === 'file').length}</span>
+              </div>
             )}
           </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderDrawer = () => {
-    if (!isDrawerVisible) return null;
-
-    return (
-      <div className="schedule-modal">
-        <div className="modal-header">
-          <h2 className="modal-title">
-            {currentMessageIndex !== null ? 'Editar mensagem' : 'Nova mensagem'}
-          </h2>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Título <span className="required">*</span></label>
-          <input
-            type="text"
-            className={`form-input ${errors.title !== undefined ? 'error' : ''}`}
-            value={newMessage.title}
-            onChange={(e) => {
-              setNewMessage({ ...newMessage, title: e.target.value });
-              if (errors.title !== undefined) {
-                setErrors({ ...errors, title: null });
-              }
-            }}
-            placeholder="Título da mensagem"
-          />
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Data e Hora <span className="required">*</span></label>
-          <div className="date-input-container">
-            <input
-              type="datetime-local"
-              className={`${errors.date !== undefined ? 'error' : ''}`}
-              value={dateInputValue}
-              onChange={handleDateChange}
-            />
-            <Icons.Calendar />
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Mensagem <span className="required">*</span></label>
-          <textarea
-            className={`form-textarea ${errors.description !== undefined ? 'error' : ''}`}
-            value={newMessage.description}
-            onChange={(e) => {
-              handleDescriptionChange(e);
-              if (errors.description !== undefined) {
-                setErrors({ ...errors, description: null });
-              }
-            }}
-            placeholder="Digite sua mensagem aqui..."
-            rows={4}
-          />
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Contato <span className="required">*</span></label>
-          <select
-            className={`form-select ${errors.contactId !== undefined ? 'error' : ''}`}
-            value={newMessage.contactId || ''}
-            onChange={(e) => {
-              const selectedContact = contacts.find(c => c.id === Number(e.target.value));
-              setNewMessage({ 
-                ...newMessage, 
-                contactId: Number(e.target.value),
-                contact: selectedContact || {} as Contact
-              });
-              if (errors.contactId !== undefined) {
-                setErrors({ ...errors, contactId: null });
-              }
-            }}
-          >
-            <option value="">Selecione um contato</option>
-            {contacts.map((contact) => (
-              <option key={contact.id} value={contact.id}>
-                {contact.name} ({contact.number})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Etiquetas do usuário</label>
-          <select
-            className={`form-select`}
-            value={newMessage.labels[0] || ''}
-            onChange={(e) => {
-              if (e.target.value === '') {
-                removeTag();
-              } else {
-                toggleTagSelection(e.target.value);
-              }
-            }}
-          >
-            <option value="">Selecione uma etiqueta</option>
-            {tags.map((tag) => (
-              <option 
-                key={tag.id} 
-                value={tag.id}
-                style={{ color: tag.color }}
-              >
-                {tag.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-actions">
-          <button className="btn btn-secondary" onClick={closeDrawer}>
-            Cancelar
-          </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            Salvar
-          </button>
-        </div>
+        )}
       </div>
     );
   };
@@ -615,4 +1228,4 @@ const MessageSchedule: React.FC = () => {
   );
 };
 
-export default MessageSchedule;
+export default MessageScheduleScreen;

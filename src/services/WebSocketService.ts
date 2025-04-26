@@ -8,62 +8,136 @@ export class WebSocketService {
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private currentSectorId: string | null = null;
   private isIntentionalClose = false;
+  private connectionCheckInterval: NodeJS.Timeout | null = null;
+  private lastPongTime: number | null = null;
+  private isReconnecting = false;
+  private lastConnectionAttempt: number = 0;
+  private minReconnectDelay = 1000;
 
-  constructor(private baseUrl: string = 'wss://whatsapp.ligchat.com') {}
+  constructor() {}
 
   connect(sectorId: string) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      console.log('WebSocket já está conectado');
+    // Prevenir múltiplas tentativas de conexão simultâneas
+    const now = Date.now();
+    if (this.isReconnecting || (now - this.lastConnectionAttempt < this.minReconnectDelay)) {
+      console.log('🚫 [WebSocketService] Tentativa de conexão ignorada - reconexão em andamento ou muito cedo');
       return;
     }
 
-    this.isIntentionalClose = false;
-    this.currentSectorId = sectorId;
+    this.lastConnectionAttempt = now;
+
+    if (this.ws) {
+      console.log('🔄 [WebSocketService] Desconectando WebSocket existente antes de nova conexão');
+      this.disconnect();
+    }
+
+    const url = `wss://unofficial.ligchat.com/api/v1/ws/${sectorId}`;
+
+    console.log('🚀 [WebSocketService] Iniciando conexão:', {
+      sectorId,
+      url,
+      reconnectAttempts: this.reconnectAttempts
+    });
 
     try {
-      const wsUrl = `${this.baseUrl}?sectorId=${sectorId}`;
-      console.log('Tentando conectar ao WebSocket:', wsUrl);
-      
-      this.ws = new WebSocket(wsUrl);
+      this.ws = new WebSocket(url);
+      this.isIntentionalClose = false;
+      this.currentSectorId = sectorId;
       this.setupWebSocketHandlers();
+      this.setupConnectionCheck();
     } catch (error) {
-      console.error('Erro ao criar conexão WebSocket:', error);
+      console.error('❌ [WebSocketService] Erro ao criar conexão:', error);
       this.handleReconnect();
     }
   }
 
-  private normalizeMessage(message: any): MessageType {
-    console.log('Normalizando mensagem no WebSocketService:', message);
-    
-    // Função auxiliar para pegar propriedade independente do case
-    const getProp = (obj: any, prop: string) => {
-      const props = [prop, prop.toLowerCase(), prop.toUpperCase(), 
-        prop.charAt(0).toUpperCase() + prop.slice(1),
-        prop.charAt(0).toLowerCase() + prop.slice(1)
-      ];
-      
-      for (const p of props) {
-        if (obj[p] !== undefined) return obj[p];
+  private setupConnectionCheck() {
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+    }
+
+    // Envia ping a cada 30 segundos
+    this.connectionCheckInterval = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        try {
+          console.log('💓 [WebSocketService] Enviando ping');
+          this.ws.send(JSON.stringify({ type: 'ping' }));
+          
+          // Se não receber pong em 10 segundos, considera conexão perdida
+          setTimeout(() => {
+            if (this.lastPongTime && Date.now() - this.lastPongTime > 10000) {
+              console.log('⚠️ [WebSocketService] Timeout no ping/pong, reconectando...');
+              this.reconnect();
+            }
+          }, 10000);
+        } catch (error) {
+          console.error('❌ [WebSocketService] Erro ao enviar ping:', error);
+          this.reconnect();
+        }
       }
-      return undefined;
-    };
+    }, 30000);
+  }
+
+  private reconnect() {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    this.handleReconnect();
+  }
+
+  private normalizeMessage(message: any): MessageType {
+    console.log('🔄 [WebSocketService] Normalizando mensagem:', message);
+    
+    const messageData = message.data || message;
+    
+    let mediaType = messageData.type || 'text';
+    let mediaUrl = null;
+    let localUrl = null;
+    let fileName = null;
+    let mimeType = null;
+
+    if (messageData.type === 'image' || messageData.type === 'video') {
+      mediaUrl = messageData.url || messageData.mediaUrl;
+      localUrl = messageData.localUrl;
+      mimeType = messageData.mime_type || messageData.mimeType || `${messageData.type}/jpeg`;
+      fileName = messageData.file_name || messageData.fileName || `${messageData.type}.${mimeType.split('/')[1]}`;
+    } else if (messageData.type === 'document') {
+      mediaUrl = messageData.url || messageData.mediaUrl;
+      localUrl = messageData.localUrl;
+      mimeType = messageData.mime_type || messageData.mimeType;
+      fileName = messageData.file_name || messageData.fileName || 'document';
+    } else if (messageData.type === 'audio' || messageData.type === 'voice') {
+      mediaUrl = messageData.url || messageData.mediaUrl;
+      localUrl = messageData.localUrl;
+      mimeType = messageData.mime_type || messageData.mimeType || 'audio/mpeg';
+      fileName = messageData.file_name || messageData.fileName || 'audio.mp3';
+      mediaType = 'audio';
+    }
 
     const normalized = {
-      id: getProp(message, 'id') || Date.now(),
-      content: getProp(message, 'content') || '',
-      isSent: getProp(message, 'isSent') ?? false,
-      mediaType: getProp(message, 'mediaType') || 'text',
-      mediaUrl: getProp(message, 'mediaUrl') || null,
-      fileName: getProp(message, 'fileName') || null,
-      mimeType: getProp(message, 'mimeType') || null,
-      sectorId: getProp(message, 'sectorId'),
-      contactID: getProp(message, 'contactID') || getProp(message, 'contactId'),
-      isRead: getProp(message, 'isRead') ?? false,
-      sentAt: getProp(message, 'sentAt') || new Date().toISOString(),
-      type: getProp(message, 'type') || undefined
+      id: messageData.message_id || messageData.id || Date.now(),
+      content: messageData.content || messageData.caption || '',
+      isSent: false,
+      mediaType,
+      mediaUrl,
+      localUrl,
+      fileName,
+      mimeType,
+      sectorId: message.sector_id || messageData.sector_id,
+      contactID: messageData.contact_id,
+      isRead: false,
+      sentAt: messageData.timestamp ? new Date(messageData.timestamp * 1000).toISOString() : new Date().toISOString(),
+      type: message.type,
+      attachment: mediaUrl ? {
+        url: mediaUrl,
+        localUrl,
+        type: mediaType,
+        name: fileName || ''
+      } : undefined
     };
 
-    console.log('Mensagem normalizada no WebSocketService:', normalized);
+    console.log('✨ [WebSocketService] Mensagem normalizada:', normalized);
     return normalized;
   }
 
@@ -71,59 +145,101 @@ export class WebSocketService {
     if (!this.ws) return;
 
     this.ws.onopen = () => {
-      console.log('WebSocket conectado com sucesso');
+      console.log('🌟 [WebSocketService] Conexão estabelecida com sucesso');
       this.reconnectAttempts = 0;
+      this.isReconnecting = false;
+      this.lastPongTime = Date.now();
     };
 
     this.ws.onmessage = (event) => {
       try {
-        console.log('Mensagem WebSocket recebida (raw):', event.data);
+        console.log('📥 [WebSocketService] Mensagem recebida (raw):', event.data);
         
         let parsedMessage;
         try {
-          // Primeiro parse
           parsedMessage = JSON.parse(event.data);
           
-          // Se for string JSON, tenta segundo parse
+          // Tratamento especial para mensagens de ping/pong
+          if (parsedMessage.type === 'pong') {
+            console.log('💗 [WebSocketService] Pong recebido');
+            this.lastPongTime = Date.now();
+            return;
+          }
+          
           if (typeof parsedMessage === 'string' && parsedMessage.startsWith('{')) {
             parsedMessage = JSON.parse(parsedMessage);
           }
+          console.log('🔄 [WebSocketService] Mensagem após parse:', parsedMessage);
         } catch (e) {
-          console.error('Erro ao fazer parse da mensagem:', e);
+          console.error('❌ [WebSocketService] Erro ao fazer parse da mensagem:', e);
           return;
         }
         
-        console.log('Mensagem após parse:', parsedMessage);
         const normalizedMessage = this.normalizeMessage(parsedMessage);
+        console.log('✨ [WebSocketService] Mensagem normalizada:', normalizedMessage);
         
-        console.log('Notificando handlers com mensagem normalizada:', normalizedMessage);
-        this.messageHandlers.forEach(handler => {
+        console.log('📢 [WebSocketService] Notificando handlers:', {
+          handlersCount: this.messageHandlers.length,
+          messageId: normalizedMessage.id,
+          contactId: normalizedMessage.contactID
+        });
+
+        this.messageHandlers.forEach((handler, index) => {
           try {
+            console.log(`🎯 [WebSocketService] Executando handler ${index + 1}/${this.messageHandlers.length}`);
             handler(normalizedMessage);
           } catch (error) {
-            console.error('Erro no handler da mensagem:', error);
+            console.error(`❌ [WebSocketService] Erro no handler ${index + 1}:`, error);
           }
         });
       } catch (error) {
-        console.error('Erro ao processar mensagem do WebSocket:', error);
+        console.error('❌ [WebSocketService] Erro ao processar mensagem:', error);
       }
     };
 
     this.ws.onerror = (event) => {
-      console.error('Erro na conexão WebSocket:', event);
-      this.handleReconnect();
+      console.error('❌ [WebSocketService] Erro na conexão:', event);
+      // Não iniciar reconexão aqui, deixar o onclose lidar com isso
     };
 
     this.ws.onclose = (event) => {
-      console.log(`WebSocket fechado. Código: ${event.code}, Razão: ${event.reason}`);
-      if (!this.isIntentionalClose) {
-        this.handleReconnect();
+      console.log(`🔒 [WebSocketService] Conexão fechada. Código: ${event.code}, Razão: ${event.reason || 'Não especificada'}`);
+      
+      // Não tentar reconectar se o fechamento foi intencional
+      if (this.isIntentionalClose) {
+        console.log('✋ [WebSocketService] Fechamento intencional - não tentando reconectar');
+        return;
+      }
+
+      // Tratar diferentes códigos de fechamento
+      switch (event.code) {
+        case 1000: // Fechamento normal
+          console.log('�� [WebSocketService] Fechamento normal da conexão');
+          break;
+        case 1006: // Fechamento anormal
+          console.log('⚠️ [WebSocketService] Fechamento anormal - iniciando reconexão');
+          this.handleReconnect();
+          break;
+        default:
+          if (!this.isReconnecting) {
+            console.log('🔄 [WebSocketService] Código de fechamento não esperado - tentando reconectar');
+            this.handleReconnect();
+          }
       }
     };
   }
 
   private handleReconnect() {
-    if (this.isIntentionalClose || !this.currentSectorId) return;
+    if (this.isIntentionalClose || !this.currentSectorId || this.isReconnecting) {
+      console.log('🚫 [WebSocketService] Reconexão ignorada:', {
+        isIntentionalClose: this.isIntentionalClose,
+        hasSectorId: !!this.currentSectorId,
+        isReconnecting: this.isReconnecting
+      });
+      return;
+    }
+
+    this.isReconnecting = true;
 
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
@@ -132,38 +248,58 @@ export class WebSocketService {
         clearTimeout(this.reconnectTimeout);
       }
 
+      console.log(`⏳ [WebSocketService] Agendando reconexão em ${delay}ms (tentativa ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
+
       this.reconnectTimeout = setTimeout(() => {
         this.reconnectAttempts++;
-        console.log(`Tentativa de reconexão ${this.reconnectAttempts} de ${this.maxReconnectAttempts}`);
+        console.log(`🔄 [WebSocketService] Tentativa de reconexão ${this.reconnectAttempts} de ${this.maxReconnectAttempts}`);
         this.connect(this.currentSectorId!);
       }, delay);
     } else {
-      console.error('Número máximo de tentativas de reconexão atingido');
+      console.error('❌ [WebSocketService] Número máximo de tentativas de reconexão atingido');
+      this.isReconnecting = false;
     }
   }
 
   addMessageHandler(handler: (message: MessageType) => void) {
+    console.log('➕ [WebSocketService] Adicionando novo handler. Total:', this.messageHandlers.length + 1);
     this.messageHandlers.push(handler);
   }
 
   removeMessageHandler(handler: (message: MessageType) => void) {
+    const previousCount = this.messageHandlers.length;
     this.messageHandlers = this.messageHandlers.filter(h => h !== handler);
+    console.log('➖ [WebSocketService] Removendo handler. Antes:', previousCount, 'Depois:', this.messageHandlers.length);
   }
 
   disconnect() {
+    console.log('🔌 [WebSocketService] Iniciando desconexão');
     this.isIntentionalClose = true;
     this.currentSectorId = null;
+    this.isReconnecting = false;
     
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
 
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+      this.connectionCheckInterval = null;
+    }
+
     if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+      try {
+        console.log('👋 [WebSocketService] Fechando conexão WebSocket');
+        this.ws.close(1000, 'Desconexão intencional');
+      } catch (error) {
+        console.error('❌ [WebSocketService] Erro ao fechar conexão:', error);
+      } finally {
+        this.ws = null;
+      }
     }
 
     this.reconnectAttempts = 0;
+    console.log('✅ [WebSocketService] Desconexão completa');
   }
 } 

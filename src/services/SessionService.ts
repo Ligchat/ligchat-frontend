@@ -2,6 +2,7 @@ class SessionService {
   private static readonly TOKEN_KEY = '@ligchat/token';
   private static readonly USER_KEY = '@ligchat/user';
   private static readonly SECTOR_KEY = '@ligchat/sector';
+  private static readonly SECTOR_OFFICIAL_KEY = '@ligchat/sector_official';
   private static readonly AVAILABLE_SECTORS_KEY = '@ligchat/available_sectors';
 
   // Salva um valor na sessão
@@ -28,16 +29,14 @@ class SessionService {
   }
 
   static isTokenExpired(token: string): boolean {
-    const decodedToken = this.decodeToken(token);
-    
-    // Caso o token não possua informação de expiração, considera expirado
-    if (!decodedToken || !decodedToken.exp) {
-        return true;
+    try {
+      const payload = this.decodeToken(token);
+      if (!payload || !payload.exp) return true;
+      return Date.now() >= payload.exp * 1000;
+    } catch {
+      return true;
     }
-
-    const currentTimeInSeconds = Math.floor(Date.now() / 1000);
-    return decodedToken.exp < currentTimeInSeconds;
-}
+  }
 
   // Recupera um item da sessão para o setor
   static getSessionForSector(): any | null {
@@ -56,15 +55,13 @@ class SessionService {
 
   // Recupera um item específico da sessão
   static getSession(key: string): any | null {
-      const sessionData = localStorage.getItem(key);
-      if (!sessionData) {
+      const value = localStorage.getItem(key);
+      if (!value) return null;
+      try {
+          return JSON.parse(value);
+      } catch {
           return null;
       }
-
-      const parsedData = JSON.parse(sessionData);
-      
-      // Retorna qualquer tipo, não apenas tokens
-      return parsedData;
   }
 
   // Remove um item específico da sessão
@@ -100,7 +97,7 @@ class SessionService {
       return decodedToken.exp < currentTimeInSeconds;
   }
 
-  static setToken(token: string) {
+  static setToken(token: string): void {
     localStorage.setItem(this.TOKEN_KEY, token);
   }
 
@@ -108,20 +105,20 @@ class SessionService {
     return localStorage.getItem(this.TOKEN_KEY);
   }
 
-  static removeToken() {
+  static removeToken(): void {
     localStorage.removeItem(this.TOKEN_KEY);
   }
 
-  static setUser(user: any) {
+  static setUser(user: any): void {
     localStorage.setItem(this.USER_KEY, JSON.stringify(user));
   }
 
-  static getUser(): any {
+  static getUser(): any | null {
     const user = localStorage.getItem(this.USER_KEY);
     return user ? JSON.parse(user) : null;
   }
 
-  static removeUser() {
+  static removeUser(): void {
     localStorage.removeItem(this.USER_KEY);
   }
 
@@ -134,19 +131,36 @@ class SessionService {
     return sectors ? JSON.parse(sectors) : [];
   }
 
-  static setSectorId(sectorId: number) {
-    const availableSectors = this.getAvailableSectors();
-    
-    if (!availableSectors.includes(sectorId)) {
-      this.removeSectorId();
+  static setSectorId(sectorId: number, isOfficial: boolean) {
+    // Validar e converter os valores
+    if (!sectorId || typeof sectorId !== 'number') {
+      console.error('Invalid sectorId:', sectorId);
       return;
     }
+
+    const officialValue = Boolean(isOfficial);
     
+    // Verificar se o setor atual é diferente do novo
+    const currentSectorId = this.getSectorId();
+    const currentIsOfficial = this.getSectorIsOfficial();
+    
+    if (currentSectorId === sectorId && currentIsOfficial === officialValue) {
+      return; // Se for o mesmo setor e mesmo status, não faz nada
+    }
+    
+    // Salvar os valores
     localStorage.setItem(this.SECTOR_KEY, sectorId.toString());
+    localStorage.setItem(this.SECTOR_OFFICIAL_KEY, officialValue.toString());
     
-    // Dispara um evento custom para notificar sobre a mudança do setor
+    // Atualizar setores disponíveis se necessário
+    const availableSectors = this.getAvailableSectors();
+    if (!availableSectors.includes(sectorId)) {
+      this.setAvailableSectors([...availableSectors, sectorId]);
+    }
+    
+    // Disparar evento de mudança apenas se houve mudança real
     const event = new CustomEvent('sectorChanged', { 
-      detail: { sectorId } 
+      detail: { sectorId, isOfficial: officialValue } 
     });
     window.dispatchEvent(event);
   }
@@ -155,32 +169,50 @@ class SessionService {
     const sectorId = localStorage.getItem(this.SECTOR_KEY);
     if (!sectorId) return null;
 
-    const parsedId = parseInt(sectorId);
-    const availableSectors = this.getAvailableSectors();
-
-    if (!availableSectors.includes(parsedId)) {
-      this.removeSectorId();
+    try {
+      const parsedId = parseInt(sectorId);
+      if (isNaN(parsedId)) return null;
+      return parsedId;
+    } catch {
       return null;
     }
+  }
 
-    return parsedId;
+  static getSectorIsOfficial(): boolean | null {
+    const isOfficial = localStorage.getItem(this.SECTOR_OFFICIAL_KEY);
+    if (!isOfficial) return null;
+
+    try {
+      return isOfficial === 'true';
+    } catch {
+      return null;
+    }
   }
 
   static removeSectorId() {
     localStorage.removeItem(this.SECTOR_KEY);
+    localStorage.removeItem(this.SECTOR_OFFICIAL_KEY);
     
-    // Dispara um evento custom para notificar sobre a remoção do setor
     const event = new CustomEvent('sectorChanged', { 
-      detail: { sectorId: null } 
+      detail: { sectorId: null, isOfficial: null } 
     });
     window.dispatchEvent(event);
   }
 
   static validateAndCleanSectorSession(availableSectors: number[]) {
+    if (!Array.isArray(availableSectors)) {
+      console.error('Invalid availableSectors:', availableSectors);
+      return;
+    }
+
     this.setAvailableSectors(availableSectors);
     const currentSectorId = this.getSectorId();
     
     if (currentSectorId && !availableSectors.includes(currentSectorId)) {
+      console.log('Current sector not in available sectors, removing...', {
+        currentSectorId,
+        availableSectors
+      });
       this.removeSectorId();
     }
   }
@@ -193,9 +225,10 @@ class SessionService {
   }
 
   static clearSession() {
-    this.removeToken();
-    this.removeUser();
-    this.removeSectorId();
+    localStorage.removeItem(this.TOKEN_KEY);
+    localStorage.removeItem(this.USER_KEY);
+    localStorage.removeItem(this.SECTOR_KEY);
+    localStorage.removeItem(this.SECTOR_OFFICIAL_KEY);
     localStorage.removeItem(this.AVAILABLE_SECTORS_KEY);
   }
 }

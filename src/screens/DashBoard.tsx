@@ -7,10 +7,29 @@ import 'react-datepicker/dist/react-datepicker.css';
 import '../styles/Dashboard/Dashboard.css';
 import '../styles/Dashboard/CustomDatePicker.css';
 import SessionService from '../services/SessionService';
-import { getContacts, Contact } from '../services/ContactService';
+import { getContacts } from '../services/ContactService';
 import { getTags, Tag } from '../services/LabelService';
 import { getAllUsers, User } from '../services/UserService';
 import { useNavigate } from 'react-router-dom';
+
+interface Contact {
+  id: number;
+  name: string;
+  tagId: number | null;
+  number: string;
+  avatarUrl: string | null;
+  email: string;
+  notes: string | null;
+  sectorId: number;
+  isActive: boolean;
+  priority: string;
+  contactStatus: string;
+  aiActive: number;
+  assignedTo: number | null;
+  createdAt: string;
+  updatedAt: string;
+  isOfficial: boolean;
+}
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -27,13 +46,8 @@ const Dashboard: React.FC = () => {
   const [tasksPending, setTasksPending] = useState<number>(0);
   const [goalProgress, setGoalProgress] = useState<number>(0);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [dateRange, setDateRange] = useState<{start: Date | null, end: Date | null}>(() => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(start.getDate() - 7); // Define para 7 dias atrás
-    return { start, end };
-  });
-  const [selectedPeriod, setSelectedPeriod] = useState<string | null>('semanal'); // Inicia com período semanal selecionado
+  const [dateRange, setDateRange] = useState<{start: Date | null, end: Date | null}>({ start: null, end: null }); // Sem filtro customizado
+  const [selectedPeriod, setSelectedPeriod] = useState<string | null>('diario'); // Sempre inicia com período diário (7 dias)
   const [sectorSelected, setSectorSelected] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [tasksPerPage] = useState<number>(5);
@@ -77,8 +91,14 @@ const Dashboard: React.FC = () => {
   ));
 
   useEffect(() => {
+    console.log('useEffect disparado - dateRange ou selectedPeriod mudou:', {
+      dateRange,
+      selectedPeriod
+    });
+    
     const loadData = async () => {
       try {
+        console.log('Iniciando carregamento de dados...');
         setIsLoadingNewContacts(true);
         setIsLoadingActiveContacts(true);
         setIsLoadingComparison(true);
@@ -87,43 +107,82 @@ const Dashboard: React.FC = () => {
         setIsLoadingActiveTable(true);
 
         const sectorId = SessionService.getSectorId();
+        console.log('Setor ID:', sectorId);
+        
         if (!sectorId) {
           console.error('Setor não selecionado');
           return;
         }
 
-        // Carregar todos os dados necessários simultaneamente
-        const [contactsResponse, tagsResponse, usersResponse] = await Promise.all([
-          getContacts(sectorId),
-          getTags(sectorId),
-          getAllUsers()
-        ]);
+        console.log('Fazendo chamadas à API...');
+        
+        // Separar as chamadas para melhor tratamento de erro
+        const contactsResponse = await getContacts(sectorId);
+        console.log('Resposta da API de contatos:', contactsResponse);
 
-        // Configurar contatos
-        const contacts = contactsResponse.data;
-        setUsers(contacts);
-
-        // Filtrar contatos pelo período selecionado
-        const filteredContacts = filterContactsByPeriod(contacts, dateRange.start, dateRange.end);
-        setFilteredUsers(filteredContacts);
-        setTasksPending(filteredContacts.length);
-        setTasksDone(filteredContacts.length);
-        setCompletedTasks(filteredContacts);
-
-        // Configurar tags
-        setTags(tagsResponse.data || []);
-
-        // Configurar usuários
-        setAllUsers(usersResponse || []);
-
-        // Processar dados para o gráfico com o range de datas atual
-        if (dateRange.start && dateRange.end) {
-          processContactsData(contacts, selectedPeriod, dateRange);
+        let tagsData: Tag[] = [];
+        try {
+          const tagsResponse = await getTags(sectorId);
+          tagsData = tagsResponse.data || [];
+          console.log('Tags carregadas com sucesso:', tagsData);
+        } catch (error) {
+          console.warn('Erro ao carregar tags, continuando sem tags:', error);
         }
+
+        let usersData: User[] = [];
+        try {
+          const usersResponse = await getAllUsers();
+          usersData = usersResponse || [];
+          console.log('Usuários carregados com sucesso:', usersData);
+        } catch (error) {
+          console.warn('Erro ao carregar usuários, continuando sem usuários:', error);
+        }
+
+        if (contactsResponse && contactsResponse.data) {
+          const contacts = contactsResponse.data;
+          console.log('Contatos extraídos da resposta:', contacts);
+          
+          setUsers(contacts);
+          console.log('Estado users atualizado:', contacts);
+
+          const filteredContacts = filterContactsByPeriod(contacts, dateRange.start, dateRange.end);
+          console.log('Contatos filtrados por período:', {
+            total: contacts.length,
+            filtrados: filteredContacts.length,
+            periodo: {
+              inicio: dateRange.start,
+              fim: dateRange.end
+            }
+          });
+          
+          setFilteredUsers(filteredContacts);
+          setTasksPending(filteredContacts.length);
+          setTasksDone(filteredContacts.length);
+          setCompletedTasks(filteredContacts);
+
+          console.log('Estados atualizados:', {
+            filteredUsers: filteredContacts.length,
+            tasksPending: filteredContacts.length,
+            tasksDone: filteredContacts.length,
+            completedTasks: filteredContacts.length
+          });
+
+          if (selectedPeriod === 'diario' && (!dateRange.start || !dateRange.end)) {
+            processContactsData(contacts, 'diario', { start: null, end: null });
+          } else if (dateRange.start && dateRange.end) {
+            processContactsData(contacts, selectedPeriod, dateRange);
+          }
+        } else {
+          console.error('Formato de resposta inválido ou sem dados:', contactsResponse);
+        }
+
+        setTags(tagsData);
+        setAllUsers(usersData);
 
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
       } finally {
+        console.log('Finalizando carregamento de dados...');
         setIsLoadingNewContacts(false);
         setIsLoadingActiveContacts(false);
         setIsLoadingComparison(false);
@@ -136,11 +195,17 @@ const Dashboard: React.FC = () => {
     const checkSector = () => {
       const selectedSector = SessionService.getSectorId();
       const hasSector = !!selectedSector;
+      console.log('Verificação de setor:', {
+        selectedSector,
+        hasSector
+      });
+      
       setSectorSelected(hasSector);
       
       if (hasSector) {
         loadData();
       } else {
+        console.log('Resetando estados por falta de setor');
         setTasksDone(0);
         setTasksPending(0);
         setGoalProgress(0);
@@ -167,15 +232,17 @@ const Dashboard: React.FC = () => {
     checkSector();
     
     const handleStorageChange = () => {
+      console.log('Evento de mudança no storage detectado');
       checkSector();
     };
     
     window.addEventListener('storage', handleStorageChange);
     
     return () => {
+      console.log('Limpando event listener do storage');
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [dateRange, selectedPeriod]); // Adicionar selectedPeriod como dependência
+  }, [dateRange, selectedPeriod]);
 
   const goalOptions = {
     indexAxis: 'y' as const,
@@ -476,10 +543,26 @@ const Dashboard: React.FC = () => {
     const start = setStartOfDay(new Date(startDate));
     const end = setEndOfDay(new Date(endDate));
 
-    return contacts.filter(contact => {
-      const contactDate = new Date(contact.createdAt);
-      return contactDate >= start && contactDate <= end;
+    console.log('Filtrando contatos:', {
+      totalContatos: contacts.length,
+      dataInicial: start,
+      dataFinal: end
     });
+
+    const filtered = contacts.filter(contact => {
+      const contactDate = new Date(contact.createdAt);
+      const isInRange = contactDate >= start && contactDate <= end;
+      console.log('Verificando contato:', {
+        id: contact.id,
+        nome: contact.name,
+        dataCriacao: contactDate,
+        dentroDoRange: isInRange
+      });
+      return isInRange;
+    });
+
+    console.log('Contatos filtrados:', filtered);
+    return filtered;
   };
 
   // Adicione esta função para calcular as tarefas da página atual usando os contatos filtrados

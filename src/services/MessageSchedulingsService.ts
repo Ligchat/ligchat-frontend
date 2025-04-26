@@ -1,18 +1,26 @@
 import axios from 'axios';
 import SessionService from './SessionService';
 
-const API_URL = process.env.REACT_APP_API_URL; // Adicionando a variável de ambiente
+const API_URL = process.env.REACT_APP_API_URL;
 
 export interface Attachment {
-  type: string;
-  content: string;
+  type: 'image' | 'audio' | 'file';
+  data: string;
+  name: string;
+}
+
+export interface MessageSchedulingData {
+  contact_id: number;
+  message: string;
+  scheduled_at: string;
+  attachments?: Attachment[];
 }
 
 export interface MessageScheduling {
   id: number;
   name: string;
   messageText: string;
-  sendDate: string; // Usando string para datas no formato ISO
+  sendDate: string;
   flowId: number;
   sectorId: number;
   tagIds: string;
@@ -26,17 +34,20 @@ export interface MessageScheduling {
   attachments?: Attachment[];
   createdAt: string;
   updatedAt: string;
+  contactId?: number;
+  contact_id?: number;
 }
 
 // DTO para criar um MessageScheduling
 export interface CreateMessageSchedulingDTO {
   name: string;
   messageText: string;
-  sendDate: string; // ISO string
+  sendDate: string;
   contactId: number;
   sectorId: number;
   status?: boolean;
   tagIds: string;
+  attachments?: Attachment[];
 }
 
 // DTO para atualizar um MessageScheduling
@@ -137,3 +148,26 @@ export const deleteMessageScheduling = async (id: number): Promise<void> => {
     throw new Error(`Failed to delete message scheduling with id ${id}: ${error.response?.data?.message || error.message}`);
   }
 };
+
+export class MessageSchedulingsService {
+  static async create(data: MessageSchedulingData) {
+    const sectorId = SessionService.getSectorId();
+    if (!sectorId) throw new Error('Setor não selecionado');
+
+    return axios.post(`${API_URL}/message-schedulings`, {
+      ...data,
+      sector_id: sectorId
+    });
+  }
+
+  static async list() {
+    const sectorId = SessionService.getSectorId();
+    if (!sectorId) throw new Error('Setor não selecionado');
+
+    return axios.get(`${API_URL}/message-schedulings?sector_id=${sectorId}`);
+  }
+
+  static async delete(id: number) {
+    return axios.delete(`${API_URL}/message-schedulings/${id}`);
+  }
+}

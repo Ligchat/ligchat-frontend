@@ -24,6 +24,8 @@ export interface Contact {
   aiActive: number;
   assignedTo: number | null;
   createdAt: string;
+  updatedAt: string;
+  isOfficial: boolean;
 }
 
 export interface CreateContactRequestDTO {
@@ -55,19 +57,40 @@ export interface UpdateResponsibleRequestDTO {
 
 export const getContacts = async (sectorId: number): Promise<ApiResponse<Contact>> => {
   try {
+    console.log('Iniciando getContacts:', { sectorId });
     const token = localStorage.getItem('token');
+    console.log('Token recuperado:', !!token);
+
+    const url = `${API_URL}/Contact`;
+    const params = {
+      sector_id: sectorId
+    };
+    console.log('Fazendo requisição para:', { url, params });
+
     const response = await axios.get<ApiResponse<Contact>>(
-      `${API_URL}/Contact/sector/${sectorId}`,
+      url,
       {
+        params,
         headers: {
           'Accept': '*/*',
           'Authorization': `Bearer ${token}`
         },
       }
     );
+
+    console.log('Resposta recebida:', {
+      status: response.status,
+      data: response.data
+    });
+
     return response.data;
   } catch (error) {
-    console.error('Error fetching contacts:', error);
+    console.error('Erro detalhado em getContacts:', {
+      error,
+      message: error instanceof Error ? error.message : 'Erro desconhecido',
+      config: error?.['config'],
+      response: error?.['response']?.data
+    });
     throw new Error('Falha ao obter contatos: ' + error);
   }
 };

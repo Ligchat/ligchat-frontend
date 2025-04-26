@@ -208,7 +208,7 @@ body.drawer-open {
 
 .drawer-content {
     padding: 1.5rem;
-    height: calc(100vh - 140px);
+    height: 100%;
     overflow-y: auto;
 }
 
@@ -254,7 +254,7 @@ body.drawer-open {
     }
     
     .drawer-content {
-        height: calc(100vh - 120px);
+        height: 100%;
     }
 }
 
@@ -575,4 +575,239 @@ body.drawer-open {
 .required {
     color: #ff4c4c;
     margin-left: 4px;
+}
+
+/* Estilos para o tipo de API */
+.radio-group {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.radio-group input[type="radio"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #00c2ff;
+  border-radius: 50%;
+  margin: 0;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.radio-group input[type="radio"]:checked {
+  background-color: #00c2ff;
+  border-color: #00c2ff;
+}
+
+.radio-group input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background-color: white;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.radio-group input[type="radio"]:hover {
+  border-color: #00c2ff;
+  box-shadow: 0 0 0 2px rgba(0, 194, 255, 0.1);
+}
+
+/* Status do WhatsApp */
+.whatsapp-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.whatsapp-connect-button {
+  background-color: #00c2ff;
+  color: #121212;
+  border: none;
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.whatsapp-connect-button:hover {
+  background-color: #00a8e0;
+  transform: translateY(-1px);
+}
+
+/* Modal do QR Code */
+.qrcode-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.qrcode-modal {
+  background-color: #1a1a1a;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.qrcode-modal-header {
+  padding: 1rem;
+  border-bottom: 1px solid #2a2a2a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.qrcode-modal-header h3 {
+  margin: 0;
+  color: #00c2ff;
+}
+
+.qrcode-modal-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.whatsapp-status-message {
+  width: 100%;
+  padding: 1rem;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.whatsapp-status-message.connecting {
+  background-color: rgba(255, 193, 7, 0.1);
+  color: #FFC107;
+  border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.whatsapp-status-message.connected {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: #4CAF50;
+  border: 1px solid rgba(76, 175, 80, 0.2);
+}
+
+.whatsapp-status-message.disconnected,
+.whatsapp-status-message.error {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #FF5252;
+  border: 1px solid rgba(255, 82, 82, 0.2);
+}
+
+.qrcode-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  background-color: white;
+  border-radius: 8px;
+}
+
+.qrcode-container img {
+  max-width: 100%;
+  height: auto;
+}
+
+.connection-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: #4CAF50;
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.connection-success p {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .qrcode-modal {
+    width: 95%;
+    margin: 1rem;
+  }
+
+  .radio-group {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+.qrcode-instructions {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.qrcode-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  gap: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  width: 100%;
+}
+
+.qrcode-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top: 3px solid #00c2ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.qrcode-loading-text {
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  text-align: center;
 }

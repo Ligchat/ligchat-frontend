@@ -21,6 +21,19 @@ module.exports = function(app) {
             secure: false,
             logLevel: 'debug'
         })
-    ); 
+    );
+
+    // Proxy para a API não oficial
+    app.use(
+        '/unofficial',
+        createProxyMiddleware({
+            target: 'https://unofficial.ligchat.com',
+            changeOrigin: true,
+            pathRewrite: {
+                '^/unofficial': '/api/v1'
+            },
+            logLevel: 'debug'
+        })
+    );
 };
  

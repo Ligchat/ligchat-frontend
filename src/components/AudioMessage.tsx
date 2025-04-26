@@ -9,13 +9,13 @@ interface AudioMessageProps {
 
 const PlayIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M8 5V19L19 12L8 5Z" fill="currentColor"/>
+    <path d="M8 6.82v10.36c0 .79.87 1.27 1.54.84l8.14-5.18c.62-.39.62-1.29 0-1.69L9.54 5.98C8.87 5.55 8 6.03 8 6.82z" fill="currentColor"/>
   </svg>
 );
 
 const PauseIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M6 19H10V5H6V19ZM14 5V19H18V5H14Z" fill="currentColor"/>
+    <path d="M8 19c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2s-2 .9-2 2v10c0 1.1.9 2 2 2zm6-12v10c0 1.1.9 2 2 2s2-.9 2-2V7c0-1.1-.9-2-2-2s-2 .9-2 2z" fill="currentColor"/>
   </svg>
 );
 
@@ -38,11 +38,10 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ src, isSent, onCance
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
         
         const channelData = audioBuffer.getChannelData(0);
-        const samples = 40;
+        const samples = 50;
         const blockSize = Math.floor(channelData.length / samples);
         const dataPoints: number[] = [];
 
-        // Encontrar o valor máximo para normalização
         let maxValue = 0;
         for (let i = 0; i < channelData.length; i++) {
           const absValue = Math.abs(channelData[i]);
@@ -51,33 +50,34 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ src, isSent, onCance
 
         for (let i = 0; i < samples; i++) {
           let blockStart = blockSize * i;
-          let max = 0;
+          let sum = 0;
+          let count = 0;
           
-          // Encontrar o pico de amplitude em cada bloco
           for (let j = 0; j < blockSize; j++) {
-            const absValue = Math.abs(channelData[blockStart + j]);
-            if (absValue > max) max = absValue;
+            if (blockStart + j < channelData.length) {
+              sum += channelData[blockStart + j] ** 2;
+              count++;
+            }
           }
-
-          // Normalizar e aplicar uma curva logarítmica para melhor visualização
-          const normalized = Math.max(0.15, Math.min(1, (max / maxValue)));
-          const logScaled = 0.3 + Math.log10(normalized * 9 + 1) * 0.7;
+          
+          const rms = Math.sqrt(sum / count);
+          const normalized = Math.max(0.2, Math.min(1, (rms / maxValue)));
+          const logScaled = 0.2 + Math.log10(normalized * 9 + 1) * 0.8;
           
           dataPoints.push(logScaled);
         }
 
-        // Suavizar as transições entre as barras
-        const smoothedPoints = dataPoints.map((point, index) => {
-          if (index === 0 || index === dataPoints.length - 1) return point;
-          return (dataPoints[index - 1] + point + dataPoints[index + 1]) / 3;
+        const smoothedPoints = dataPoints.map((point, index, array) => {
+          if (index === 0) return point;
+          if (index === array.length - 1) return point;
+          return (array[index - 1] + point + array[index + 1]) / 3;
         });
 
         setAudioData(smoothedPoints);
       } catch (error) {
         console.error('Erro ao analisar áudio:', error);
-        // Gerar um fallback com alguma variação
-        const fallbackData = Array(40).fill(0).map(() => 
-          0.3 + Math.random() * 0.4
+        const fallbackData = Array(50).fill(0).map(() => 
+          0.2 + Math.random() * 0.6
         );
         setAudioData(fallbackData);
       }
@@ -95,19 +95,6 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ src, isSent, onCance
       setIsLoaded(true);
     };
 
-    const handleLoadedData = () => {
-      if (audio.duration && Number.isFinite(audio.duration)) {
-        setDuration(audio.duration);
-        setIsLoaded(true);
-      }
-    };
-
-    const handleDurationChange = () => {
-      if (Number.isFinite(audio.duration)) {
-        setDuration(audio.duration);
-      }
-    };
-
     const handleTimeUpdate = () => {
       if (Number.isFinite(audio.currentTime)) {
         setCurrentTime(audio.currentTime);
@@ -123,21 +110,11 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ src, isSent, onCance
     };
 
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('loadeddata', handleLoadedData);
-    audio.addEventListener('durationchange', handleDurationChange);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
 
-    if (audio.readyState >= 2) {
-      handleLoadedMetadata();
-    }
-
-    audio.load();
-
     return () => {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('loadeddata', handleLoadedData);
-      audio.removeEventListener('durationchange', handleDurationChange);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       
@@ -145,7 +122,7 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ src, isSent, onCance
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [src]);
+  }, []);
 
   const togglePlay = async () => {
     const audio = audioRef.current;
@@ -171,9 +148,7 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ src, isSent, onCance
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (Number.isFinite(audio.currentTime)) {
-      setCurrentTime(audio.currentTime);
-    }
+    setCurrentTime(audio.currentTime);
     animationRef.current = requestAnimationFrame(updateTime);
   };
 
@@ -183,7 +158,7 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ src, isSent, onCance
     const rect = waveformRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = Math.min(Math.max(x / rect.width, 0), 1);
-    const newTime = Math.min(Math.max(percentage * duration, 0), duration);
+    const newTime = percentage * duration;
 
     if (Number.isFinite(newTime)) {
       audioRef.current.currentTime = newTime;
@@ -197,10 +172,9 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ src, isSent, onCance
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Calcular a porcentagem de progresso
   const progress = useMemo(() => {
-    if (!duration || !Number.isFinite(currentTime)) return 0;
-    return Math.min(Math.max((currentTime / duration) * 100, 0), 100);
+    if (!duration) return 0;
+    return (currentTime / duration) * 100;
   }, [currentTime, duration]);
 
   return (
@@ -219,28 +193,26 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ src, isSent, onCance
           className="waveform-container" 
           ref={waveformRef}
           onClick={handleWaveformClick}
+          style={{ '--progress': `${progress}%` } as React.CSSProperties}
         >
           <div className="waveform-wrapper">
-            {audioData.map((amplitude, index) => {
-              const isPlayed = (index / audioData.length) * 100 <= progress;
-              return (
-                <div
-                  key={index}
-                  className={`waveform-bar ${isPlayed ? 'played' : ''}`}
-                  style={{
-                    transform: `scaleY(${amplitude})`
-                  }}
-                />
-              );
-            })}
+            {audioData.map((amplitude, index) => (
+              <div
+                key={index}
+                className={`waveform-bar ${(index / audioData.length) * 100 <= progress ? 'played' : ''}`}
+                style={{
+                  transform: `scaleY(${amplitude})`
+                }}
+              />
+            ))}
           </div>
         </div>
-        
-        <div className="message-info">
-          <span className="message-time">
-            {isLoaded ? formatTime(currentTime) : '--:--'} / {isLoaded ? formatTime(duration) : '--:--'}
-          </span>
-        </div>
+      </div>
+
+      <div className="message-info">
+        <span className="message-time">
+          {formatTime(currentTime)} / {formatTime(duration || 0)}
+        </span>
       </div>
 
       <audio

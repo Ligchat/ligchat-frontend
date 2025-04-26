@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Logo from '../assets/images/Logo.png';
 import DashBoard from '../screens/DashBoard';
@@ -13,7 +13,7 @@ import SessionService from '../services/SessionService';
 import { getUser } from '../services/UserService';
 import { getSectors, Sector } from '../services/SectorService';
 import { useMenu } from '../contexts/MenuContext';
-import { WebSocketService } from '../services/WebSocketService';
+import { getContacts } from '../services/ContactService';
 import '../styles/CombinedMenu/CombinedMenu.css';
 import AgentsPage from '../screens/AgentsPage';
 
@@ -23,6 +23,14 @@ interface ProfileUpdateEvent extends CustomEvent {
         name: string;
         timestamp: number;
     };
+}
+
+interface UnreadMessagesState {
+    [contactId: number]: boolean;
+}
+
+interface ViewedStatus {
+    [contactId: number]: boolean;
 }
 
 const PROFILE_UPDATED_EVENT = 'profileUpdated';
@@ -44,120 +52,101 @@ const CombinedMenu: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { drawerVisible, setDrawerVisible } = useMenu();
-    const webSocketRef = useRef<WebSocketService | null>(null);
-    const initialRenderRef = useRef(true);
     const navigationInProgressRef = useRef(false);
+    const [unreadMessagesState, setUnreadMessagesState] = useState<UnreadMessagesState>({});
 
-    useEffect(() => {
-        const sectorId = SessionService.getSectorId();
-        console.log('Initial load:', { sectorId, pathname: location.pathname });
+    const updateComponentForCurrentRoute = useCallback((sectorId: string | null) => {
+        const path = location.pathname;
+        const componentKey = `${path}-${sectorId || 'no-sector'}`;
         
-        if (sectorId) {
-            setSelectedSector(sectorId.toString());
-            
-            // Inicializa o WebSocket para o setor atual
-            if (!webSocketRef.current) {
-                webSocketRef.current = new WebSocketService();
-                webSocketRef.current.connect(sectorId.toString());
-            }
+        if (path.includes('/sectors')) {
+            setSelectedComponent(<div key={componentKey} className="page-container"><SectorsPage /></div>);
+        } else if (path === '/' || path.includes('/dashboard')) {
+            setSelectedComponent(<DashBoard key={componentKey} />);
+        } else if (path.includes('/chat')) {
+            setSelectedComponent(
+                <ChatNew 
+                    key={componentKey}
+                    hasNewMessages={unreadMessagesState}
+                    setHasNewMessages={(newState: UnreadMessagesState) => setUnreadMessagesState(newState)}
+                />
+            );
+        } else if (path.includes('/schedule')) {
+            setSelectedComponent(<MessageSchedule key={componentKey} />);
+        } else if (path.includes('/crm')) {
+            setSelectedComponent(<CRMPage key={componentKey} />);
+        } else if (path.includes('/profile')) {
+            setSelectedComponent(<ProfilePage key={componentKey} />);
+        } else if (path.includes('/labels')) {
+            setSelectedComponent(<LabelPage key={componentKey} />);
+        } else if (path.includes('/access')) {
+            setSelectedComponent(<AccessPage key={componentKey} />);
+        } else if (path.includes('/agents')) {
+            setSelectedComponent(<div key={componentKey} className="page-container"><AgentsPage /></div>);
         }
-        
-        // Força a atualização do componente inicial
-        updateComponentForCurrentRoute(sectorId?.toString() || null);
-    }, []);
+    }, [unreadMessagesState, location.pathname, sectors]);
 
-    // Inicializar WebSocket
     useEffect(() => {
-        const sectorId = SessionService.getSectorId();
-        if (!sectorId) return;
-
-        console.log('CombinedMenu: Inicializando WebSocket para o setor:', sectorId);
-        
-        // Criar ou reutilizar instância do WebSocket
-        if (!webSocketRef.current) {
-            webSocketRef.current = new WebSocketService();
-        }
-        
-        // Conectar ao WebSocket
-        webSocketRef.current.connect(sectorId.toString());
-
-        // Registrar handler
-        webSocketRef.current.addMessageHandler((message) => {
-            console.log('CombinedMenu: Mensagem recebida via WebSocket:', message);
-            // Notificações removidas conforme solicitado
-        });
-
-        // Cleanup
-        return () => {
-            if (webSocketRef.current) {
-                // Limpar handlers ao desmontar
-                webSocketRef.current.removeMessageHandler(() => {});
-            }
-        };
-    }, []);
-
-    // Desconectar WebSocket quando o componente for desmontado
-    useEffect(() => {
-        return () => {
-            console.log('CombinedMenu: Desconectando WebSocket');
-            if (webSocketRef.current) {
-                webSocketRef.current.disconnect();
-                webSocketRef.current = null;
-            }
-        };
-    }, []);
-
-    // Reconectar WebSocket quando o setor muda
-    useEffect(() => {
-        const handleSectorChange = () => {
+        const loadInitialSector = async () => {
+            // Obter o setor atual
             const sectorId = SessionService.getSectorId();
-            if (!sectorId) {
-                if (webSocketRef.current) {
-                    webSocketRef.current.disconnect();
-                }
-                return;
+            
+            // Se tiver um setor definido, atualizar o estado local
+            if (sectorId) {
+                setSelectedSector(sectorId.toString());
+                updateComponentForCurrentRoute(sectorId.toString());
+            } else {
+                setSelectedSector('');
+                updateComponentForCurrentRoute(null);
             }
             
-            console.log('CombinedMenu: Setor alterado, reconectando WebSocket:', sectorId);
-            
-            if (!webSocketRef.current) {
-                webSocketRef.current = new WebSocketService();
+            // Carregar os setores disponíveis
+            const token = SessionService.getToken();
+            if (token) {
+                await fetchSectors(token);
             }
-            
-            webSocketRef.current.disconnect();
-            webSocketRef.current.connect(sectorId.toString());
         };
         
-        window.addEventListener('sectorChanged', handleSectorChange);
-        
+        loadInitialSector();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Executar apenas na montagem
+
+    useEffect(() => {
+        const handleSectorChange = (event: CustomEvent) => {
+            const { sectorId } = event.detail;
+            if (sectorId) {
+                setSelectedSector(sectorId.toString());
+                updateComponentForCurrentRoute(sectorId.toString());
+            } else {
+                setSelectedSector('');
+                updateComponentForCurrentRoute(null);
+            }
+        };
+
+        window.addEventListener('sectorChanged', handleSectorChange as EventListener);
         return () => {
-            window.removeEventListener('sectorChanged', handleSectorChange);
+            window.removeEventListener('sectorChanged', handleSectorChange as EventListener);
         };
-    }, []);
+    }, [updateComponentForCurrentRoute]);
 
     useEffect(() => {
-        if (!initialRenderRef.current) {
-            console.log('Route changed:', location.pathname);
-            updateComponentForCurrentRoute(selectedSector);
-        } else {
-            initialRenderRef.current = false;
-        }
-    }, [location.pathname]);
+        const checkAuthentication = () => {
+            const tokenFromSession = SessionService.getToken();
+            if (!tokenFromSession) {
+                navigate('/');
+                return false;
+            }
 
-    useEffect(() => {
-        const tokenFromSession = SessionService.getToken();
-        if (!tokenFromSession) {
-            navigate('/');
-            return;
-        }
+            if (SessionService.isTokenExpired(tokenFromSession)) {
+                SessionService.clearSession();
+                navigate('/');
+                return false;
+            }
 
-        if (SessionService.isTokenExpired(tokenFromSession)) {
-            SessionService.clearSession();
-            navigate('/');
-            return;
-        }
+            return true;
+        };
 
-        fetchSectors(tokenFromSession);
+        checkAuthentication();
     }, [navigate]);
 
     useEffect(() => {
@@ -185,18 +174,18 @@ const CombinedMenu: React.FC = () => {
         };
     }, []);
 
-    const fetchSectors = async (token: string) => {
+
+
+    const fetchSectors = useCallback(async (token: string) => {
         try {
             console.log('Fetching sectors...');
             const sectors = await getSectors(token);
             console.log('Sectors fetched:', sectors);
             setSectors(sectors);
             
-            // Atualiza os setores disponíveis no SessionService
             const sectorIds = sectors.map(s => s.id);
             SessionService.validateAndCleanSectorSession(sectorIds);
             
-            // Verifica se o setor atual ainda é válido
             const currentSectorId = SessionService.getSectorId();
             if (currentSectorId) {
                 const sectorExists = sectors.some(s => s.id === currentSectorId);
@@ -210,7 +199,7 @@ const CombinedMenu: React.FC = () => {
             console.error('Erro ao buscar setores:', error);
             setSectors([]);
         }
-    };
+    }, []);
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -227,7 +216,6 @@ const CombinedMenu: React.FC = () => {
                 const userData = response.data;
                 setName(userData.name);
                 
-                // Verifica se é uma URL ou base64
                 if (userData.avatarUrl) {
                     if (userData.avatarUrl.startsWith('data:image')) {
                         setAvatar(userData.avatarUrl);
@@ -252,7 +240,6 @@ const CombinedMenu: React.FC = () => {
             const profileEvent = event as ProfileUpdateEvent;
             if (profileEvent.detail) {
                 const newAvatarUrl = profileEvent.detail.avatarUrl;
-                // Verifica se é uma URL ou base64
                 if (newAvatarUrl) {
                     if (newAvatarUrl.startsWith('data:image')) {
                         setAvatar(newAvatarUrl);
@@ -273,81 +260,46 @@ const CombinedMenu: React.FC = () => {
         };
     }, []);
 
-    const renderComponent = (Component: React.ComponentType, sectorId: string | null, timestamp: number) => {
-        const key = `${selectedMenuKey}-${sectorId}-${timestamp}`;
-        return <Component key={key} />;
-    };
-
-    const updateComponentForCurrentRoute = (sectorId: string | null) => {
-        const timestamp = Date.now();
-        console.log('Updating component for route:', { path: location.pathname, sectorId, timestamp });
-        
-        // Atualiza o componente baseado na rota atual
-        const path = location.pathname;
-        const key = `${path}-${sectorId}-${timestamp}`;
-        
-        if (path.includes('/sectors')) {
-            setSelectedComponent(<div key={key} className="page-container"><SectorsPage /></div>);
-        } else if (path === '/' || path.includes('/dashboard')) {
-            setSelectedComponent(<DashBoard key={key} />);
-        } else if (path.includes('/chat')) {
-            setSelectedComponent(<ChatNew key={key} />);
-        } else if (path.includes('/schedule')) {
-            setSelectedComponent(<MessageSchedule key={key} />);
-        } else if (path.includes('/crm')) {
-            setSelectedComponent(<CRMPage key={key} />);
-        } else if (path.includes('/profile')) {
-            setSelectedComponent(<ProfilePage key={key} />);
-        } else if (path.includes('/labels')) {
-            setSelectedComponent(<LabelPage key={key} />);
-        } else if (path.includes('/access')) {
-            setSelectedComponent(<AccessPage key={key} />);
-        } else if (path.includes('/agents')) {
-            setSelectedComponent(<div key={key} className="page-container"><AgentsPage /></div>);
-        }
-    };
-
     useEffect(() => {
-        const sectorId = selectedSector ? parseInt(selectedSector) : null;
-        const currentSectorId = SessionService.getSectorId();
-        
-        console.log('Sector change detected:', { selectedSector, sectorId, currentSectorId });
-        
-        if (sectorId !== currentSectorId) {
-            console.log('Updating sector in SessionService');
-            if (sectorId) {
-                SessionService.setSectorId(sectorId);
-            } else {
-                SessionService.removeSectorId();
-            }
+        if (selectedSector) {
+            const sectorId = parseInt(selectedSector);
+            const sector = sectors.find(s => s.id === sectorId);
             
-            // Força a atualização do componente
-            const timestamp = Date.now();
-            updateComponentForCurrentRoute(selectedSector);
+            if (sector) {
+                // Atualizar o setor no SessionService sem disparar evento
+                SessionService.setSectorId(sectorId, sector.isOfficial);
+                
+                // Atualizar o componente atual
+                updateComponentForCurrentRoute(selectedSector);
+            }
         }
-    }, [selectedSector]);
+    }, [selectedSector, sectors, updateComponentForCurrentRoute]);
 
-    const handleSectorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const handleSectorChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = e.target.value;
-        console.log('Sector selection changed:', { value });
-        setIsLoading(true);
         
-        // Atualiza o setor no SessionService
-        if (value) {
-            const sectorId = parseInt(value);
-            SessionService.setSectorId(sectorId);
-        } else {
-            SessionService.removeSectorId();
-        }
-        
-        setSelectedSector(value);
-        
-        // Força uma atualização imediata do componente
-        updateComponentForCurrentRoute(value);
-        
-        setTimeout(() => {
+        try {
+            setIsLoading(true);
+            
+            if (value) {
+                const sectorId = parseInt(value);
+                const sector = sectors.find(s => s.id === sectorId);
+                
+                if (sector && String(sectorId) !== selectedSector) {
+                    await SessionService.setSectorId(sectorId, sector.isOfficial);
+                    setSelectedSector(value);
+                    updateComponentForCurrentRoute(value);
+                }
+            } else {
+                await SessionService.removeSectorId();
+                setSelectedSector('');
+                updateComponentForCurrentRoute(null);
+            }
+        } catch (error) {
+            console.error('Erro ao mudar setor:', error);
+        } finally {
             setIsLoading(false);
-        }, 500);
+        }
     };
 
     const toggleSidebar = () => {
@@ -400,6 +352,10 @@ const CombinedMenu: React.FC = () => {
         setSelectedMenuKey(key);
         localStorage.setItem('selectedMenuKey', key);
 
+        if (key === '2') {
+            setUnreadMessagesState({});
+        }
+
         const path = getPathFromKey(key);
         
         updateSelectedComponent(key);
@@ -431,16 +387,21 @@ const CombinedMenu: React.FC = () => {
     };
 
     const updateSelectedComponent = (key: string) => {
-        const timestamp = Date.now();
         const sectorId = selectedSector || SessionService.getSectorId()?.toString();
-        const componentKey = `${key}-${sectorId}-${timestamp}`;
+        const componentKey = `${key}-${sectorId || 'no-sector'}`;
         
         switch (key) {
             case '1':
                 setSelectedComponent(<DashBoard key={componentKey} />);
                 break;
             case '2':
-                setSelectedComponent(<ChatNew key={componentKey} />);
+                setSelectedComponent(
+                    <ChatNew 
+                        key={componentKey}
+                        hasNewMessages={unreadMessagesState}
+                        setHasNewMessages={(newState: UnreadMessagesState) => setUnreadMessagesState(newState)}
+                    />
+                );
                 break;
             case '3':
                 setSelectedComponent(<MessageSchedule key={componentKey} />);
@@ -491,6 +452,9 @@ const CombinedMenu: React.FC = () => {
                     <div className="menu-item-content" onClick={() => handleMenuClick('2')}>
                         <span className="menu-icon icon-message"></span>
                         <span className="menu-label">Chat</span>
+                        {Object.values(unreadMessagesState).some(hasUnread => hasUnread) && (
+                            <div className="notification-dot"></div>
+                        )}
                         {collapsed && <div className="menu-tooltip">Chat</div>}
                     </div>
                 </li>

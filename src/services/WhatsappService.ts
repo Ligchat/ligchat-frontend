@@ -1,4 +1,5 @@
 import axios from 'axios';
+import SessionService from './SessionService';
 
 // Usar a variável de ambiente sem concatenar uma porta específica
 const WHATSAPP_API_URL = process.env.REACT_APP_WHATSAPP_API_URL;
@@ -22,12 +23,10 @@ const API_URL = getApiUrl();
 
 export interface SendMessageDto {
   to: string;
-  recipientNumber: string;
+  recipientPhone: string;
   text: string;
-  message: string;
   contactId: number;
   sectorId: number;
-  isHuman: boolean;
 }
 
 interface SendFileRequest {
@@ -40,28 +39,39 @@ interface SendFileRequest {
   sectorId: number;
 }
 
+// Função auxiliar para verificar se o setor é oficial
+const validateOfficialSector = () => {
+  const isOfficial = SessionService.getSectorIsOfficial();
+  if (!isOfficial) {
+    throw new Error('WhatsappService só pode ser usado com setores oficiais');
+  }
+};
+
 export const sendMessage = async (data: SendMessageDto) => {
   try {
+    validateOfficialSector();
+
     const payload = {
-      message: data.text,
+      text: data.text,
       to: data.to,
-      recipientNumber: data.recipientNumber,
+      recipientPhone: data.recipientPhone,
       contactId: data.contactId,
-      sectorId: data.sectorId,
-      isHuman: true
+      sectorId: data.sectorId
     };
 
-    console.log(`Enviando mensagem para: ${API_URL}/whatsapp/send-message`);
+    console.log(`Enviando mensagem oficial para: ${API_URL}/whatsapp/send-message`);
     const response = await axios.post(`${API_URL}/whatsapp/send-message`, payload);
     return response.data;
   } catch (error) {
-    console.error('Erro ao enviar mensagem:', error);
+    console.error('Erro ao enviar mensagem oficial:', error);
     throw error;
   }
 };
 
 export const sendFile = async (data: SendFileRequest) => {
   try {
+    validateOfficialSector();
+
     const payload = {
       base64File: data.base64File,
       mediaType: data.mediaType,
@@ -72,11 +82,11 @@ export const sendFile = async (data: SendFileRequest) => {
       sectorId: data.sectorId
     };
 
-    console.log(`Enviando arquivo para: ${API_URL}/whatsapp/send-file`);
+    console.log(`Enviando arquivo oficial para: ${API_URL}/whatsapp/send-file`);
     const response = await axios.post(`${API_URL}/whatsapp/send-file`, payload);
     return response.data;
   } catch (error) {
-    console.error('Erro ao enviar arquivo:', error);
+    console.error('Erro ao enviar arquivo oficial:', error);
     throw error;
   }
 }; 
