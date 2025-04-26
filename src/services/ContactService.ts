@@ -60,17 +60,10 @@ export const getContacts = async (sectorId: number): Promise<ApiResponse<Contact
     console.log('Iniciando getContacts:', { sectorId });
     const token = localStorage.getItem('token');
     console.log('Token recuperado:', !!token);
-
-    const url = `${API_URL}/Contact`;
-    const params = {
-      sector_id: sectorId
-    };
-    console.log('Fazendo requisição para:', { url, params });
-
+    const url = `${API_URL}/Contact/sector/${sectorId}`;
     const response = await axios.get<ApiResponse<Contact>>(
       url,
       {
-        params,
         headers: {
           'Accept': '*/*',
           'Authorization': `Bearer ${token}`
@@ -88,8 +81,6 @@ export const getContacts = async (sectorId: number): Promise<ApiResponse<Contact
     console.error('Erro detalhado em getContacts:', {
       error,
       message: error instanceof Error ? error.message : 'Erro desconhecido',
-      config: error?.['config'],
-      response: error?.['response']?.data
     });
     throw new Error('Falha ao obter contatos: ' + error);
   }

@@ -53,7 +53,7 @@ const SectorsPage: React.FC = () => {
     phoneNumberId: '',
     accessToken: '',
     description: '',
-    isOfficial: true,
+    isOfficial: false,
   });
   const [errors, setErrors] = useState<{ [key: string]: string | undefined }>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -247,7 +247,6 @@ const SectorsPage: React.FC = () => {
 
   const handleSave = async () => {
     if (!validateForm()) return;
-
     try {
       setIsLoading(true);
       const token = SessionService.getToken();
@@ -257,62 +256,43 @@ const SectorsPage: React.FC = () => {
       }
       const decodedToken = SessionService.decodeToken(token);
       const userBusinessId = decodedToken?.userId;
-
       if (!userBusinessId) {
         addToast('Erro de autenticação', 'error');
         return;
       }
-
       const updatedSectorData = {
         name: sectorData.name,
         description: sectorData.description,
-        isOfficial: sectorData.isOfficial,
-        phoneNumberId: sectorData.isOfficial ? sectorData.phoneNumberId : '',
-        accessToken: sectorData.isOfficial ? sectorData.accessToken : '',
+        isOfficial: false,
+        phoneNumberId: '',
+        accessToken: '',
         userBusinessId
       };
-
       if (editingSector?.id) {
         try {
           const response = await updateSector(editingSector.id, updatedSectorData);
           if (response) {
-            await fetchSectors(); // Recarrega todos os setores
+            await fetchSectors();
             addToast('Setor atualizado com sucesso', 'success');
             handleCloseDrawer();
           }
         } catch (error: any) {
           console.error('Erro ao atualizar setor:', error);
           const errorMessage = error?.response?.data?.message;
-          if (errorMessage === 'Invalid request: Phone number ID is already in use.') {
-            setErrors(prev => ({
-              ...prev,
-              phoneNumberId: 'Este ID de telefone já está sendo usado'
-            }));
-            addToast('ID do telefone já está sendo usado', 'error');
-          } else {
-            addToast(errorMessage || 'Erro ao atualizar setor', 'error');
-          }
+          addToast(errorMessage || 'Erro ao atualizar setor', 'error');
         }
       } else {
         try {
           const response = await createSector(updatedSectorData);
           if (response) {
-            await fetchSectors(); // Recarrega todos os setores
+            await fetchSectors();
             addToast('Setor criado com sucesso', 'success');
             handleCloseDrawer();
           }
         } catch (error: any) {
           console.error('Erro ao criar setor:', error);
           const errorMessage = error?.response?.data?.message;
-          if (errorMessage === 'Invalid request: Phone number ID is already in use.') {
-            setErrors(prev => ({
-              ...prev,
-              phoneNumberId: 'Este ID de telefone já está sendo usado'
-            }));
-            addToast('ID do telefone já está sendo usado', 'error');
-          } else {
-            addToast(errorMessage || 'Erro ao criar setor', 'error');
-          }
+          addToast(errorMessage || 'Erro ao criar setor', 'error');
         }
       }
     } catch (error) {
@@ -345,7 +325,7 @@ const SectorsPage: React.FC = () => {
       phoneNumberId: '',
       accessToken: '',
       description: '',
-      isOfficial: true,
+      isOfficial: false,
     });
     setErrors({});
     document.body.classList.remove('drawer-open');
@@ -461,28 +441,6 @@ const SectorsPage: React.FC = () => {
       </div>
 
       <div className="form-group">
-        <label>Tipo de API</label>
-        <div className="radio-group">
-          <label>
-            <input
-              type="radio"
-              checked={sectorData.isOfficial}
-              onChange={() => handleApiTypeChange(true)}
-            />
-            Whatsapp V1
-          </label>
-          <label>
-            <input
-              type="radio"
-              checked={!sectorData.isOfficial}
-              onChange={() => handleApiTypeChange(false)}
-            />
-            Whatsapp V2
-          </label>
-        </div>
-      </div>
-
-      <div className="form-group">
         <label>Descrição <span className="required">*</span></label>
         <textarea
           className={`form-input form-textarea ${errors.description ? 'error' : ''}`}
@@ -495,39 +453,6 @@ const SectorsPage: React.FC = () => {
         />
         {errors.description && <span className="error-message">{errors.description}</span>}
       </div>
-
-      {sectorData.isOfficial && (
-        <>
-          <div className="form-group">
-            <label>ID do Telefone <span className="required">*</span></label>
-            <input
-              type="text"
-              className={`form-input ${errors.phoneNumberId ? 'error' : ''}`}
-              value={sectorData.phoneNumberId}
-              placeholder="ID do número do WhatsApp Business"
-              onChange={(e) => {
-                setSectorData({ ...sectorData, phoneNumberId: e.target.value });
-                if (errors.phoneNumberId) setErrors({ ...errors, phoneNumberId: '' });
-              }}
-            />
-            {errors.phoneNumberId && <span className="error-message">{errors.phoneNumberId}</span>}
-          </div>
-
-          <div className="form-group">
-            <label>Token de Acesso <span className="required">*</span></label>
-            <textarea
-              className={`form-input form-textarea ${errors.accessToken ? 'error' : ''}`}
-              value={sectorData.accessToken}
-              placeholder="Token de acesso da API do WhatsApp Business"
-              onChange={(e) => {
-                setSectorData({ ...sectorData, accessToken: e.target.value });
-                if (errors.accessToken) setErrors({ ...errors, accessToken: '' });
-              }}
-            />
-            {errors.accessToken && <span className="error-message">{errors.accessToken}</span>}
-          </div>
-        </>
-      )}
 
       <div className="drawer-footer">
         <button type="button" className="btn btn-secondary" onClick={handleCloseDrawer}>
