@@ -1387,4 +1387,447 @@ select.form-input:hover {
 
 .attachment-count span {
     font-weight: 500;
+}
+
+/* Estilos para o calendário e seletor de hora customizados */
+.datetime-inputs {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.date-picker-container,
+.time-picker-container {
+  flex: 1;
+  min-width: 200px;
+}
+
+.date-input-wrapper,
+.time-input-wrapper {
+  position: relative;
+  width: 100%;
+  background-color: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  height: 46px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.date-input-wrapper:hover,
+.time-input-wrapper:hover {
+  border-color: #00c2ff;
+  background-color: rgba(0, 194, 255, 0.05);
+}
+
+.date-input-icon,
+.time-input-icon {
+  color: #888;
+  margin-right: 12px;
+}
+
+.date-input,
+.time-input {
+  border: none;
+  background: transparent;
+  color: #e0e0e0;
+  font-size: 0.95rem;
+  width: 100%;
+}
+
+/* Modificação do dropdown de calendário para centralizar na tela */
+.calendar-dropdown,
+.time-selector-dropdown {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #252525;
+  border: 1px solid #333;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  z-index: 1100;
+  width: 340px;
+  max-width: 90vw;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+  overflow: hidden;
+}
+
+.datetime-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 1090;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+  animation: fadeInOverlay 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Estilos para o calendário unificado */
+.unified-datetime-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #1e1e1e;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+    z-index: 1001;
+    width: 90%;
+    max-width: 420px;
+    animation: fadeInModal 0.3s ease;
+}
+
+@keyframes fadeInModal {
+    from { opacity: 0; transform: translate(-50%, -55%); }
+    to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+.datetime-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: fadeInOverlay 0.3s ease;
+    backdrop-filter: blur(2px);
+}
+
+@keyframes fadeInOverlay {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.unified-datetime-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #333;
+}
+
+.unified-datetime-title {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #00c2ff;
+  margin: 0;
+}
+
+.unified-datetime-close {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 1.2rem;
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.unified-datetime-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.unified-datetime-tabs {
+  display: flex;
+  border-bottom: 1px solid #333;
+}
+
+.unified-datetime-tab {
+  flex: 1;
+  padding: 12px 16px;
+  text-align: center;
+  color: #888;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.unified-datetime-tab.active {
+  color: #00c2ff;
+  border-bottom: 2px solid #00c2ff;
+}
+
+.unified-datetime-tab:hover:not(.active) {
+  color: #ccc;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.unified-datetime-content {
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.unified-datetime-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid #333;
+}
+
+.unified-datetime-button {
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.unified-datetime-cancel {
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: transparent;
+  color: #e0e0e0;
+  border: 1px solid #444;
+}
+
+.unified-datetime-cancel:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.unified-datetime-confirm {
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: #00c2ff;
+  color: #121212;
+  border: none;
+}
+
+.unified-datetime-confirm:hover {
+  background-color: #00a8e0;
+}
+
+/* Modificação do custom calendar */
+.custom-calendar {
+  width: 100%;
+  color: #e0e0e0;
+  user-select: none;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 8px 16px;
+}
+
+.calendar-month-year {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #00c2ff;
+}
+
+.calendar-nav-button {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.calendar-nav-button:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #ccc;
+}
+
+.calendar-nav-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 8px;
+}
+
+.calendar-weekday {
+  font-size: 0.85rem;
+  color: #888;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.calendar-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.calendar-day.empty {
+  cursor: default;
+}
+
+.calendar-day:not(.empty):hover {
+  background-color: rgba(0, 194, 255, 0.1);
+}
+
+.calendar-day.today {
+  background-color: rgba(0, 194, 255, 0.05);
+  border: 1px dashed rgba(0, 194, 255, 0.3);
+}
+
+.calendar-day.selected {
+  background-color: #00c2ff;
+  color: #121212;
+  font-weight: 500;
+}
+
+.calendar-day.hovered:not(.selected) {
+  background-color: rgba(0, 194, 255, 0.1);
+}
+
+/* Time selector styles */
+.time-selector {
+  width: 100%;
+  color: #e0e0e0;
+  user-select: none;
+}
+
+.time-selector-header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.selected-time {
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: #00c2ff;
+}
+
+.time-selector-body {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.time-selector-column {
+  flex: 1;
+}
+
+.time-selector-label {
+  font-size: 0.9rem;
+  color: #888;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.time-selector-items {
+  height: 200px;
+  overflow-y: auto;
+  background-color: #252525;
+  border-radius: 8px;
+  border: 1px solid #333;
+  scrollbar-width: thin;
+  scrollbar-color: #444 #252525;
+}
+
+.time-selector-items::-webkit-scrollbar {
+  width: 6px;
+}
+
+.time-selector-items::-webkit-scrollbar-track {
+  background: #252525;
+}
+
+.time-selector-items::-webkit-scrollbar-thumb {
+  background-color: #444;
+  border-radius: 6px;
+}
+
+.time-item {
+  padding: 8px 0;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.time-item:hover {
+  background-color: rgba(0, 194, 255, 0.1);
+}
+
+.time-item.selected {
+  background-color: #00c2ff;
+  color: #121212;
+  font-weight: 500;
+}
+
+@media (max-width: 600px) {
+  .datetime-inputs {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .calendar-dropdown,
+  .time-selector-dropdown,
+  .unified-datetime-modal {
+    width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .time-selector-body {
+    flex-direction: column;
+  }
+
+  .time-selector-items {
+    height: 160px;
+  }
 } 

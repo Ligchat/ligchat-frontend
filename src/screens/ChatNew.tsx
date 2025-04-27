@@ -4,18 +4,19 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import SessionService from '../services/SessionService';
-import { getContacts, updateContact } from '../services/ContactService';
+import { getContacts, updateContact, createContact, deleteContactFromSector } from '../services/ContactService';
 import { sendMessage, sendFile, MessageResponse, sendAudioMessage } from '../services/MessageService';
 import { getSector, Sector } from '../services/SectorService';
 import { getMessagesByContactId } from '../services/MessageService';
 import { AudioMessage } from '../components/AudioMessage';
 import { AudioRecorder } from '../components/AudioRecorder';
-import {  FiPhone, FiMoreVertical, FiUserPlus, FiTag } from 'react-icons/fi';
+import {  FiPhone, FiMoreVertical, FiUserPlus, FiTag, FiUsers } from 'react-icons/fi';
 import { getAllUsers, User } from '../services/UserService';
 import { getTags, Tag } from '../services/LabelService';
 import { useLocation } from 'react-router-dom';
 import ChatWebSocketService from '../services/ChatWebSocketService';
 import { UserPlus } from 'lucide-react';
+import InputMask from 'react-input-mask';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -178,6 +179,20 @@ const RenderContacts = React.memo(({
   onSelect: (c: ContactData) => void,
   tags: Tag[]
 }) => {
+  if (contacts.length === 0) {
+    return (
+      <div className="contacts-empty-state">
+        <div className="contacts-empty-content">
+          <div className="contacts-empty-icon">
+            <FiUsers size={40} />
+          </div>
+          <h4>Nenhum contato encontrado</h4>
+          <p>Adicione um novo contato para iniciar uma conversa</p>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="contacts-list">
       {contacts.map((contact) => (
@@ -232,6 +247,13 @@ const ChatNew: React.FC<ChatNewProps> = () => {
   const [selectedFilterTag, setSelectedFilterTag] = useState<number | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [showNewContactModal, setShowNewContactModal] = useState(false);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactNumber, setNewContactNumber] = useState('');
+  const [isCreatingContact, setIsCreatingContact] = useState(false);
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingContact, setIsDeletingContact] = useState(false);
 
   const loadMessages = useCallback(async (contactId: number, pageParam = 0, append = false) => {
     console.log('🔄 loadMessages - Iniciando carregamento de mensagens', { contactId, pageParam, append });
@@ -943,19 +965,29 @@ const ChatNew: React.FC<ChatNewProps> = () => {
 
     setIsTagLoading(true);
     try {
-      // Atualizar o contato selecionado e a lista de contatos
+      await updateContact(selectedContact.id, {
+        name: selectedContact.name,
+        email: selectedContact.email,
+        phoneWhatsapp: selectedContact.number,
+        notes: selectedContact.notes,
+        sectorId: selectedContact.sectorId,
+        isActive: selectedContact.isActive,
+        priority: selectedContact.priority,
+        aiActive: selectedContact.aiActive,
+        assignedTo: selectedContact.assignedTo,
+        tagId: selectedTagId || null,
+        avatarUrl: selectedContact.avatarUrl
+      });
       const updatedContactData = {
         ...selectedContact,
         tagId: selectedTagId || null
       };
-
       setSelectedContact(updatedContactData);
       setContacts(prevContacts => prevContacts.map(contact => 
         contact.id === selectedContact.id
           ? updatedContactData
           : contact
       ));
-
     } catch (error) {
       console.error('❌ handleChangeTag - Erro ao alterar tag:', error);
     } finally {
@@ -1077,29 +1109,14 @@ const ChatNew: React.FC<ChatNewProps> = () => {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      console.log('🔄 fetchUserData - Iniciando busca de dados do usuário');
       try {
         const token = SessionService.getToken();
         const decodedToken = token ? SessionService.decodeToken(token) : null;
         const userId = decodedToken ? decodedToken.userId : null;
-        console.log('✅ fetchUserData - ID do usuário obtido:', userId);
-
-        if (!userId) {
-          console.log('❌ fetchUserData - Sem ID de usuário disponível');
-          return;
-        }
-
-        const userIdNum = Number(userId);
-        setCurrentUserId(userIdNum);
-        
-        // Configurar o filtro para mostrar apenas contatos delegados para o usuário atual por padrão
-        setSelectedFilterUser(userIdNum);
-        console.log('🔄 fetchUserData - Configurando filtro para mostrar apenas contatos delegados para:', userIdNum);
-      } catch (error) {
-        console.error('❌ fetchUserData - Erro ao buscar dados do usuário:', error);
-      }
+        if (!userId) return;
+        setCurrentUserId(Number(userId));
+      } catch (error) {}
     };
-
     fetchUserData();
   }, []);
 
@@ -1138,60 +1155,75 @@ const ChatNew: React.FC<ChatNewProps> = () => {
     }
   };
 
+  const isCurrentUserAdmin = useMemo(() => {
+    const user = users.find(u => u.id === currentUserId);
+    return user?.isAdmin || false;
+  }, [users, currentUserId]);
+
+  const handleDeleteContact = async () => {
+    if (!selectedContact || !selectedSectorId) return;
+    setIsDeletingContact(true);
+    try {
+      await deleteContactFromSector(selectedContact.id, Number(selectedSectorId));
+      setContacts(prev => prev.filter(c => c.id !== selectedContact.id));
+      setSelectedContact(null);
+      setShowDeleteModal(false);
+    } catch (error) {
+      setShowDeleteModal(false);
+    } finally {
+      setIsDeletingContact(false);
+    }
+  };
+
   return (
     <div className="chat-new-container dark-mode">
       {/* Sidebar de contatos */}
       <div className={`chat-new-sidebar ${!showSidebar ? 'hidden' : ''}`}>
+        <div className="chat-new-sidebar-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 8px 12px' }}>
+          <button 
+            className="chat-new-new-contact-btn" 
+            onClick={() => selectedSectorId && setShowNewContactModal(true)}
+            disabled={!selectedSectorId}
+            style={{ opacity: !selectedSectorId ? 0.5 : 1, cursor: !selectedSectorId ? 'not-allowed' : 'pointer' }}
+          >
+            + Novo contato
+          </button>
+          <button 
+            className="chat-new-filters-btn" 
+            onClick={() => selectedSectorId && setShowFiltersModal(true)}
+            disabled={!selectedSectorId}
+            style={{ opacity: !selectedSectorId ? 0.5 : 1, cursor: !selectedSectorId ? 'not-allowed' : 'pointer' }}
+          >
+            Filtros
+          </button>
+        </div>
         <div className="chat-new-search">
           <input
             type="text"
-            placeholder="Buscar contatos..."
+            placeholder={selectedSectorId ? "Buscar contatos..." : "Selecione um setor primeiro"}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            disabled={!selectedSectorId}
+            style={{ opacity: !selectedSectorId ? 0.7 : 1 }}
           />
-          <div className="chat-new-filters">
-            <select 
-              value={selectedFilterUser || ''} 
-              onChange={(e) => setSelectedFilterUser(e.target.value ? Number(e.target.value) : null)}
-              className="filter-select"
-            >
-              <option value="">Todos os responsáveis</option>
-              <option value={Number(currentUserId)} selected={selectedFilterUser === Number(currentUserId)}>
-                Delegados para mim
-              </option>
-              {users.filter(user => user.id !== Number(currentUserId)).map(user => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
-            </select>
-
-            <select 
-              value={selectedFilterTag || ''} 
-              onChange={(e) => setSelectedFilterTag(e.target.value ? Number(e.target.value) : null)}
-              className="filter-select"
-            >
-              <option value="">Todas as tags</option>
-              {tags.map(tag => (
-                <option key={tag.id} value={tag.id}>
-                  {tag.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">Todos os status</option>
-              <option value="unread">Não visualizados</option>
-              <option value="read">Visualizados</option>
-            </select>
-          </div>
         </div>
         <div className="chat-new-contacts">
-          {isContactsLoading ? (
+          {!selectedSectorId ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              minHeight: 200,
+              color: '#bbb'
+            }}>
+              <div style={{ fontSize: 40, marginBottom: 16 }}>🔍</div>
+              <span style={{ color: '#bbb', fontSize: 16, textAlign: 'center' }}>
+                Selecione um setor no menu principal<br/>para visualizar os contatos
+              </span>
+            </div>
+          ) : isContactsLoading ? (
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -1330,6 +1362,21 @@ const ChatNew: React.FC<ChatNewProps> = () => {
                       <FiTag />
                       Alterar tag
                     </div>
+                    {isCurrentUserAdmin && (
+                      <>
+                        <div className="chat-new-header-menu-divider" />
+                        <div
+                          className="chat-new-header-menu-item"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDeleteModal(true);
+                            setShowMenu(false);
+                          }}
+                        >
+                          Remover contato
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -1514,11 +1561,22 @@ const ChatNew: React.FC<ChatNewProps> = () => {
                 onChange={(e) => setSelectedUserId(Number(e.target.value))}
               >
                 <option value="">Selecione um usuário</option>
-                {users.map(user => (
-                  <option key={user.id} value={user.id}>
-                    {user.name}
-                  </option>
-                ))}
+                {users
+                  .filter(user => {
+                    // Filtrar apenas usuários que têm acesso ao setor atual
+                    if (!selectedSectorId) return false;
+                    
+                    // Verificar se o usuário tem o setor atual entre seus setores
+                    return user.sectors && user.sectors.some(
+                      (sector: {id: number}) => sector.id === Number(selectedSectorId)
+                    );
+                  })
+                  .map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.name}
+                    </option>
+                  ))
+                }
               </select>
             </div>
             <div className="chat-new-modal-actions">
@@ -1555,6 +1613,7 @@ const ChatNew: React.FC<ChatNewProps> = () => {
                 className="chat-new-modal-select"
                 value={selectedTagId || ''}
                 onChange={(e) => setSelectedTagId(Number(e.target.value))}
+                style={{ minWidth: 0, width: '100%' }}
               >
                 <option value="">Sem tag</option>
                 {tags.map(tag => (
@@ -1580,6 +1639,182 @@ const ChatNew: React.FC<ChatNewProps> = () => {
                 disabled={isTagLoading}
               >
                 {isTagLoading ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Novo Contato */}
+      {showNewContactModal && selectedSectorId && (
+        <div className="chat-new-modal">
+          <div className="chat-new-modal-content">
+            <div className="chat-new-modal-header">
+              <h3 className="chat-new-modal-title">Novo contato</h3>
+            </div>
+            <div className="chat-new-modal-body">
+              <input
+                className="chat-new-modal-input"
+                placeholder="Nome"
+                value={newContactName}
+                onChange={e => setNewContactName(e.target.value)}
+                disabled={isCreatingContact}
+              />
+              <InputMask
+                mask="+55 (99) 99999-9999"
+                value={newContactNumber}
+                onChange={e => setNewContactNumber(e.target.value)}
+                disabled={isCreatingContact}
+              >
+                {(inputProps) => (
+                  <input
+                    {...inputProps}
+                    className="chat-new-modal-input"
+                    placeholder="Número (ex: +55 (11) 99999-9999)"
+                    type="text"
+                  />
+                )}
+              </InputMask>
+            </div>
+            <div className="chat-new-modal-actions">
+              <button
+                className="chat-new-modal-button cancel"
+                onClick={() => {
+                  setShowNewContactModal(false);
+                  setNewContactName('');
+                  setNewContactNumber('');
+                }}
+                disabled={isCreatingContact}
+              >
+                Cancelar
+              </button>
+              <button
+                className="chat-new-modal-button confirm"
+                onClick={async () => {
+                  if (!newContactName.trim() || !newContactNumber.trim() || !selectedSectorId) return;
+                  setIsCreatingContact(true);
+                  try {
+                    const cleanNumber = newContactNumber.replace(/\D/g, '').slice(0, 15);
+                    const created = await createContact({ name: newContactName, phoneNumber: cleanNumber, email: '', sectorId: Number(selectedSectorId) });
+                    if (created && created.id) {
+                      setContacts(prev => [...prev, { ...created, is_viewed: true }]);
+                      setSelectedContact({ ...created, is_viewed: true });
+                      setShowNewContactModal(false);
+                      setNewContactName('');
+                      setNewContactNumber('');
+                    }
+                  } finally {
+                    setIsCreatingContact(false);
+                  }
+                }}
+                disabled={isCreatingContact || !newContactName.trim() || !newContactNumber.trim()}
+              >
+                {isCreatingContact ? 'Criando...' : 'Iniciar conversa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Filtros */}
+      {showFiltersModal && (
+        <div className="chat-new-modal">
+          <div className="chat-new-modal-content">
+            <div className="chat-new-modal-header">
+              <h3 className="chat-new-modal-title">Filtros</h3>
+            </div>
+            <div className="chat-new-modal-body chat-new-modal-filters-body">
+              <select 
+                value={selectedFilterUser || ''} 
+                onChange={(e) => setSelectedFilterUser(e.target.value ? Number(e.target.value) : null)}
+                className="filter-select"
+              >
+                <option value="">Todos os responsáveis</option>
+                {users
+                  .filter(user => {
+                    // Filtrar apenas usuários que têm acesso ao setor atual
+                    if (!selectedSectorId) return false;
+                    
+                    // Verificar se o usuário tem o setor atual entre seus setores
+                    return user.sectors && user.sectors.some(
+                      (sector: {id: number}) => sector.id === Number(selectedSectorId)
+                    );
+                  })
+                  .map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.name}
+                    </option>
+                  ))
+                }
+              </select>
+              <select 
+                value={selectedFilterTag || ''} 
+                onChange={(e) => setSelectedFilterTag(e.target.value ? Number(e.target.value) : null)}
+                className="filter-select"
+                style={{ marginTop: 16 }}
+              >
+                <option value="">Todas as tags</option>
+                {tags.map(tag => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="filter-select"
+                style={{ marginTop: 16 }}
+              >
+                <option value="all">Todos os status</option>
+                <option value="unread">Não visualizados</option>
+                <option value="read">Visualizados</option>
+              </select>
+            </div>
+            <div className="chat-new-modal-actions">
+              <button
+                className="chat-new-modal-button cancel"
+                onClick={() => setShowFiltersModal(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="chat-new-modal-button confirm"
+                onClick={() => setShowFiltersModal(false)}
+              >
+                Aplicar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Remoção */}
+      {showDeleteModal && (
+        <div className="chat-new-modal">
+          <div className="chat-new-modal-content">
+            <div className="chat-new-modal-header">
+              <h3 className="chat-new-modal-title">Remover contato</h3>
+            </div>
+            <div className="chat-new-modal-body">
+              Tem certeza que deseja remover este contato? <br />
+              <b>Todo o histórico de mensagens e anexos deste contato será removido permanentemente.</b>
+              <br />Esta ação não poderá ser desfeita.
+            </div>
+            <div className="chat-new-modal-actions">
+              <button
+                className="chat-new-modal-button cancel"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeletingContact}
+              >
+                Cancelar
+              </button>
+              <button
+                className="chat-new-modal-button confirm"
+                onClick={handleDeleteContact}
+                disabled={isDeletingContact}
+              >
+                {isDeletingContact ? 'Removendo...' : 'Remover'}
               </button>
             </div>
           </div>

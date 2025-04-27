@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { FiEdit2, FiTrash2, FiPlus, FiX, FiCheck, FiAlertCircle } from 'react-icons/fi';
+import { ImSpinner2 } from 'react-icons/im';
 import { Tag, createTag, getTags, updateTag, deleteTag } from '../services/LabelService';
 import { getSectors, Sector } from '../services/SectorService';
 import SessionService from '../services/SessionService';
@@ -59,7 +60,7 @@ interface ModalProps {
   }>>;
 }
 
-const Modal: React.FC<ModalProps> = ({ 
+const Modal: React.FC<ModalProps & { isSaving?: boolean }> = ({ 
   isOpen, 
   onClose, 
   onSave, 
@@ -73,7 +74,8 @@ const Modal: React.FC<ModalProps> = ({
   showColorPicker, 
   setShowColorPicker, 
   errors,
-  setErrors 
+  setErrors,
+  isSaving = false
 }) => {
   if (!isOpen) return null;
   
@@ -168,14 +170,17 @@ const Modal: React.FC<ModalProps> = ({
           <button 
             className="label-cancel-button" 
             onClick={onClose}
+            disabled={isSaving}
           >
             Cancelar
           </button>
           <button 
             className="label-save-button" 
             onClick={onSave}
-            disabled={!newTitle.trim()}
+            disabled={!newTitle.trim() || isSaving}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
+            {isSaving && <ImSpinner2 className="spin" style={{ fontSize: 18 }} />}
             Salvar
           </button>
         </div>
@@ -190,7 +195,8 @@ const DeleteConfirmationModal: React.FC<{
   onClose: () => void;
   onConfirm: () => void;
   tagName: string;
-}> = ({ isOpen, onClose, onConfirm, tagName }) => {
+  isDeleting: boolean;
+}> = ({ isOpen, onClose, onConfirm, tagName, isDeleting }) => {
   if (!isOpen) return null;
 
   return ReactDOM.createPortal(
@@ -217,13 +223,17 @@ const DeleteConfirmationModal: React.FC<{
           <button 
             className="label-cancel-button"
             onClick={onClose}
+            disabled={isDeleting}
           >
             Cancelar
           </button>
           <button 
             className="label-delete-button"
             onClick={onConfirm}
+            disabled={isDeleting}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
+            {isDeleting && <ImSpinner2 className="spin" style={{ fontSize: 18 }} />}
             Excluir
           </button>
         </div>
@@ -251,6 +261,8 @@ const LabelScreen = () => {
     const [selectedColor, setSelectedColor] = useState<string>(PRESET_COLORS[0]);
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [deleteModalOpen, setDeleteModalOpen] = useState<number | null>(null);
+    const [isDeletingTag, setIsDeletingTag] = useState(false);
+    const [isSavingTag, setIsSavingTag] = useState(false);
 
     useEffect(() => {
         const sectorId = SessionService.getSectorId();
@@ -329,13 +341,16 @@ const LabelScreen = () => {
     };
 
     const handleSave = async () => {
+        setIsSavingTag(true);
         if (!validateForm()) {
+            setIsSavingTag(false);
             return;
         }
 
         const sectorId = SessionService.getSectorId();
         if (!sectorId) {
             addToast('Selecione um setor antes de continuar', 'error');
+            setIsSavingTag(false);
             return;
         }
 
@@ -364,9 +379,11 @@ const LabelScreen = () => {
             setErrors({ title: 'Erro ao salvar a etiqueta. Tente novamente.' });
             addToast('Erro ao salvar a etiqueta', 'error');
         }
+        setIsSavingTag(false);
     };
 
     const handleDelete = async (index: number) => {
+        setIsDeletingTag(true);
         try {
             await deleteTag(tags[index].id);
             await fetchTags();
@@ -376,6 +393,7 @@ const LabelScreen = () => {
             console.error('Erro ao excluir etiqueta:', error);
             addToast('Erro ao excluir a etiqueta', 'error');
         }
+        setIsDeletingTag(false);
     };
 
     const handleCloseModal = () => {
@@ -488,13 +506,15 @@ const LabelScreen = () => {
                 setShowColorPicker={setShowColorPicker}
                 errors={errors}
                 setErrors={setErrors}
+                isSaving={isSavingTag}
             />
 
             <DeleteConfirmationModal
                 isOpen={deleteModalOpen !== null}
-                onClose={() => setDeleteModalOpen(null)}
-                onConfirm={() => deleteModalOpen !== null && handleDelete(deleteModalOpen)}
+                onClose={() => { if (!isDeletingTag) setDeleteModalOpen(null); }}
+                onConfirm={() => { if (deleteModalOpen !== null && !isDeletingTag) handleDelete(deleteModalOpen); }}
                 tagName={deleteModalOpen !== null ? tags[deleteModalOpen].name : ''}
+                isDeleting={isDeletingTag}
             />
 
             <div className="ls-toast-container">

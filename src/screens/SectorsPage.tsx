@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiEdit2, FiTrash2, FiPlus, FiX, FiFolder, FiCheckCircle } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiPlus, FiX, FiFolder, FiCheckCircle, FiLoader } from 'react-icons/fi';
 import { createSector, updateSector, deleteSector, getSectors, getWhatsAppStatus, getWhatsAppQRCode } from '../services/SectorService';
 import SessionService from '../services/SessionService';
 import Toast from '../components/Toast';
@@ -68,6 +68,7 @@ const SectorsPage: React.FC = () => {
   const [isLoadingQRCode, setIsLoadingQRCode] = useState<boolean>(false);
   const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchSectors();
@@ -247,8 +248,8 @@ const SectorsPage: React.FC = () => {
 
   const handleSave = async () => {
     if (!validateForm()) return;
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       const token = SessionService.getToken();
       if (!token) {
         addToast('Erro de autenticação', 'error');
@@ -275,6 +276,9 @@ const SectorsPage: React.FC = () => {
             await fetchSectors();
             addToast('Setor atualizado com sucesso', 'success');
             handleCloseDrawer();
+            
+            // Disparar evento para notificar que os setores foram atualizados
+            window.dispatchEvent(new CustomEvent('sectorsUpdated'));
           }
         } catch (error: any) {
           console.error('Erro ao atualizar setor:', error);
@@ -288,6 +292,9 @@ const SectorsPage: React.FC = () => {
             await fetchSectors();
             addToast('Setor criado com sucesso', 'success');
             handleCloseDrawer();
+            
+            // Disparar evento para notificar que os setores foram atualizados
+            window.dispatchEvent(new CustomEvent('sectorsUpdated'));
           }
         } catch (error: any) {
           console.error('Erro ao criar setor:', error);
@@ -304,16 +311,20 @@ const SectorsPage: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
+    setIsDeleting(prev => ({ ...prev, [id]: true }));
     try {
       await deleteSector(id);
       setSectors(sectors.filter(sector => sector.id !== id));
       addToast('Setor excluído com sucesso', 'success');
+      
+      // Disparar evento para notificar que os setores foram atualizados
+      window.dispatchEvent(new CustomEvent('sectorsUpdated'));
     } catch (error) {
       console.error('Erro ao excluir setor:', error);
       addToast('Erro ao excluir setor', 'error');
     } finally {
-      setIsLoading(false);
-      setIsDeleting({ ...isDeleting, [id]: false });
+      setIsDeleting(prev => ({ ...prev, [id]: false }));
+      setConfirmDeleteId(null);
     }
   };
 
@@ -455,10 +466,13 @@ const SectorsPage: React.FC = () => {
       </div>
 
       <div className="drawer-footer">
-        <button type="button" className="btn btn-secondary" onClick={handleCloseDrawer}>
+        <button type="button" className="btn btn-secondary" onClick={handleCloseDrawer} disabled={isLoading}>
           Cancelar
         </button>
-        <button type="submit" className="btn btn-primary">
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+          {isLoading && (
+            <FiLoader className="spin" style={{ marginRight: 8 }} />
+          )}
           {editingSector ? 'Salvar' : 'Criar'}
         </button>
       </div>
@@ -466,102 +480,112 @@ const SectorsPage: React.FC = () => {
   );
 
   // Atualizar o card do setor para incluir status e botão de QR code
-  const renderSectorCard = (sector: Sector) => (
-    <div key={sector.id} className="sector-card">
-      <div className="sector-card-header">
-        <h3>{sector.name}</h3>
-        <div className="sector-actions">
-          <button
-            className="action-button edit"
-            onClick={() => {
-              setEditingSector(sector);
-              setSectorData({
-                name: sector.name,
-                description: sector.description,
-                isOfficial: sector.isOfficial,
-                phoneNumberId: sector.phoneNumberId || '',
-                accessToken: sector.accessToken || '',
-              });
-              handleOpenDrawer();
-            }}
-          >
-            <FiEdit2 />
-          </button>
-          <button
-            className="action-button delete"
-            onClick={() => setIsDeleting({ ...isDeleting, [sector.id!]: true })}
-          >
-            <FiTrash2 />
-          </button>
-        </div>
-      </div>
-
-      <div className="sector-card-content">
-        <div className="sector-info-section">
-          <p className="info-row">
-            <strong>Descrição:</strong>
-            <p>{sector.description}</p>
-          </p>
-          <p className="info-row">
-            <strong>Tipo de API:</strong>
-            <p>{sector.isOfficial ? 'Oficial' : 'Não Oficial'}</p>
-          </p>
-        </div>
-
-        {sector.isOfficial ? (
-          <div className="sector-info-section">
-            <h4>Configuração da API</h4>
-            <p className="info-row">
-              <strong>ID do Telefone:</strong>
-              <p>{sector.phoneNumberId}</p>
-            </p>
-            <p className="info-row">
-              <strong>Token de Acesso:</strong>
-              <p>{sector.accessToken}</p>
-            </p>
+  const renderSectorCard = (sector: Sector) => {
+    if (confirmDeleteId === sector.id) {
+      return (
+        <div key={sector.id} className="sector-card delete-confirmation-active">
+          <div className="delete-confirmation">
+            <div className="delete-message-container">
+              <h4 className="delete-title">Confirmar Exclusão</h4>
+              <p className="delete-message">
+                Tem certeza que deseja excluir o setor "{sector.name}"?
+                <br />
+                Esta ação não poderá ser desfeita.
+              </p>
+            </div>
+            <div className="confirmation-actions">
+              <button 
+                className="cancel-button"
+                onClick={() => setConfirmDeleteId(null)}
+                disabled={isDeleting[sector.id!]}
+              >
+                <FiX /> Cancelar
+              </button>
+              <button 
+                className="confirm-button"
+                onClick={() => handleDelete(sector.id!)}
+                disabled={isDeleting[sector.id!]}
+              >
+                {isDeleting[sector.id!] && (
+                  <FiLoader className="spin" style={{ marginRight: 8 }} />
+                )}
+                Confirmar
+              </button>
+            </div>
           </div>
-        ) : (
-          <div className="sector-info-section">
-            <h4>Status do WhatsApp</h4>
-            {renderWhatsAppStatus(sector)}
+        </div>
+      );
+    }
+    return (
+      <div key={sector.id} className="sector-card">
+        <div className="sector-card-header">
+          <h3>{sector.name}</h3>
+          <div className="sector-actions">
             <button
-              className="whatsapp-connect-button"
-              onClick={() => sector.id && handleShowQRCode(sector.id)}
+              className="action-button edit"
+              onClick={() => {
+                setEditingSector(sector);
+                setSectorData({
+                  name: sector.name,
+                  description: sector.description,
+                  isOfficial: sector.isOfficial,
+                  phoneNumberId: sector.phoneNumberId || '',
+                  accessToken: sector.accessToken || '',
+                });
+                handleOpenDrawer();
+              }}
             >
-              {sector.whatsappConnection?.status === 'connected' ? 'Reconectar WhatsApp' : 'Conectar WhatsApp'}
+              <FiEdit2 />
             </button>
-          </div>
-        )}
-      </div>
-
-      {isDeleting[sector.id!] && (
-        <div className="delete-confirmation">
-          <div className="delete-message-container">
-            <h4 className="delete-title">Confirmar Exclusão</h4>
-            <p className="delete-message">
-              Tem certeza que deseja excluir o setor "{sector.name}"?
-              <br />
-              Esta ação não poderá ser desfeita.
-            </p>
-          </div>
-          <div className="confirmation-actions">
-            <button 
-              className="cancel-button"
-              onClick={() => setIsDeleting({ ...isDeleting, [sector.id!]: false })}
+            <button
+              className="action-button delete"
+              onClick={() => setConfirmDeleteId(sector.id!)}
             >
-              <FiX /> Cancelar
-            </button>
-            <button 
-              className="confirm-button"
-              onClick={() => handleDelete(sector.id!)}
-            >
-              Confirmar
+              <FiTrash2 />
             </button>
           </div>
         </div>
-      )}
-    </div>
-  );
+
+        <div className="sector-card-content">
+          <div className="sector-info-section">
+            <p className="info-row">
+              <strong>Descrição:</strong>
+              <p>{sector.description}</p>
+            </p>
+            <p className="info-row">
+              <strong>Tipo de API:</strong>
+              <p>{sector.isOfficial ? 'Oficial' : 'Não Oficial'}</p>
+            </p>
+          </div>
+
+          {sector.isOfficial ? (
+            <div className="sector-info-section">
+              <h4>Configuração da API</h4>
+              <p className="info-row">
+                <strong>ID do Telefone:</strong>
+                <p>{sector.phoneNumberId}</p>
+              </p>
+              <p className="info-row">
+                <strong>Token de Acesso:</strong>
+                <p>{sector.accessToken}</p>
+              </p>
+            </div>
+          ) : (
+            <div className="sector-info-section">
+              <h4>Status do WhatsApp</h4>
+              {renderWhatsAppStatus(sector)}
+              <button
+                className="whatsapp-connect-button"
+                onClick={() => sector.id && handleShowQRCode(sector.id)}
+              >
+                {sector.whatsappConnection?.status === 'connected' ? 'Reconectar WhatsApp' : 'Conectar WhatsApp'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="sectors-screen">

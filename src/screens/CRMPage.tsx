@@ -37,7 +37,8 @@ import {
   FiChevronRight,
   FiX,
   FiTrash2,
-  FiMail
+  FiMail,
+  FiEdit
 } from 'react-icons/fi';
 import CardSidebar from '../components/CardSidebar';
 import FilterPanel from '../components/FilterPanel';
@@ -395,27 +396,21 @@ const CRMPage: React.FC = () => {
       setDirectModalError('O título da coluna é obrigatório');
       return false;
     }
-    
     if (title.trim().length < 3) {
       setDirectModalError('O título deve ter pelo menos 3 caracteres');
       return false;
     }
-    
-    if (title.trim().length > 30) {
-      setDirectModalError('O título deve ter no máximo 30 caracteres');
+    if (title.trim().length > 27) {
+      setDirectModalError('O título deve ter no máximo 27 caracteres');
       return false;
     }
-    
-    // Verificar se já existe uma coluna com esse título
     const columnExists = columns.some(col => 
-      col.title.toLowerCase() === title.trim().toLowerCase()
+      col.title.toLowerCase() === title.trim().toLowerCase() && (!editingColumn || col.id !== editingColumn.id)
     );
-    
     if (columnExists) {
       setDirectModalError('Já existe uma coluna com esse título');
       return false;
     }
-    
     setDirectModalError('');
     return true;
   };
@@ -508,12 +503,10 @@ const CRMPage: React.FC = () => {
     if (over.id === 'trash-bin' && activeType === 'column') {
       const column = columns.find(col => col.id === active.id);
       if (!column) return;
-
       if (column.cards.length > 0) {
-        addToast('Não é possível excluir uma coluna com cards', 'error');
+        addToast('Só é possível excluir colunas vazias', 'error');
         return;
       }
-
       setColumnToDelete(column);
       setShowDeleteModal(true);
       return;
@@ -540,8 +533,8 @@ const CRMPage: React.FC = () => {
         addToast('Erro ao mover coluna', 'error');
       }
     } else if (activeType === 'card') {
-      const [sourceColumnId, cardId] = active.id.toString().split(':');
-      const [targetColumnId, targetPosition] = over.id.toString().split(':');
+      const [sourceColumnId, cardId] = active.id.split(':');
+      const [targetColumnId, targetPosition] = over.id.split(':');
       
       // Verifica se é o mesmo card
       if (cardId === targetPosition) return;
@@ -856,10 +849,42 @@ const CRMPage: React.FC = () => {
           {...attributes}
           {...listeners}
           data-count={column.cards.length}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
         >
-          <h2>{column.title}</h2>
+          <h2 style={{ flex: 1 }}>{column.title}</h2>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="table-action-button"
+              title="Editar coluna"
+              onClick={e => {
+                e.stopPropagation();
+                setEditingColumn(column);
+                setDirectModalTitle(column.title);
+                setShowDirectModal(true);
+              }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3b82f6', padding: 4 }}
+            >
+              <FiEdit size={18} />
+            </button>
+            <button
+              className="table-action-button"
+              title={column.cards.length > 0 ? 'Só é possível excluir colunas vazias' : 'Excluir coluna'}
+              onClick={e => {
+                e.stopPropagation();
+                if (column.cards.length > 0) {
+                  addToast('Só é possível excluir colunas vazias', 'error');
+                  return;
+                }
+                setColumnToDelete(column);
+                setShowDeleteModal(true);
+              }}
+              style={{ background: 'none', border: 'none', cursor: column.cards.length > 0 ? 'not-allowed' : 'pointer', color: '#ef4444', padding: 4, opacity: column.cards.length > 0 ? 0.5 : 1 }}
+              disabled={column.cards.length > 0}
+            >
+              <FiTrash2 size={18} />
+            </button>
+          </div>
         </div>
-        
         <div className={`cards-container ${isDraggingOver ? 'is-dragging-over' : ''}`} ref={setDroppableRef}>
           <SortableContext 
             items={column.cards.map(card => `${column.id}:${card.id}`)} 
@@ -1300,7 +1325,6 @@ const CRMPage: React.FC = () => {
                           <th>Telefone</th>
                           <th>Status</th>
                           <th>Prioridade</th>
-                          <th>Último Contato</th>
                           <th>Ações</th>
                         </tr>
                       </thead>
@@ -1311,7 +1335,7 @@ const CRMPage: React.FC = () => {
                               <td>{card.title}</td>
                               <td>{column.title}</td>
                               <td>{card.phone}</td>
-                              <td>{card.status}</td>
+                              <td>{card.status === 'active' ? 'Ativo' : card.status === 'inactive' ? 'Inativo' : ''}</td>
                               <td>
                                 {card.priority && (
                                   <span className={`priority-tag ${card.priority}`}>
@@ -1320,7 +1344,6 @@ const CRMPage: React.FC = () => {
                                   </span>
                                 )}
                               </td>
-                              <td>{card.lastContact}</td>
                               <td>
                                 <button className="table-action-button" onClick={(e) => {
                                   e.stopPropagation();
@@ -1369,7 +1392,7 @@ const CRMPage: React.FC = () => {
                   setDirectModalTitle('');
                   setDirectModalError('');
                 }}
-                title="Adicionar Nova Etapa"
+                title={editingColumn ? 'Editar Etapa' : 'Adicionar Nova Etapa'}
               >
                 <div className="enhanced-modal-form">
                   <div className="form-group">
@@ -1379,18 +1402,23 @@ const CRMPage: React.FC = () => {
                       type="text"
                       value={directModalTitle}
                       onChange={(e) => {
-                        setDirectModalTitle(e.target.value);
-                        if (directModalError) validateColumnTitle(e.target.value);
+                        if (e.target.value.length <= 27) {
+                          setDirectModalTitle(e.target.value);
+                          if (directModalError) validateColumnTitle(e.target.value);
+                        }
                       }}
                       placeholder="Ex: Qualificação, Proposta, Fechamento..."
                       className={directModalError ? 'input-error' : ''}
+                      maxLength={27}
                       autoFocus
                     />
+                    <div style={{ fontSize: 12, color: directModalTitle.length > 27 ? '#ef4444' : '#888', marginTop: 2, textAlign: 'right' }}>
+                      {directModalTitle.length}/27
+                    </div>
                     {directModalError && (
                       <div className="error-message">{directModalError}</div>
                     )}
                   </div>
-                  
                   <div className="form-actions">
                     <button 
                       className="form-button secondary"

@@ -15,6 +15,10 @@ export interface User {
   sector_id?: number;
   created_at: string;
   updated_at: string;
+  sectors?: Array<{
+    id: number;
+    name: string;
+  }>;
 }
 
 interface UserCreate {
@@ -105,27 +109,28 @@ export const getSectors = async (): Promise<Sector[]> => {
   }
 };
 
-export const getAllUsers = async (): Promise<User[]> => {
+export const getAllUsers = async (invitedBy?: number): Promise<User[]> => {
   try {
     console.log('Fazendo requisição para buscar usuários...');
+    const params: any = {};
+    if (typeof invitedBy === 'number') {
+      params.invitedBy = invitedBy;
+    }
     const response = await axios.get(`${API_URL}/users`, {
       headers: {
         'Accept': '*/*',
       },
+      params,
     });
     
     console.log('Resposta da API (users):', response.data);
 
-    // Se a resposta já contiver o array de usuários diretamente
     if (Array.isArray(response.data)) {
       return response.data;
     }
-
-    // Se a resposta estiver no formato { data: [...] }
     if (response.data && Array.isArray(response.data.data)) {
       return response.data.data;
     }
-
     console.error('Formato de resposta inesperado:', response.data);
     return [];
   } catch (error) {

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createUser, updateUser, getAllUsers, deleteUser } from '../services/UserService';
-import { getSector, Sector } from '../services/SectorService';
+import { getSector, getSectors, Sector } from '../services/SectorService';
 import SessionService from '../services/SessionService';
 import { useNavigate } from 'react-router-dom';
 import Toast from '../components/Toast';
@@ -91,26 +91,21 @@ const AccessPage: React.FC = () => {
     sectors?: string;
   }>({});
 
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+
   const fetchSectors = async () => {
     try {
       setIsLoading(true);
-      const sectorId = SessionService.getSectorId();
-      console.log('Buscando setor ID:', sectorId);
-      
-      if (!sectorId) {
-        console.error('ID do setor não encontrado');
-        throw new Error('ID do setor não encontrado');
+      const token = SessionService.getToken();
+      if (!token) {
+        throw new Error('Token não encontrado');
       }
-
-      const response = await getSector(sectorId);
-      console.log('Resposta do setor:', response);
-      
-      // Convertendo para array com um único setor
-      const sectorsData = [response];
-      console.log('Setores processados:', sectorsData);
-      setSectors(sectorsData);
+      const response = await getSectors(token);
+      setSectors(response || []);
     } catch (error) {
-      console.error('Erro ao buscar setor:', error);
+      console.error('Erro ao buscar setores:', error);
+      setSectors([]);
     } finally {
       setIsLoading(false);
     }
@@ -123,7 +118,7 @@ const AccessPage: React.FC = () => {
       }
       setIsLoading(true);
       console.log('Buscando usuários...');
-      const response = await getAllUsers();
+      const response = await getAllUsers(Number(userId));
       console.log('Usuários retornados:', response);
       
       let usersData: Person[] = [];
@@ -234,18 +229,14 @@ const AccessPage: React.FC = () => {
     }
     if (editingPerson) {
       try {
-        setIsLoading(true);
-        
-        const sectorsToUpdate = selectedSectors.length > 0 
-          ? selectedSectors.map((sectorId) => {
-              const sector = sectors.find((s) => s.id === Number(sectorId));
-              return {
-                id: sector?.id,
-                name: sector?.name
-              };
-            })
-          : [];
-
+        setIsSaving(true);
+        const sectorsToUpdate = selectedSectors.map((sectorId) => {
+          const sector = sectors.find((s) => s.id === Number(sectorId));
+          return {
+            Id: sector?.id,
+            IsShared: true,
+          };
+        });
         const updatedUser = {
           name: editingPerson.name,
           email: editingPerson.email,
@@ -255,7 +246,6 @@ const AccessPage: React.FC = () => {
           sectors: sectorsToUpdate,
           invitedBy: editingPerson.invitedBy
         };
-
         await updateUser(editingPerson.id, updatedUser as any);
         addToast('Usuário atualizado com sucesso!', 'success');
         handleCloseDrawer();
@@ -264,14 +254,14 @@ const AccessPage: React.FC = () => {
         console.error('Erro ao atualizar usuário:', error);
         addToast('Erro ao atualizar usuário', 'error');
       } finally {
-        setIsLoading(false);
+        setIsSaving(false);
       }
     }
   };
 
   const handleDeletePerson = async (personId: string) => {
     try {
-      setIsLoading(true);
+      setDeletingUserId(Number(personId));
       await deleteUser(personId);
       addToast('Usuário excluído com sucesso!', 'success');
       await refreshUsers();
@@ -279,7 +269,7 @@ const AccessPage: React.FC = () => {
       console.error('Failed to delete user', error);
       addToast('Erro ao excluir usuário', 'error');
     } finally {
-      setIsLoading(false);
+      setDeletingUserId(null);
     }
   };
 
@@ -295,8 +285,7 @@ const AccessPage: React.FC = () => {
       return;
     }
     try {
-      setIsLoading(true);
-
+      setIsSaving(true);
       const sectorsToUpdate = selectedSectors.map((sectorId) => {
         const sector = sectors.find((s) => s.id === Number(sectorId));
         return {
@@ -304,7 +293,6 @@ const AccessPage: React.FC = () => {
           IsShared: true,
         };
       });
-
       const newUser: any = {
         name: newPerson.name,
         email: newPerson.email,
@@ -315,7 +303,6 @@ const AccessPage: React.FC = () => {
         sectors: sectorsToUpdate,
         invitedBy: invitedBy,
       };
-
       await createUser(newUser);
       addToast('Usuário criado com sucesso!', 'success');
       setIsDrawerOpen(false);
@@ -337,7 +324,7 @@ const AccessPage: React.FC = () => {
       console.error('Failed to create user', error);
       addToast('Erro ao criar usuário', 'error');
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
@@ -400,9 +387,13 @@ const AccessPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="ap-loading">
-          <div className="ap-spinner"></div>
-          <p>Carregando Acessos...</p>
+        <div className="ap-content" style={{ position: 'relative', flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="loading-overlay">
+            <div className="card-loading">
+              <div className="card-loading-spinner" />
+              <span className="loading-text">Carregando acessos...</span>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="ap-content">
@@ -438,7 +429,9 @@ const AccessPage: React.FC = () => {
                         <button 
                           className="ap-button ap-button-danger" 
                           onClick={() => handleDeletePerson(person.id.toString())}
+                          disabled={deletingUserId === person.id}
                         >
+                          {deletingUserId === person.id && <span className="ap-spinner-btn" />}
                           <FiCheck /> Confirmar
                         </button>
                       </div>
@@ -487,12 +480,30 @@ const AccessPage: React.FC = () => {
                         <div className="ap-info-item">
                           <span>Tipo: {person.isAdmin ? 'Administrador' : 'Colaborador'}</span>
                         </div>
-                        {person.sectors && person.sectors.length > 0 && (
-                          <div className="ap-info-item">
-                            <span className="ap-info-label">Setores:</span>
-                            <span className="ap-info-text">{person.sectors.map(s => s.name).join(', ')}</span>
-                          </div>
-                        )}
+                        {(() => {
+                          const userSectorIds = sectors.map(s => s.id);
+                          const commonSectors = person.sectors
+                            ? person.sectors.filter(s => userSectorIds.includes(s.id))
+                            : [];
+                          if (commonSectors.length > 0) {
+                            return (
+                              <div className="ap-info-item">
+                                <span className="ap-info-label">Setores:</span>
+                                <div className="ap-info-sectors">
+                                  {commonSectors.map(s => (
+                                    <span key={s.id} className="ap-sector-tag">{s.name}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="ap-info-item">
+                              <span className="ap-info-label">Setores:</span>
+                              <span className="ap-info-text">Nenhum setor associado</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
@@ -538,7 +549,7 @@ const AccessPage: React.FC = () => {
                         setErrors({ ...errors, name: undefined });
                       }
                     }}
-                    disabled={isLoading}
+                    disabled={isLoading || isSaving}
                   />
                   {errors.name && <span className="ap-error-message">{errors.name}</span>}
                 </div>
@@ -560,7 +571,7 @@ const AccessPage: React.FC = () => {
                         setErrors({ ...errors, email: undefined });
                       }
                     }}
-                    disabled={isLoading}
+                    disabled={isLoading || isSaving}
                   />
                   {errors.email && <span className="ap-error-message">{errors.email}</span>}
                 </div>
@@ -571,7 +582,7 @@ const AccessPage: React.FC = () => {
                     className="ap-form-select"
                     value={editingPerson ? (editingPerson.isAdmin ? "Administrador" : "Colaborador") : (isAdmin ? "Administrador" : "Colaborador")}
                     onChange={handleSelectChange}
-                    disabled={isLoading}
+                    disabled={isLoading || isSaving}
                   >
                     <option value="Colaborador">Colaborador</option>
                     <option value="Administrador">Administrador</option>
@@ -600,6 +611,88 @@ const AccessPage: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="ap-form-group">
+                  <label className="ap-form-label">Setores <span className="ap-required">*</span></label>
+                  <div
+                    className={`ap-multiselect${showSectorDropdown ? ' open' : ''}`}
+                    onClick={() => setShowSectorDropdown(prev => !prev)}
+                  >
+                    <div className="ap-multiselect-content">
+                      {selectedSectors.length === 0 ? (
+                        <div className="ap-multiselect-placeholder">Selecione os setores</div>
+                      ) : (
+                        <div className="ap-multiselect-tags">
+                          {selectedSectors.map(sectorId => {
+                            const sector = sectors.find(s => s.id.toString() === sectorId);
+                            if (!sector) return null;
+                            return (
+                              <span key={sector.id} className="ap-multiselect-tag">
+                                {sector.name}
+                                <button
+                                  type="button"
+                                  className="ap-multiselect-tag-remove"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveSector(sectorId);
+                                  }}
+                                >
+                                  <FiX size={14} />
+                                </button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div className="ap-multiselect-toggle">
+                      <FiChevronDown size={18} />
+                    </div>
+
+                    {showSectorDropdown && (
+                      <div className="ap-multiselect-dropdown">
+                        <div className="ap-multiselect-search">
+                          <input
+                            type="text"
+                            placeholder="Buscar setores..."
+                            value={sectorSearchText}
+                            onChange={(e) => setSectorSearchText(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        <div className="ap-multiselect-options">
+                          {sectors
+                            .filter(sector => 
+                              sector.name.toLowerCase().includes(sectorSearchText.toLowerCase())
+                            )
+                            .map(sector => (
+                              <div
+                                key={sector.id}
+                                className={`ap-multiselect-option${
+                                  selectedSectors.includes(sector.id.toString()) ? ' selected' : ''
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSectorSelect(sector.id);
+                                }}
+                              >
+                                <div className="ap-multiselect-checkbox" />
+                                {sector.name}
+                              </div>
+                            ))}
+                          {sectors.filter(sector => 
+                            sector.name.toLowerCase().includes(sectorSearchText.toLowerCase())
+                          ).length === 0 && (
+                            <div className="ap-multiselect-no-results">
+                              Nenhum setor encontrado
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {errors.sectors && <span className="ap-error-message">{errors.sectors}</span>}
+                </div>
+
                 <div className="ap-drawer-footer">
                   <button 
                     type="button"
@@ -611,8 +704,9 @@ const AccessPage: React.FC = () => {
                   <button 
                     type="submit"
                     className="ap-button ap-button-primary"
-                    disabled={isLoading}
+                    disabled={isLoading || isSaving}
                   >
+                    {isSaving && <span className="ap-spinner-btn" />}
                     {editingPerson ? 'Salvar' : 'Adicionar'}
                   </button>
                 </div>

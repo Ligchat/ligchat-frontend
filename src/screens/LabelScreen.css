@@ -1026,3 +1026,15 @@
   z-index: 9999;
   pointer-events: none;
 }
+
+.spin {
+  animation: spin 1s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

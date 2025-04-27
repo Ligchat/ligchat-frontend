@@ -8,7 +8,7 @@ const UNOFFICIAL_API_URL = process.env.REACT_APP_UNOFFICIAL_API_URL || '/unoffic
 // Verificação de segurança para garantir que não estamos usando a porta 5002
 const getApiUrl = () => {
   if (!WHATSAPP_API_URL) {
-    return 'https://whatsapp.ligchat.com';
+    return 'http://localhost:5001';
   }
   
   if (WHATSAPP_API_URL.includes(':5002')) {

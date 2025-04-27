@@ -547,17 +547,6 @@ const CardSidebar: React.FC<CardSidebarProps> = ({
                       <span className="info-value">{formatDate(editingCard.createdAt)}</span>
                     </div>
                   )}
-                  {editingCard?.lastContact ? (
-                    <div className="card-sidebar-info-item">
-                      <span className="info-label"><FiClock /> Último contato:</span>
-                      <span className="info-value">{formatDate(editingCard.lastContact)}</span>
-                    </div>
-                  ) : (
-                    <div className="card-sidebar-info-item empty">
-                      <span className="info-label"><FiClock /> Último contato:</span>
-                      <span className="info-value empty">Sem contato</span>
-                    </div>
-                  )}
                   {mode === 'crm' && editingCard?.priority ? (
                     <div className="card-sidebar-info-item">
                       <span className="info-label"><FiFlag /> Prioridade:</span>

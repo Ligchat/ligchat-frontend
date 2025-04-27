@@ -33,6 +33,13 @@ interface ViewedStatus {
     [contactId: number]: boolean;
 }
 
+// Define interface for ChatNew component props
+interface ChatNewProps {
+    key?: string;
+    hasNewMessages?: UnreadMessagesState;
+    setHasNewMessages?: (newState: UnreadMessagesState) => void;
+}
+
 const PROFILE_UPDATED_EVENT = 'profileUpdated';
 
 const CombinedMenu: React.FC = () => {
@@ -69,7 +76,7 @@ const CombinedMenu: React.FC = () => {
                     key={componentKey}
                     hasNewMessages={unreadMessagesState}
                     setHasNewMessages={(newState: UnreadMessagesState) => setUnreadMessagesState(newState)}
-                />
+                /> as React.ReactElement<ChatNewProps>
             );
         } else if (path.includes('/schedule')) {
             setSelectedComponent(<MessageSchedule key={componentKey} />);
@@ -85,6 +92,41 @@ const CombinedMenu: React.FC = () => {
             setSelectedComponent(<div key={componentKey} className="page-container"><AgentsPage /></div>);
         }
     }, [unreadMessagesState, location.pathname, sectors]);
+
+    const fetchSectors = useCallback(async (token: string) => {
+        try {
+            console.log('Fetching sectors...');
+            const sectors = await getSectors(token);
+            console.log('Sectors fetched:', sectors);
+            setSectors(sectors);
+            
+            // Verificar se o setor atualmente selecionado ainda existe
+            const currentSectorId = selectedSector ? parseInt(selectedSector) : SessionService.getSectorId();
+            if (currentSectorId) {
+                const sectorExists = sectors.some(s => s.id === currentSectorId);
+                if (!sectorExists) {
+                    console.log('Current sector not found in available sectors, probably deleted');
+                    SessionService.removeSectorId();
+                    setSelectedSector('');
+                    
+                    // Disparar evento para notificar que o setor foi alterado
+                    const event = new CustomEvent('sectorChanged', { 
+                        detail: { sectorId: null } 
+                    });
+                    window.dispatchEvent(event);
+                    
+                    // Redirecionar para o dashboard quando o setor selecionado não existir mais
+                    updateComponentForCurrentRoute(null);
+                    if (location.pathname !== '/dashboard') {
+                        navigate('/dashboard');
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao buscar setores:', error);
+            setSectors([]);
+        }
+    }, [selectedSector, updateComponentForCurrentRoute, navigate, location.pathname]);
 
     useEffect(() => {
         const loadInitialSector = async () => {
@@ -110,6 +152,23 @@ const CombinedMenu: React.FC = () => {
         loadInitialSector();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Executar apenas na montagem
+
+    // Adicionar listener para atualização de setores
+    useEffect(() => {
+        const handleSectorsUpdated = async () => {
+            console.log('Evento sectorsUpdated recebido, atualizando lista de setores');
+            const token = SessionService.getToken();
+            if (token) {
+                await fetchSectors(token);
+            }
+        };
+
+        window.addEventListener('sectorsUpdated', handleSectorsUpdated);
+        
+        return () => {
+            window.removeEventListener('sectorsUpdated', handleSectorsUpdated);
+        };
+    }, [fetchSectors]);
 
     useEffect(() => {
         const handleSectorChange = (event: CustomEvent) => {
@@ -172,33 +231,6 @@ const CombinedMenu: React.FC = () => {
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, []);
-
-
-
-    const fetchSectors = useCallback(async (token: string) => {
-        try {
-            console.log('Fetching sectors...');
-            const sectors = await getSectors(token);
-            console.log('Sectors fetched:', sectors);
-            setSectors(sectors);
-            
-            const sectorIds = sectors.map(s => s.id);
-            SessionService.validateAndCleanSectorSession(sectorIds);
-            
-            const currentSectorId = SessionService.getSectorId();
-            if (currentSectorId) {
-                const sectorExists = sectors.some(s => s.id === currentSectorId);
-                if (!sectorExists) {
-                    console.log('Current sector not found in available sectors');
-                    SessionService.removeSectorId();
-                    setSelectedSector('');
-                }
-            }
-        } catch (error) {
-            console.error('Erro ao buscar setores:', error);
-            setSectors([]);
-        }
     }, []);
 
     useEffect(() => {

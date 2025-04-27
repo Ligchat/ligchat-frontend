@@ -36,11 +36,15 @@ export const createColumn = async (columnData: CreateColumnRequestDTO): Promise<
 
 export const updateColumn = async (id: string, data: UpdateColumnRequestDTO): Promise<Column> => {
   try {
-    const response = await axios.put<Column>(`${API_URL}/colunas/${id}`, data, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const response = await axios.put<Column>(
+      `${API_URL}/Colunas/${id}/name`,
+      { name: data.name },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
     return {
       ...response.data,
       id: response.data.id.toString()

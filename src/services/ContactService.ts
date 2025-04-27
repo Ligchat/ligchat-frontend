@@ -30,7 +30,7 @@ export interface Contact {
 
 export interface CreateContactRequestDTO {
   name: string;
-  phone: string;
+  phoneNumber: string;
   email: string;
   sectorId: number;
   status?: string;
@@ -159,5 +159,20 @@ export const deleteContact = async (id: number) => {
     return response.data;
   } catch (error) {
     throw new Error(`Failed to delete contact with id ${id}: ${error}`);
+  }
+};
+
+export const deleteContactFromSector = async (contactId: number, sectorId: number) => {
+  try {
+    const token = localStorage.getItem('token');
+    const url = `${CONTACTS_API_URL}/contact/${contactId}/sector/${sectorId}`;
+    const response = await axios.delete(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(`Failed to delete contact ${contactId} from sector ${sectorId}: ${error}`);
   }
 };
