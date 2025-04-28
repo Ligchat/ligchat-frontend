@@ -16,6 +16,7 @@ import { useMenu } from '../contexts/MenuContext';
 import { getContacts } from '../services/ContactService';
 import '../styles/CombinedMenu/CombinedMenu.css';
 import AgentsPage from '../screens/AgentsPage';
+import ChatWebSocketService from '../services/ChatWebSocketService';
 
 interface ProfileUpdateEvent extends CustomEvent {
     detail: {
@@ -38,6 +39,8 @@ interface ChatNewProps {
     key?: string;
     hasNewMessages?: UnreadMessagesState;
     setHasNewMessages?: (newState: UnreadMessagesState) => void;
+    contacts?: any[];
+    setContacts?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 const PROFILE_UPDATED_EVENT = 'profileUpdated';
@@ -61,6 +64,7 @@ const CombinedMenu: React.FC = () => {
     const { drawerVisible, setDrawerVisible } = useMenu();
     const navigationInProgressRef = useRef(false);
     const [unreadMessagesState, setUnreadMessagesState] = useState<UnreadMessagesState>({});
+    const [contacts, setContacts] = useState<any[]>([]);
 
     const updateComponentForCurrentRoute = useCallback((sectorId: string | null) => {
         const path = location.pathname;
@@ -75,8 +79,10 @@ const CombinedMenu: React.FC = () => {
                 <ChatNew 
                     key={componentKey}
                     hasNewMessages={unreadMessagesState}
-                    setHasNewMessages={(newState: UnreadMessagesState) => setUnreadMessagesState(newState)}
-                /> as React.ReactElement<ChatNewProps>
+                    setHasNewMessages={setUnreadMessagesState}
+                    contacts={contacts}
+                    setContacts={setContacts}
+                />
             );
         } else if (path.includes('/schedule')) {
             setSelectedComponent(<MessageSchedule key={componentKey} />);
@@ -91,7 +97,7 @@ const CombinedMenu: React.FC = () => {
         } else if (path.includes('/agents')) {
             setSelectedComponent(<div key={componentKey} className="page-container"><AgentsPage /></div>);
         }
-    }, [unreadMessagesState, location.pathname, sectors]);
+    }, [unreadMessagesState, location.pathname, sectors, contacts]);
 
     const fetchSectors = useCallback(async (token: string) => {
         try {
@@ -307,6 +313,65 @@ const CombinedMenu: React.FC = () => {
         }
     }, [selectedSector, sectors, updateComponentForCurrentRoute]);
 
+    // Função para buscar contatos do setor selecionado
+    const fetchContacts = useCallback(async (sectorId: string) => {
+        if (!sectorId) return;
+        try {
+            const response = await getContacts(Number(sectorId));
+            if (response && response.data) {
+                setContacts(response.data);
+            } else {
+                setContacts([]);
+            }
+        } catch (error) {
+            setContacts([]);
+        }
+    }, []);
+
+    // Buscar contatos sempre que o setor mudar
+    useEffect(() => {
+        if (selectedSector) {
+            fetchContacts(selectedSector);
+        }
+    }, [selectedSector, fetchContacts]);
+
+    // WebSocket para notificações globais de mensagens não lidas
+    useEffect(() => {
+        const token = SessionService.getToken?.() || '';
+        if (!token || !selectedSector) return;
+
+        const handleWebSocketMessage = (msg: any) => {
+            if (msg.type === 'unread_status') {
+                const unread = msg.payload.unreadStatus || {};
+                const normalized = Object.fromEntries(
+                    Object.entries(unread).map(([id, value]) => [id, !value])
+                );
+                setUnreadMessagesState(prev => ({ ...prev, ...normalized }));
+                fetchContacts(selectedSector);
+            } else if (msg.type === 'message') {
+                setUnreadMessagesState(prev => ({
+                    ...prev,
+                    [msg.payload.contactID]: true
+                }));
+                fetchContacts(selectedSector);
+            } else if (msg.type === 'contact') {
+                setContacts(prev => {
+                    const exists = prev.some(c => c.id === msg.payload.id);
+                    if (exists) {
+                        return prev.map(c => c.id === msg.payload.id ? { ...c, ...msg.payload } : c);
+                    } else {
+                        return [...prev, msg.payload];
+                    }
+                });
+            }
+        };
+
+        ChatWebSocketService.connect(token, handleWebSocketMessage, Number(selectedSector));
+        return () => {
+            ChatWebSocketService.disconnect();
+        };
+    }, [selectedSector, fetchContacts]);
+
     const handleSectorChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = e.target.value;
         
@@ -431,7 +496,9 @@ const CombinedMenu: React.FC = () => {
                     <ChatNew 
                         key={componentKey}
                         hasNewMessages={unreadMessagesState}
-                        setHasNewMessages={(newState: UnreadMessagesState) => setUnreadMessagesState(newState)}
+                        setHasNewMessages={setUnreadMessagesState}
+                        contacts={contacts}
+                        setContacts={setContacts}
                     />
                 );
                 break;

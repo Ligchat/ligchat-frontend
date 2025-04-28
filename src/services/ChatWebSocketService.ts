@@ -18,16 +18,15 @@ class ChatWebSocketService {
   private socket: WebSocket | null = null;
   private onMessageCallback: OnMessageCallback | null = null;
 
-  connect(token: string, onMessage: OnMessageCallback) {
+  connect(token: string, onMessage: OnMessageCallback, sectorId?: number) {
     this.onMessageCallback = onMessage;
-    this.socket = new WebSocket('wss://unofficial.ligchat.com/api/v1/ws');
+    const sectorParam = sectorId ? `?sector_id=${sectorId}` : '';
+    this.socket = new WebSocket(`wss://unofficial.ligchat.com/api/v1/ws${sectorParam}`);
 
     this.socket.onopen = () => {};
     this.socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.type === 'message') {
-        this.onMessageCallback?.(data.payload);
-      }
+      this.onMessageCallback?.(data);
     };
     this.socket.onclose = () => {};
     this.socket.onerror = () => {};

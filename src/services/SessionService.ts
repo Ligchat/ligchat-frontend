@@ -231,6 +231,15 @@ class SessionService {
     localStorage.removeItem(this.SECTOR_OFFICIAL_KEY);
     localStorage.removeItem(this.AVAILABLE_SECTORS_KEY);
   }
+
+  static setIsAnonymous(isAnonymous: boolean) {
+    localStorage.setItem('@ligchat/is_anonymous', JSON.stringify(isAnonymous));
+  }
+
+  static getIsAnonymous(): boolean {
+    const value = localStorage.getItem('@ligchat/is_anonymous');
+    return value ? JSON.parse(value) : false;
+  }
 }
 
 export default SessionService;

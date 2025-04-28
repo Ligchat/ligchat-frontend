@@ -176,3 +176,20 @@ export const deleteContactFromSector = async (contactId: number, sectorId: numbe
     throw new Error(`Failed to delete contact ${contactId} from sector ${sectorId}: ${error}`);
   }
 };
+
+export const markContactAsViewed = async (sectorId: number, contactId: number) => {
+  try {
+    const token = localStorage.getItem('token');
+    const url = `${API_URL}/Contact/mark-as-viewed?sectorId=${sectorId}&contactId=${contactId}`;
+    await axios.post(url, '', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': '*/*'
+      }
+    });
+    return true;
+  } catch (error) {
+    console.error('Erro ao marcar contato como visualizado:', error);
+    return false;
+  }
+};

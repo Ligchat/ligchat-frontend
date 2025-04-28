@@ -43,6 +43,8 @@ export interface SendMessageDto {
   text: string;
   contactId: number;
   sectorId: number;
+  userId?: number;
+  isAnonymous?: boolean;
 }
 
 // Constantes para tipos de áudio suportados
@@ -59,6 +61,8 @@ export interface SendFileDto {
   contactId: number;
   sectorId: number;
   isHuman?: boolean;
+  userId?: number;
+  isAnonymous?: boolean;
 }
 
 export interface MessageType {
@@ -116,7 +120,9 @@ export const sendMessage = async (message: SendMessageDto): Promise<MessageRespo
       const unofficialResponse = await UnofficialMessageService.sendTextMessage({
         sector_id: message.sectorId,
         recipient: message.recipientPhone,
-        message: message.text
+        message: message.text,
+        userId: message.userId,
+        isAnonymous: message.isAnonymous
       });
 
       // Converter a resposta não oficial para o formato MessageResponse
@@ -141,7 +147,9 @@ export const sendMessage = async (message: SendMessageDto): Promise<MessageRespo
       recipientPhone: message.recipientPhone,
       text: message.text,
       contactId: message.contactId,
-      sectorId: message.sectorId
+      sectorId: message.sectorId,
+      userId: message.userId,
+      isAnonymous: message.isAnonymous
     };
 
     console.log(`Enviando mensagem para: ${API_URL}/whatsapp/send-message`);
@@ -192,8 +200,10 @@ export async function sendFile(fileData: SendFileDto): Promise<MessageResponse> 
           fileName,
           mediaType,
           recipient: fileData.recipientPhone,
-          sectorId: fileData.sectorId,
-          caption: fileData.caption || ''
+          sector_id: fileData.sectorId,
+          caption: fileData.caption || '',
+          userId: fileData.userId,
+          isAnonymous: fileData.isAnonymous
         });
       } else if (isDocument) {
         response = await UnofficialMessageService.sendDocument({
@@ -202,7 +212,9 @@ export async function sendFile(fileData: SendFileDto): Promise<MessageResponse> 
           mediaType,
           recipient: fileData.recipientPhone,
           sectorId: fileData.sectorId,
-          caption: fileData.caption || ''
+          caption: fileData.caption || '',
+          userId: fileData.userId,
+          isAnonymous: fileData.isAnonymous
         });
       } else {
         // Para áudio, sempre usar audio/mpeg como tipo
@@ -211,8 +223,10 @@ export async function sendFile(fileData: SendFileDto): Promise<MessageResponse> 
           fileName,
           mediaType: 'audio/mpeg',
           recipient: fileData.recipientPhone,
-          sectorId: fileData.sectorId,
-          caption: fileData.caption || ''
+          sector_id: fileData.sectorId,
+          caption: fileData.caption || '',
+          userId: fileData.userId,
+          isAnonymous: fileData.isAnonymous
         });
       }
 
@@ -249,6 +263,12 @@ export async function sendFile(fileData: SendFileDto): Promise<MessageResponse> 
     formData.append('sectorId', fileData.sectorId.toString());
     if (fileData.isHuman !== undefined) {
       formData.append('isHuman', fileData.isHuman.toString());
+    }
+    if (fileData.userId !== undefined) {
+      formData.append('userId', String(fileData.userId));
+    }
+    if (fileData.isAnonymous !== undefined) {
+      formData.append('isAnonymous', String(fileData.isAnonymous));
     }
 
     const response = await axios.post(
@@ -352,7 +372,9 @@ export const sendAudioMessage = async (
   audioBlob: Blob,
   recipient: string,
   contactId: number,
-  sectorId: number
+  sectorId: number,
+  userId?: number,
+  isAnonymous?: boolean
 ): Promise<MessageResponse> => {
   try {
     console.log('Áudio original:', {
@@ -378,8 +400,10 @@ export const sendAudioMessage = async (
         fileName,
         mediaType: 'audio/wav',
         recipient,
-        sectorId,
-        caption: ''
+        sector_id: sectorId,
+        caption: '',
+        userId: userId,
+        isAnonymous: isAnonymous
       });
 
       if (unofficialResponse.status === 'error') {
@@ -418,6 +442,12 @@ export const sendAudioMessage = async (
     formData.append('recipient', recipient);
     formData.append('contactId', contactId.toString());
     formData.append('sectorId', sectorId.toString());
+    if (userId !== undefined) {
+      formData.append('userId', String(userId));
+    }
+    if (isAnonymous !== undefined) {
+      formData.append('isAnonymous', String(isAnonymous));
+    }
 
     const response = await axios.post<MessageResponse>(
       `${getApiUrl()}/whatsapp/send-file`,

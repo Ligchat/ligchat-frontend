@@ -421,11 +421,11 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
       removeToast(id);
     }, 3000);
   };
-  
+
   const removeToast = (id: number) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   };
-  
+
   // Buscar contatos
   useEffect(() => {
     const fetchContacts = async () => {
@@ -450,12 +450,12 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
         setIsLoading(false);
       }
     };
-    
+
     if (visible) {
       fetchContacts();
     }
   }, [visible]);
-  
+
   // Fechar dropdowns quando clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -527,7 +527,7 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
       addLocalToast('Erro ao acessar microfone', 'error');
     }
   };
-  
+
   // Parar gravação de áudio
   const stopRecording = () => {
     if (mediaRecorder && isRecording) {
@@ -535,7 +535,7 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
       setIsRecording(false);
     }
   };
-  
+
   // Iniciar ou parar gravação
   const handleAudioRecording = () => {
     if (isRecording) {
@@ -544,7 +544,7 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
       startRecording();
     }
   };
-  
+
   // Manipular seleção de arquivos
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'document') => {
     const files = event.target.files;
@@ -560,8 +560,8 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
           {
             fileType: 'image',
             data: base64,
-            name: file.name,
-            mimeType: file.type
+        name: file.name,
+        mimeType: file.type
           }
         ]);
       } else {
@@ -582,7 +582,7 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
     
     event.target.value = '';
   };
-  
+
   // Salvar áudio gravado
   const handleSaveAudio = async () => {
     if (!audioBlob) return;
@@ -593,7 +593,7 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
       setAttachments(prev => [
         ...prev,
         {
-          fileType: 'audio',
+        fileType: 'audio',
           data: base64,
           name: `audio_${new Date().toISOString()}.mp3`,
           duration: recordingTime,
@@ -613,7 +613,7 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
-  
+
   // Renderizar preview de anexos
   const renderAttachmentsPreview = () => {
     if (attachments.length === 0) {
@@ -623,13 +623,13 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
         </div>
       );
     }
-    
+
     return (
-      <div className="attachment-list">
+            <div className="attachment-list">
         {attachments.map((attachment, index) => {
           if (attachment.fileType === 'image') {
             return (
-              <div key={index} className="attachment-item">
+                <div key={index} className="attachment-item">
                 <img 
                   src={attachment.s3Url || `data:${attachment.mimeType};base64,${attachment.data}`}
                   alt={attachment.name} 
@@ -642,12 +642,12 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                   </svg>
-                </button>
-              </div>
+                  </button>
+                </div>
             );
           } else if (attachment.fileType === 'audio') {
             return (
-              <div key={index} className="attachment-item">
+                <div key={index} className="attachment-item">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
                   <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
@@ -672,12 +672,12 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                   </svg>
-                </button>
-              </div>
+                  </button>
+                </div>
             );
           } else {
             return (
-              <div key={index} className="attachment-item">
+                <div key={index} className="attachment-item">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                   <polyline points="14 2 14 8 20 8"></polyline>
@@ -697,48 +697,48 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                   </svg>
-                </button>
-              </div>
+                  </button>
+                </div>
             );
           }
         })}
       </div>
     );
   };
-  
+
   // Salvar agendamento
   const handleSave = async () => {
     try {
       // Validar campos
-      if (!selectedDate || !selectedTime) {
+    if (!selectedDate || !selectedTime) {
         addLocalToast('Selecione data e hora para o agendamento', 'error');
-        return;
-      }
-      
+      return;
+    }
+
       // Verificar se há texto ou anexos
       if (!messageText.trim() && attachments.length === 0) {
         addLocalToast('Adicione uma mensagem ou anexo', 'error');
-        return;
-      }
-      
+      return;
+    }
+
       // Verificar se há contatos disponíveis
       if (contacts.length === 0) {
         addLocalToast('Não há contatos disponíveis neste setor', 'error');
-        return;
-      }
-      
+      return;
+    }
+
       // Verificar se há um contato selecionado
       if (!selectedContactId) {
         addLocalToast('Selecione um contato', 'error');
-        return;
-      }
-      
+      return;
+    }
+
       setIsSaving(true);
       
       // Combinar data e hora
       const combinedDate = selectedDate
-        .hour(selectedTime.hour())
-        .minute(selectedTime.minute())
+      .hour(selectedTime.hour())
+      .minute(selectedTime.minute())
         .second(0);
       
       const token = SessionService.getToken();
@@ -786,7 +786,7 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
       setIsSaving(false);
     }
   };
-  
+
   // Manipular mudança de data
   const handleDateChange = (date: dayjs.Dayjs) => {
     setSelectedDate(date);
@@ -816,7 +816,7 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
   // Renderizar o drawer
   const renderDrawer = () => {
     if (!visible) return null;
-    
+
     return (
       <div className="drawer">
         <div className="drawer-content">
@@ -888,20 +888,20 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
                 ))}
               </select>
             </div>
-            
+
             <div className="form-group">
               <label>Mensagem</label>
-              <textarea
-                className="message-textarea"
-                placeholder="Digite sua mensagem..."
-                value={messageText}
+            <textarea
+              className="message-textarea"
+              placeholder="Digite sua mensagem..."
+              value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
-              />
+            />
             </div>
-            
+
             <div className="form-group">
               <label>Anexos</label>
-              <div className="attachment-tools">
+            <div className="attachment-tools">
                 <button 
                   type="button"
                   className={`tool-button ${isRecording ? 'recording' : ''}`}
@@ -933,8 +933,8 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
                   </svg>
                   Imagem
                 </button>
-                
-                <button 
+
+              <button
                   type="button"
                   className="tool-button"
                   onClick={() => fileInputRef.current?.click()}
@@ -947,13 +947,13 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
                     <line x1="10" y1="9" x2="8" y2="9"></line>
                   </svg>
                   Documento
-                </button>
-                
+              </button>
+
                 {audioBlob && (
-                  <button 
+                <button
                     type="button"
                     className="tool-button"
-                    onClick={handleSaveAudio}
+                  onClick={handleSaveAudio}
                   >
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
@@ -961,11 +961,11 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
                       <polyline points="7 3 7 8 15 8"></polyline>
                     </svg>
                     Salvar áudio
-                  </button>
-                )}
-              </div>
-              
-              <input 
+                </button>
+              )}
+            </div>
+
+              <input
                 type="file"
                 accept="image/*"
                 ref={imageInputRef}
@@ -973,7 +973,7 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
                 onChange={(e) => handleFileSelect(e, 'image')}
               />
               
-              <input 
+              <input
                 type="file"
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
                 ref={fileInputRef}
@@ -983,21 +983,21 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
               
               {renderAttachmentsPreview()}
             </div>
-          </div>
-          
-          <div className="drawer-footer">
-            <button 
+            </div>
+
+            <div className="drawer-footer">
+              <button
               className="btn btn-secondary"
-              onClick={onClose}
+                onClick={onClose}
               disabled={isSaving}
-            >
-              Cancelar
-            </button>
-            <button 
+              >
+                Cancelar
+              </button>
+              <button
               className="btn btn-primary"
-              onClick={handleSave}
-              disabled={isSaving}
-            >
+                onClick={handleSave}
+                disabled={isSaving}
+              >
               {isSaving ? 'Salvando...' : 'Agendar'}
             </button>
           </div>
@@ -1066,9 +1066,9 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
                   onClick={closeDateTimeModal}
                 >
                   Confirmar
-                </button>
-              </div>
+              </button>
             </div>
+          </div>
           </div>
         )}
         
@@ -1092,7 +1092,7 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
       </div>
     );
   };
-  
+
   return renderDrawer();
 };
 
@@ -1335,7 +1335,7 @@ const MessageScheduleScreen: React.FC = () => {
       }
 
       console.log('Buscando dados para o setor:', sectorId);
-      
+
       // Buscar tags e contatos primeiro
       const [tagsResponse, contactsResponse] = await Promise.all([
         getTags(sectorId).catch(error => {
@@ -1374,23 +1374,23 @@ const MessageScheduleScreen: React.FC = () => {
         if (Array.isArray(messagesResponse)) {
           console.log(`Encontradas ${messagesResponse.length} mensagens agendadas`);
           
-          const formattedMessages = messagesResponse.map(msg => {
+        const formattedMessages = messagesResponse.map(msg => {
             // Encontrar o contato correspondente, se disponível
             const messageContact = contactsResponse.data?.find(c => c.id === (msg.contactId || msg.contact_id));
-            
-            return {
-              id: msg.id,
+          
+          return {
+            id: msg.id,
               title: msg.name || "Sem título",
-              date: new Date(msg.sendDate).getTime(),
+            date: new Date(msg.sendDate).getTime(),
               description: msg.messageText || "",
-              labels: msg.tagIds ? msg.tagIds.split(',') : [],
+            labels: msg.tagIds ? msg.tagIds.split(',') : [],
               contactId: msg.contactId || msg.contact_id || null,
               contact: messageContact || (contactsResponse.data?.[0] || {}),
-              attachments: msg.attachments || []
-            };
-          });
+            attachments: msg.attachments || []
+          };
+        });
 
-          setMessages(formattedMessages);
+        setMessages(formattedMessages);
         } else {
           console.error('Resposta de mensagens não é um array:', messagesResponse);
           setMessages([]);
@@ -1497,7 +1497,7 @@ const MessageScheduleScreen: React.FC = () => {
         const mappedAttachments = (data.attachments || []).map((att: any) => ({
           fileType: att.type as 'image' | 'audio' | 'file',
           data: att.s3Url || '',   // Usar a URL do S3 diretamente
-          name: att.fileName,
+            name: att.fileName,
           preview: att.s3Url,      // Usar a URL do S3 como preview para todos os tipos
           s3Url: att.s3Url,        // Manter a URL original do S3
           mimeType: 
@@ -1507,7 +1507,7 @@ const MessageScheduleScreen: React.FC = () => {
         }));
         
         setAttachments(mappedAttachments);
-        setIsDrawerVisible(true);
+        setIsDrawerVisible(true); 
         
         // Configurar os dados iniciais para o drawer
         setDrawerInitialData({

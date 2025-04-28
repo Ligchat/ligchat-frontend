@@ -4,7 +4,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import SessionService from '../services/SessionService';
-import { getContacts, updateContact, createContact, deleteContactFromSector } from '../services/ContactService';
+import { getContacts, updateContact, createContact, deleteContactFromSector, markContactAsViewed } from '../services/ContactService';
 import { sendMessage, sendFile, MessageResponse, sendAudioMessage } from '../services/MessageService';
 import { getSector, Sector } from '../services/SectorService';
 import { getMessagesByContactId } from '../services/MessageService';
@@ -17,6 +17,7 @@ import { useLocation } from 'react-router-dom';
 import ChatWebSocketService from '../services/ChatWebSocketService';
 import { UserPlus } from 'lucide-react';
 import InputMask from 'react-input-mask';
+import { getUser } from '../services/UserService';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -46,6 +47,109 @@ const SendIcon = () => (
     <path d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z" fill="currentColor"/>
   </svg>
 );
+
+// Novo ícone para vídeo
+const VideoIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M21 3H3C1.9 3 1 3.9 1 5V19C1 20.1 1.9 21 3 21H21C22.1 21 23 20.1 23 19V5C23 3.9 22.1 3 21 3ZM9 17V7L16 12L9 17Z" fill="currentColor"/>
+  </svg>
+);
+
+// Ícone de play para usar no thumbnail do vídeo
+const PlayIcon = () => (
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="10" fill="rgba(0,0,0,0.5)" />
+    <path d="M10 8L16 12L10 16V8Z" fill="white" />
+  </svg>
+);
+
+// Componente para exibir thumbnail de vídeos
+const VideoThumbnail: React.FC<{ src: string }> = ({ src }) => {
+  const [thumbnail, setThumbnail] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) {
+      const handleLoad = () => {
+        try {
+          // Certifica-se de que o vídeo está carregado o suficiente para gerar o thumbnail
+          video.currentTime = 1.0; // Define para 1 segundo para pegar um frame real do vídeo
+          
+          // Esperar o currentTime ser aplicado
+          const handleTimeUpdate = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              const ctx = canvas.getContext('2d');
+              ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const dataUrl = canvas.toDataURL('image/jpeg');
+              setThumbnail(dataUrl);
+              
+              // Remover o listener após capturar o thumbnail
+              video.removeEventListener('timeupdate', handleTimeUpdate);
+            } catch (error) {
+              console.error('Erro ao gerar thumbnail:', error);
+            }
+          };
+          
+          video.addEventListener('timeupdate', handleTimeUpdate);
+        } catch (error) {
+          console.error('Erro ao carregar vídeo para thumbnail:', error);
+        }
+      };
+      
+      // Adicionar listener para quando os metadados estiverem carregados
+      video.addEventListener('loadedmetadata', handleLoad);
+      
+      // Limpar event listeners ao desmontar
+      return () => {
+        video.removeEventListener('loadedmetadata', handleLoad);
+        video.removeEventListener('timeupdate', () => {});
+      };
+    }
+  }, [src]);
+
+  return (
+    <>
+      {/* Vídeo oculto usado apenas para gerar o thumbnail */}
+      <video 
+        ref={videoRef} 
+        src={src}
+        style={{ display: 'none' }}
+        preload="metadata"
+        crossOrigin="anonymous"
+      />
+      
+      {/* Se o thumbnail estiver disponível, mostrar a imagem */}
+      {thumbnail ? (
+        <img 
+          src={thumbnail} 
+          alt="Prévia do vídeo" 
+          style={{ 
+            width: '100%', 
+            height: '100%', 
+            objectFit: 'cover',
+            borderRadius: 'inherit'
+          }}
+        />
+      ) : (
+        // Fundo preto enquanto carrega
+        <div style={{ 
+          width: '100%', 
+          height: '100%', 
+          backgroundColor: '#000',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center' 
+        }}>
+          <div style={{ color: '#666', fontSize: '14px' }}>Carregando prévia...</div>
+        </div>
+      )}
+    </>
+  );
+};
 
 // Novo componente de ícone para o botão voltar
 const BackIcon = () => (
@@ -117,11 +221,16 @@ const formatPhoneNumber = (phone: string): string => {
   return phone;
 };
 
-type ChatNewProps = {};
+type ChatNewProps = {
+  hasNewMessages?: { [contactId: number]: boolean };
+  setHasNewMessages?: (newState: { [contactId: number]: boolean }) => void;
+  contacts?: ContactData[];
+  setContacts?: React.Dispatch<React.SetStateAction<ContactData[]>>;
+};
 
 type ContactData = OriginalContactData;
 
-const ContactItem = React.memo(({ contact, selectedContactId, onSelect, tags }: { contact: ContactData, selectedContactId: number | null, onSelect: (c: ContactData) => void, tags: Tag[] }) => {
+const ContactItem = React.memo(({ contact, selectedContactId, onSelect, tags, hasUnread }: { contact: ContactData, selectedContactId: number | null, onSelect: (c: ContactData) => void, tags: Tag[], hasUnread?: boolean }) => {
   const initials = useMemo(() => contact.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2), [contact.name]);
   return (
     <div
@@ -152,6 +261,7 @@ const ContactItem = React.memo(({ contact, selectedContactId, onSelect, tags }: 
             {initials}
           </div>
         )}
+        {hasUnread && <span className="unread-indicator" />}
       </div>
       <div className="contact-info">
         <div className="contact-header">
@@ -172,12 +282,14 @@ const RenderContacts = React.memo(({
   contacts,
   selectedContact,
   onSelect,
-  tags
+  tags,
+  hasNewMessages
 }: {
   contacts: ContactData[],
   selectedContact: ContactData | null,
   onSelect: (c: ContactData) => void,
-  tags: Tag[]
+  tags: Tag[],
+  hasNewMessages: { [contactId: number]: boolean }
 }) => {
   if (contacts.length === 0) {
     return (
@@ -202,13 +314,14 @@ const RenderContacts = React.memo(({
           selectedContactId={selectedContact?.id ?? null} 
           onSelect={onSelect}
           tags={tags}
+          hasUnread={hasNewMessages[contact.id] === true}
         />
       ))}
     </div>
   );
 });
 
-const ChatNew: React.FC<ChatNewProps> = () => {
+const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessages, setHasNewMessages, contacts: externalContacts, setContacts: externalSetContacts }) => {
   const location = useLocation();
   const [selectedContact, setSelectedContact] = useState<ContactData | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -220,7 +333,8 @@ const ChatNew: React.FC<ChatNewProps> = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
-  const [contacts, setContacts] = useState<ContactData[]>([]);
+  const contacts = externalContacts || [];
+  const setContacts = externalSetContacts || (() => {});
   const [users, setUsers] = useState<User[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
@@ -234,7 +348,6 @@ const ChatNew: React.FC<ChatNewProps> = () => {
   const [isTagLoading, setIsTagLoading] = useState(false);
   const [isMicrophoneAvailable, setIsMicrophoneAvailable] = useState(false);
   const [isCheckingMicrophone, setIsCheckingMicrophone] = useState(true);
-  const contactsRef = useRef<ContactData[]>(contacts);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
@@ -254,6 +367,23 @@ const ChatNew: React.FC<ChatNewProps> = () => {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingContact, setIsDeletingContact] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
+  const [hasNewMessages, setLocalHasNewMessages] = useState<{ [contactId: number]: boolean }>(externalHasNewMessages || {});
+  const [isAnonymous, setIsAnonymous] = useState(() => SessionService.getIsAnonymous());
+  const [isCurrentUserAdmin, setIsCurrentUserAdmin] = useState(false);
+
+  useEffect(() => {
+    if (externalHasNewMessages) setLocalHasNewMessages(externalHasNewMessages);
+  }, [externalHasNewMessages]);
+
+  const updateHasNewMessages = useCallback((updater: (prev: { [contactId: number]: boolean }) => { [contactId: number]: boolean }) => {
+    setLocalHasNewMessages(prev => {
+      const updated = updater(prev);
+      if (setHasNewMessages) setHasNewMessages(updated);
+      return updated;
+    });
+  }, [setHasNewMessages]);
 
   const loadMessages = useCallback(async (contactId: number, pageParam = 0, append = false) => {
     console.log('🔄 loadMessages - Iniciando carregamento de mensagens', { contactId, pageParam, append });
@@ -352,9 +482,7 @@ const ChatNew: React.FC<ChatNewProps> = () => {
 
   // Troca de contato: mostra loading, só troca mensagens quando carregar
   const handleContactSelect = useCallback(async (contact: ContactData) => {
-    console.log('🔄 handleContactSelect - Iniciando seleção de contato', { contactId: contact.id, contact });
     if (!selectedSectorId) {
-      console.log('❌ handleContactSelect - Sem setor selecionado, abortando');
       return;
     }
     localStorage.setItem('openContactId', contact.id.toString());
@@ -365,8 +493,9 @@ const ChatNew: React.FC<ChatNewProps> = () => {
           : c
       ));
       setPage(0);
-      setSelectedContact({ ...contact});
-      console.log('✅ handleContactSelect - Contato selecionado com sucesso', { contactId: contact.id });
+      setSelectedContact({ ...contact });
+      // Marcar como visualizado na API
+      await markContactAsViewed(Number(selectedSectorId), contact.id);
     } catch (error) {
       console.error('❌ handleContactSelect - Erro ao selecionar contato:', error);
     }
@@ -443,7 +572,9 @@ const ChatNew: React.FC<ChatNewProps> = () => {
         to: selectedContact.number,
         recipientPhone: selectedContact.number,
         contactId: contactId,
-        sectorId: Number(selectedSectorId)
+        sectorId: Number(selectedSectorId),
+        userId: currentUserId,
+        isAnonymous: isCurrentUserAdmin ? isAnonymous : false
       });
 
       const response = await sendMessage({
@@ -451,7 +582,9 @@ const ChatNew: React.FC<ChatNewProps> = () => {
         to: selectedContact.number,
         recipientPhone: selectedContact.number,
         contactId: contactId,
-        sectorId: Number(selectedSectorId)
+        sectorId: Number(selectedSectorId),
+        userId: currentUserId,
+        isAnonymous: isCurrentUserAdmin ? isAnonymous : false
       });
 
       console.log('✅ handleSendMessage - Resposta da API:', response);
@@ -533,7 +666,9 @@ const ChatNew: React.FC<ChatNewProps> = () => {
         recipient: selectedContact.number,
         recipientPhone: selectedContact.number,
         contactId: selectedContact.id,
-        sectorId: Number(selectedSectorId)
+        sectorId: Number(selectedSectorId),
+        userId: currentUserId,
+        isAnonymous: isCurrentUserAdmin ? isAnonymous : false
       });
 
       setMessages(prev => prev.map(msg => 
@@ -616,7 +751,9 @@ const ChatNew: React.FC<ChatNewProps> = () => {
         audioBlob,
         selectedContact.number,
         selectedContact.id,
-        Number(selectedSectorId)
+        Number(selectedSectorId),
+        currentUserId,
+        isCurrentUserAdmin ? isAnonymous : false
       );
 
       // Atualiza a mensagem temporária com os dados do servidor
@@ -693,7 +830,7 @@ const ChatNew: React.FC<ChatNewProps> = () => {
 
         console.log('✅ initializeData - Contatos obtidos:', contactsResponse);
         if (contactsResponse?.data && Array.isArray(contactsResponse.data)) {
-          const currentContactsMap = new Map(contactsRef.current.map(contact => [contact.id, contact]));
+          const currentContactsMap = new Map(contacts.map(contact => [contact.id, contact]));
           
           // Obtém o ID do usuário atual
           const token = SessionService.getToken();
@@ -706,24 +843,16 @@ const ChatNew: React.FC<ChatNewProps> = () => {
           console.log('🔄 initializeData - Usuário atual (número):', { currentUserIdNum });
           
           const updatedContacts = contactsResponse.data.map(contact => {
-            console.log('🔍 Verificando contato:', { 
-              contactId: contact.id, 
-              assignedTo: contact.assignedTo, 
-              currentUserIdNum,
-              isEqual: contact.assignedTo === currentUserIdNum
-            });
-            
-            // Se o contato estiver atribuído ao usuário atual, definir assignedToName como "Delegado para mim"
+            const is_viewed = contact.is_viewed ?? contact.isViewed ?? true;
             const assignedToName = contact.assignedTo === currentUserIdNum
-              ? "Delegado para mim" 
+              ? "Delegado para mim"
               : (contact as any).assignedToName || null;
-              
             return {
               ...contact,
               lastMessage: currentContactsMap.get(contact.id)?.lastMessage || '',
               lastMessageTime: currentContactsMap.get(contact.id)?.lastMessageTime || '',
               unreadCount: currentContactsMap.get(contact.id)?.unreadCount || 0,
-              is_viewed: true,
+              is_viewed,
               assignedToName
             };
           });
@@ -739,6 +868,15 @@ const ChatNew: React.FC<ChatNewProps> = () => {
               setSelectedContact(updatedSelectedContact);
             }
           }
+          
+          // Atualizar o mapa de não visualizados
+          const unreadMap = updatedContacts.reduce((acc, contact) => {
+            acc[contact.id] = contact.is_viewed === false;
+            return acc;
+          }, {} as { [contactId: number]: boolean });
+
+          if (setHasNewMessages) setHasNewMessages(unreadMap);
+          setLocalHasNewMessages(unreadMap);
           
         } else {
           console.log('⚠️ initializeData - Formato de resposta inválido para contatos');
@@ -785,10 +923,18 @@ const ChatNew: React.FC<ChatNewProps> = () => {
   }, [selectedContact, location.pathname, loadMessages]);
 
   useEffect(() => {
-    contactsRef.current = contacts;
-  }, [contacts]);
-
-  
+    const handleScroll = () => {
+      if (!messagesContainerRef.current) return;
+      setShowScrollToBottom(
+        messagesContainerRef.current.scrollTop < messagesContainerRef.current.scrollHeight - messagesContainerRef.current.clientHeight - 120
+      );
+    };
+    handleScroll();
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.addEventListener('scroll', handleScroll);
+      return () => messagesContainerRef.current?.removeEventListener('scroll', handleScroll);
+    }
+  }, [messages]);
 
   const handleLoadMore = () => {
     console.log('🔄 handleLoadMore - Carregando mais mensagens', { 
@@ -804,19 +950,6 @@ const ChatNew: React.FC<ChatNewProps> = () => {
       loadMessages(selectedContact.id, nextPage, true);
     }
   };
-
-  useEffect(() => {
-    const messagesContainer = document.querySelector('.chat-new-messages');
-    if (!messagesContainer) return;
-    const handleScroll = () => {
-      setShowScrollToBottom(
-        messagesContainer.scrollTop < messagesContainer.scrollHeight - messagesContainer.clientHeight - 120
-      );
-    };
-    handleScroll();
-    messagesContainer.addEventListener('scroll', handleScroll);
-    return () => messagesContainer.removeEventListener('scroll', handleScroll);
-  }, [messages]);
 
   const renderMessage = (message: Message) => {
     const renderMediaContent = () => {
@@ -837,6 +970,24 @@ const ChatNew: React.FC<ChatNewProps> = () => {
                 alt="Imagem" 
                 onClick={() => message.mediaUrl && window.open(message.mediaUrl, '_blank')}
               />
+            </div>
+          );
+          
+        case 'video':
+          return (
+            <div 
+              className="chat-new-message-video"
+              onClick={() => {
+                setSelectedVideo(message.mediaUrl);
+                setShowVideoModal(true);
+              }}
+            >
+              <div className="video-thumbnail">
+                <VideoThumbnail src={message.mediaUrl} />
+                <div className="play-button">
+                  <PlayIcon />
+                </div>
+              </div>
             </div>
           );
 
@@ -1052,38 +1203,52 @@ const ChatNew: React.FC<ChatNewProps> = () => {
   useEffect(() => {
     const token = SessionService.getToken?.() || '';
     console.log('🔄 useEffect [WebSocket] - Configurando WebSocket', { hasToken: !!token });
-    if (!token) return;
-    
+    if (!token || !selectedSectorId) return;
+
     const handleWebSocketMessage = (msg: any) => {
-      console.log('📩 WebSocket - Mensagem recebida', { 
-        message: msg, 
-        selectedContactId: selectedContact?.id 
-      });
-      
-      if (!selectedContact || msg.contactID !== selectedContact.id) {
-        console.log('🔄 WebSocket - Mensagem ignorada, não é para o contato selecionado');
-        return;
+      if (msg.type === 'unread_status') {
+        const unread = msg.payload.unreadStatus || {};
+        const normalized = Object.fromEntries(
+          Object.entries(unread).map(([id, value]) => [id, !value])
+        );
+        updateHasNewMessages(() => ({ ...normalized }));
+      } else if (msg.type === 'contact') {
+        setContacts(prev => {
+          const exists = prev.some(c => c.id === msg.payload.id);
+          if (exists) {
+            return prev.map(c => c.id === msg.payload.id ? { ...c, ...msg.payload } : c);
+          } else {
+            return [...prev, msg.payload];
+          }
+        });
+      } else if (msg.type === 'message') {
+        if (!selectedContact || msg.payload.contactID !== selectedContact.id) {
+          updateHasNewMessages(prev => ({
+            ...prev,
+            [msg.payload.contactID]: true
+          }));
+        }
+        if (selectedContact && msg.payload.contactID === selectedContact.id) {
+          setMessages(prev => [...prev, msg.payload]);
+        }
       }
-      
-      console.log('✅ WebSocket - Adicionando mensagem recebida ao estado');
-      setMessages((prev) => [
-        ...prev,
-        {
-          ...msg,
-          fileName: msg.fileName ?? null,
-          mimeType: msg.mimeType ?? null
-        } as Message
-      ]);
     };
-    
-    console.log('🔄 WebSocket - Conectando ao serviço de WebSocket');
-    ChatWebSocketService.connect(token, handleWebSocketMessage);
-    
+
+    ChatWebSocketService.connect(token, handleWebSocketMessage, Number(selectedSectorId));
     return () => {
-      console.log('🔄 WebSocket - Desconectando do serviço de WebSocket');
       ChatWebSocketService.disconnect();
     };
-  }, [selectedContact]);
+  }, [selectedContact, selectedSectorId, updateHasNewMessages]);
+
+  useEffect(() => {
+    if (selectedContact) {
+      updateHasNewMessages(prev => ({
+        ...prev,
+        [selectedContact.id]: false
+      }));
+      // Aqui você pode notificar o backend que o contato foi visualizado, se necessário
+    }
+  }, [selectedContact, updateHasNewMessages]);
 
   const filteredContacts = useMemo(() => {
     return contacts.filter(contact => {
@@ -1115,6 +1280,8 @@ const ChatNew: React.FC<ChatNewProps> = () => {
         const userId = decodedToken ? decodedToken.userId : null;
         if (!userId) return;
         setCurrentUserId(Number(userId));
+        const response = await getUser(userId);
+        setIsCurrentUserAdmin(!!response.data.isAdmin);
       } catch (error) {}
     };
     fetchUserData();
@@ -1155,11 +1322,6 @@ const ChatNew: React.FC<ChatNewProps> = () => {
     }
   };
 
-  const isCurrentUserAdmin = useMemo(() => {
-    const user = users.find(u => u.id === currentUserId);
-    return user?.isAdmin || false;
-  }, [users, currentUserId]);
-
   const handleDeleteContact = async () => {
     if (!selectedContact || !selectedSectorId) return;
     setIsDeletingContact(true);
@@ -1174,6 +1336,14 @@ const ChatNew: React.FC<ChatNewProps> = () => {
       setIsDeletingContact(false);
     }
   };
+
+  const sortedContacts = useMemo(() => {
+    return [...contacts].sort((a, b) => {
+      const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+      const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+      return timeB - timeA;
+    });
+  }, [contacts]);
 
   return (
     <div className="chat-new-container dark-mode">
@@ -1237,10 +1407,11 @@ const ChatNew: React.FC<ChatNewProps> = () => {
             </div>
           ) : (
             <RenderContacts
-              contacts={filteredContacts}
+              contacts={filteredContacts.length > 0 ? filteredContacts : sortedContacts}
               selectedContact={selectedContact}
               onSelect={handleContactSelect}
               tags={tags}
+              hasNewMessages={hasNewMessages}
             />
           )}
         </div>
@@ -1378,6 +1549,20 @@ const ChatNew: React.FC<ChatNewProps> = () => {
                       </>
                     )}
                   </div>
+                )}
+                {isCurrentUserAdmin && (
+                  <label style={{ display: 'flex', alignItems: 'center', marginRight: 16, gap: 4 }}>
+                    <input
+                      type="checkbox"
+                      checked={isAnonymous}
+                      onChange={e => {
+                        setIsAnonymous(e.target.checked);
+                        SessionService.setIsAnonymous(e.target.checked);
+                      }}
+                      style={{ marginRight: 4 }}
+                    />
+                    Mensagem anônima
+                  </label>
                 )}
               </div>
             </div>
@@ -1816,6 +2001,30 @@ const ChatNew: React.FC<ChatNewProps> = () => {
               >
                 {isDeletingContact ? 'Removendo...' : 'Remover'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para reprodução de vídeo */}
+      {showVideoModal && selectedVideo && (
+        <div className="chat-new-video-modal" onClick={() => setShowVideoModal(false)}>
+          <div className="chat-new-video-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="chat-new-video-modal-header">
+              <button 
+                className="chat-new-video-modal-close" 
+                onClick={() => setShowVideoModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="chat-new-video-modal-body">
+              <video 
+                src={selectedVideo} 
+                controls 
+                autoPlay 
+                className="chat-new-video-player"
+              />
             </div>
           </div>
         </div>
