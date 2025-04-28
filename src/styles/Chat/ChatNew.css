@@ -1768,7 +1768,8 @@
   justify-content: center;
 }
 
-.play-button {
+/* Botão de play para vídeo, centralizado */
+.video-thumbnail .play-button {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -1776,10 +1777,30 @@
   z-index: 2;
   transition: transform 0.2s, opacity 0.2s;
   opacity: 0.85;
+  width: 48px;
+  height: 48px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
 }
 
 .chat-new-message-video:hover .play-button {
   transform: translate(-50%, -50%) scale(1.08);
+  opacity: 1;
+}
+
+/* Garantir que os estilos do AudioMessage não interfiram */
+.audio-message .play-button {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  border-radius: 12px;
+  width: 48px;
+  height: 48px;
   opacity: 1;
 }
 

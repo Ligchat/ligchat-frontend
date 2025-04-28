@@ -562,8 +562,8 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       status: 'sending'
     };
 
-    // Atualizar mensagens mantendo apenas as do contato atual
-    setMessages(prev => [...prev.filter(msg => msg.contactID === contactId), newMessage]);
+    // Atualizar mensagens apenas adicionando a nova
+    setMessages(prev => [...prev, newMessage]);
     setMessageInput('');
 
     try {
@@ -653,7 +653,8 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       status: 'sending'
     };
 
-    setMessages(prev => [...prev.filter(msg => msg.contactID === selectedContact.id), newMessage]);
+    // Não filtre mensagens existentes, apenas adicione a nova
+    setMessages(prev => [...prev, newMessage]);
     scrollToBottom();
 
     try {
@@ -961,7 +962,10 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         );
       }
 
-      switch (message.mediaType.toLowerCase()) {
+      // Normalizar o tipo de mídia para minúsculas e verificar corretamente
+      const mediaType = (message.mediaType || '').toLowerCase();
+
+      switch (mediaType) {
         case 'image':
           return (
             <div className="chat-new-message-image">
@@ -991,6 +995,18 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
             </div>
           );
 
+        case 'audio':
+        case 'voice':
+          return (
+            <AudioMessage
+              src={message.mediaUrl}
+              isSent={message.isSent || message.status === 'sending' || message.status === 'sent'}
+              onCancel={message.status === 'sending' ? () => {
+                setMessages(prev => prev.filter(m => m.id !== message.id));
+              } : undefined}
+            />
+          );
+
         case 'document':
           return (
             <div className="chat-new-message-document">
@@ -1004,18 +1020,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
                 {message.fileName || 'Documento'}
               </a>
             </div>
-          );
-
-        case 'audio':
-        case 'voice':
-          return (
-            <AudioMessage
-              src={message.mediaUrl}
-              isSent={message.isSent || message.status === 'sending' || message.status === 'sent'}
-              onCancel={message.status === 'sending' ? () => {
-                setMessages(prev => prev.filter(m => m.id !== message.id));
-              } : undefined}
-            />
           );
 
         case 'text':
@@ -1222,6 +1226,16 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           }
         });
       } else if (msg.type === 'message') {
+        // Para mensagens, garantir que mediaType está normalizado
+        if (msg.payload && msg.payload.mediaType) {
+          // Verificar se é áudio para garantir que não receba tipo errado
+          if (msg.payload.mediaType.toLowerCase() === 'audio' || 
+              msg.payload.mediaType.toLowerCase() === 'voice' ||
+              (msg.payload.mimeType && msg.payload.mimeType.startsWith('audio/'))) {
+            msg.payload.mediaType = 'audio';
+          }
+        }
+        
         if (!selectedContact || msg.payload.contactID !== selectedContact.id) {
           updateHasNewMessages(prev => ({
             ...prev,
@@ -1229,7 +1243,26 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           }));
         }
         if (selectedContact && msg.payload.contactID === selectedContact.id) {
-          setMessages(prev => [...prev, msg.payload]);
+          setMessages(prev => {
+            // Se já existe pelo id, não adiciona
+            if (prev.some(m => m.id === msg.payload.id)) return prev;
+            // Procurar mensagem local "sending" com mesmo conteúdo e contato
+            const now = Date.now();
+            const idx = prev.findIndex(m =>
+              m.status === 'sending' &&
+              m.content === msg.payload.content &&
+              m.contactID === msg.payload.contactID &&
+              Math.abs(new Date(m.sentAt).getTime() - new Date(msg.payload.sentAt).getTime()) < 15000 // 15s de tolerância
+            );
+            if (idx !== -1) {
+              // Substituir a mensagem local pelo retorno do backend
+              const updated = [...prev];
+              updated[idx] = { ...msg.payload, status: 'sent' };
+              return updated;
+            }
+            // Se não achou similar, adiciona normalmente
+            return [...prev, msg.payload];
+          });
         }
       }
     };

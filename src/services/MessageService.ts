@@ -200,7 +200,7 @@ export async function sendFile(fileData: SendFileDto): Promise<MessageResponse> 
           fileName,
           mediaType,
           recipient: fileData.recipientPhone,
-          sector_id: fileData.sectorId,
+          sectorId: fileData.sectorId,
           caption: fileData.caption || '',
           userId: fileData.userId,
           isAnonymous: fileData.isAnonymous
@@ -223,7 +223,7 @@ export async function sendFile(fileData: SendFileDto): Promise<MessageResponse> 
           fileName,
           mediaType: 'audio/mpeg',
           recipient: fileData.recipientPhone,
-          sector_id: fileData.sectorId,
+          sectorId: fileData.sectorId,
           caption: fileData.caption || '',
           userId: fileData.userId,
           isAnonymous: fileData.isAnonymous
@@ -400,7 +400,7 @@ export const sendAudioMessage = async (
         fileName,
         mediaType: 'audio/wav',
         recipient,
-        sector_id: sectorId,
+        sectorId: sectorId,
         caption: '',
         userId: userId,
         isAnonymous: isAnonymous
