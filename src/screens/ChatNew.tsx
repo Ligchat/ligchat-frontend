@@ -10,7 +10,7 @@ import { getSector, Sector } from '../services/SectorService';
 import { getMessagesByContactId } from '../services/MessageService';
 import { AudioMessage } from '../components/AudioMessage';
 import { AudioRecorder } from '../components/AudioRecorder';
-import {  FiPhone, FiMoreVertical, FiUserPlus, FiTag, FiUsers } from 'react-icons/fi';
+import {  FiPhone, FiMoreVertical, FiUserPlus, FiTag, FiUsers, FiEdit2 } from 'react-icons/fi';
 import { getAllUsers, User } from '../services/UserService';
 import { getTags, Tag } from '../services/LabelService';
 import { useLocation } from 'react-router-dom';
@@ -18,6 +18,7 @@ import ChatWebSocketService from '../services/ChatWebSocketService';
 import { UserPlus } from 'lucide-react';
 import InputMask from 'react-input-mask';
 import { getUser } from '../services/UserService';
+import { AnimatePresence, motion } from 'framer-motion';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -45,13 +46,6 @@ const MicIcon = () => (
 const SendIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z" fill="currentColor"/>
-  </svg>
-);
-
-// Novo ícone para vídeo
-const VideoIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M21 3H3C1.9 3 1 3.9 1 5V19C1 20.1 1.9 21 3 21H21C22.1 21 23 20.1 23 19V5C23 3.9 22.1 3 21 3ZM9 17V7L16 12L9 17Z" fill="currentColor"/>
   </svg>
 );
 
@@ -333,8 +327,8 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
-  const contacts = externalContacts || [];
-  const setContacts = externalSetContacts || (() => {});
+  const contacts = useMemo(() => externalContacts || [], [externalContacts]);
+  const setContacts = useMemo(() => externalSetContacts || (() => {}), [externalSetContacts]);
   const [users, setUsers] = useState<User[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
@@ -359,7 +353,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
   const [selectedFilterUser, setSelectedFilterUser] = useState<number | null>(null);
   const [selectedFilterTag, setSelectedFilterTag] = useState<number | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | undefined>(undefined);
   const [showNewContactModal, setShowNewContactModal] = useState(false);
   const [newContactName, setNewContactName] = useState('');
   const [newContactNumber, setNewContactNumber] = useState('');
@@ -372,6 +366,9 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
   const [hasNewMessages, setLocalHasNewMessages] = useState<{ [contactId: number]: boolean }>(externalHasNewMessages || {});
   const [isAnonymous, setIsAnonymous] = useState(() => SessionService.getIsAnonymous());
   const [isCurrentUserAdmin, setIsCurrentUserAdmin] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState('');
+  const [newContactError, setNewContactError] = useState('');
 
   useEffect(() => {
     if (externalHasNewMessages) setLocalHasNewMessages(externalHasNewMessages);
@@ -502,7 +499,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     if (isMobile) {
       setShowSidebar(false);
     }
-  }, [selectedSectorId, isMobile]);
+  }, [selectedSectorId, isMobile, setContacts]);
 
   // Voltar para a lista de contatos (apenas mobile)
   const handleBackToContacts = () => {
@@ -573,10 +570,13 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         recipientPhone: selectedContact.number,
         contactId: contactId,
         sectorId: Number(selectedSectorId),
-        userId: currentUserId,
+        ...(currentUserId !== undefined ? { userId: currentUserId } : {}),
         isAnonymous: isCurrentUserAdmin ? isAnonymous : false
       });
 
+      if (currentUserId === undefined) {
+        throw new Error('Usuário não identificado');
+      }
       const response = await sendMessage({
         text: messageInput,
         to: selectedContact.number,
@@ -668,7 +668,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         recipientPhone: selectedContact.number,
         contactId: selectedContact.id,
         sectorId: Number(selectedSectorId),
-        userId: currentUserId,
+        ...(currentUserId !== undefined ? { userId: currentUserId } : {}),
         isAnonymous: isCurrentUserAdmin ? isAnonymous : false
       });
 
@@ -753,7 +753,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         selectedContact.number,
         selectedContact.id,
         Number(selectedSectorId),
-        currentUserId,
+        ...(currentUserId !== undefined ? [currentUserId] : []),
         isCurrentUserAdmin ? isAnonymous : false
       );
 
@@ -893,7 +893,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     };
 
     initializeData();
-  }, [selectedSectorId]);
+  }, [selectedSectorId, setContacts, setHasNewMessages]);
 
   const renderMessageStatus = (message: Message) => {
     if (message.status === 'sending') {
@@ -907,7 +907,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     }
   };
 
-  // Substituir o useEffect que faz polling de mensagens por um que só carrega ao selecionar contato
   useEffect(() => {
     const isInChatPage = location.pathname === '/chat';
     console.log('🔄 useEffect [location] - Verificando localização', { 
@@ -931,9 +930,10 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       );
     };
     handleScroll();
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.addEventListener('scroll', handleScroll);
-      return () => messagesContainerRef.current?.removeEventListener('scroll', handleScroll);
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
     }
   }, [messages]);
 
@@ -1244,23 +1244,19 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         }
         if (selectedContact && msg.payload.contactID === selectedContact.id) {
           setMessages(prev => {
-            // Se já existe pelo id, não adiciona
             if (prev.some(m => m.id === msg.payload.id)) return prev;
-            // Procurar mensagem local "sending" com mesmo conteúdo e contato
-            const now = Date.now();
+
             const idx = prev.findIndex(m =>
               m.status === 'sending' &&
               m.content === msg.payload.content &&
               m.contactID === msg.payload.contactID &&
-              Math.abs(new Date(m.sentAt).getTime() - new Date(msg.payload.sentAt).getTime()) < 15000 // 15s de tolerância
+              Math.abs(new Date(m.sentAt).getTime() - new Date(msg.payload.sentAt).getTime()) < 15000
             );
             if (idx !== -1) {
-              // Substituir a mensagem local pelo retorno do backend
               const updated = [...prev];
               updated[idx] = { ...msg.payload, status: 'sent' };
               return updated;
             }
-            // Se não achou similar, adiciona normalmente
             return [...prev, msg.payload];
           });
         }
@@ -1271,7 +1267,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     return () => {
       ChatWebSocketService.disconnect();
     };
-  }, [selectedContact, selectedSectorId, updateHasNewMessages]);
+  }, [selectedContact, selectedSectorId, updateHasNewMessages, setContacts]);
 
   useEffect(() => {
     if (selectedContact) {
@@ -1313,7 +1309,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         const userId = decodedToken ? decodedToken.userId : null;
         if (!userId) return;
         setCurrentUserId(Number(userId));
-        const response = await getUser(userId);
+        const response:any = await getUser(userId);
         setIsCurrentUserAdmin(!!response.data.isAdmin);
       } catch (error) {}
     };
@@ -1377,6 +1373,41 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       return timeB - timeA;
     });
   }, [contacts]);
+
+  const handleEditName = () => {
+    setEditedName(selectedContact?.name || '');
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!selectedContact || !editedName.trim()) return;
+    try {
+      await updateContact(selectedContact.id, {
+        name: editedName.trim(),
+        email: selectedContact.email,
+        phoneWhatsapp: selectedContact.number,
+        notes: selectedContact.notes,
+        sectorId: selectedContact.sectorId,
+        isActive: selectedContact.isActive,
+        priority: selectedContact.priority,
+        aiActive: selectedContact.aiActive,
+        assignedTo: selectedContact.assignedTo,
+        tagId: selectedContact.tagId,
+        avatarUrl: selectedContact.avatarUrl
+      });
+      const updatedContact = { ...selectedContact, name: editedName.trim() };
+      setSelectedContact(updatedContact);
+      setContacts(prevContacts => prevContacts.map(contact => contact.id === selectedContact.id ? updatedContact : contact));
+      setIsEditingName(false);
+    } catch (error) {
+      setIsEditingName(false);
+    }
+  };
+
+  const handleCancelEditName = () => {
+    setIsEditingName(false);
+    setEditedName('');
+  };
 
   return (
     <div className="chat-new-container dark-mode">
@@ -1497,8 +1528,11 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
                 <div className="chat-new-header-info">
                   <div className="chat-new-header-group">
                     <div className="chat-new-header-left">
-                      <span className="chat-new-header-name">
+                      <span className="chat-new-header-name" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         {selectedContact.name}
+                        <button onClick={handleEditName} style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', padding: 0, marginLeft: 4, display: 'flex', alignItems: 'center' }} title="Editar nome">
+                          <FiEdit2 size={16} />
+                        </button>
                       </span>
                       {selectedContact.number && (
                         <span className="chat-new-header-phone">
@@ -1584,18 +1618,43 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
                   </div>
                 )}
                 {isCurrentUserAdmin && (
-                  <label style={{ display: 'flex', alignItems: 'center', marginRight: 16, gap: 4 }}>
-                    <input
-                      type="checkbox"
-                      checked={isAnonymous}
-                      onChange={e => {
-                        setIsAnonymous(e.target.checked);
-                        SessionService.setIsAnonymous(e.target.checked);
-                      }}
-                      style={{ marginRight: 4 }}
-                    />
-                    Mensagem anônima
-                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', marginRight: 16, gap: 8 }}>
+                    <span style={{ color: '#e0e0e0', fontSize: 14 }}>Mensagem anônima</span>
+                    <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={isAnonymous}
+                        onChange={e => {
+                          setIsAnonymous(e.target.checked);
+                          SessionService.setIsAnonymous(e.target.checked);
+                        }}
+                        style={{ opacity: 0, width: 0, height: 0 }}
+                      />
+                      <span style={{
+                        position: 'absolute',
+                        cursor: 'pointer',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: isAnonymous ? '#3b82f6' : '#444',
+                        borderRadius: 24,
+                        transition: 'background 0.2s',
+                        boxShadow: isAnonymous ? '0 0 4px #3b82f6' : 'none'
+                      }}></span>
+                      <span style={{
+                        position: 'absolute',
+                        left: isAnonymous ? 22 : 2,
+                        top: 2,
+                        width: 20,
+                        height: 20,
+                        background: '#fff',
+                        borderRadius: '50%',
+                        transition: 'left 0.2s',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.15)'
+                      }}></span>
+                    </label>
+                  </div>
                 )}
               </div>
             </div>
@@ -1866,7 +1925,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       {/* Modal Novo Contato */}
       {showNewContactModal && selectedSectorId && (
         <div className="chat-new-modal">
-          <div className="chat-new-modal-content">
+          <div className="chat-new-modal-content" style={{ background: '#1a1a1a', border: '1.5px solid #23272f' }}>
             <div className="chat-new-modal-header">
               <h3 className="chat-new-modal-title">Novo contato</h3>
             </div>
@@ -1878,13 +1937,19 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
                 onChange={e => setNewContactName(e.target.value)}
                 disabled={isCreatingContact}
               />
+              
+
               <InputMask
                 mask="+55 (99) 99999-9999"
                 value={newContactNumber}
-                onChange={e => setNewContactNumber(e.target.value)}
+                onChange={e => {
+                  setNewContactNumber(e.target.value);
+                  setNewContactError('');
+                }}
                 disabled={isCreatingContact}
               >
-                {(inputProps) => (
+                {/* @ts-ignore */}
+                {(inputProps: any) => (
                   <input
                     {...inputProps}
                     className="chat-new-modal-input"
@@ -1893,6 +1958,14 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
                   />
                 )}
               </InputMask>
+              {(() => {
+                const cleanNumber = newContactNumber.replace(/\D/g, '').slice(0, 15);
+                const exists = contacts.some(c => c.number.replace(/\D/g, '').slice(0, 15) === cleanNumber);
+                if (exists && newContactNumber.trim()) {
+                  return <div style={{ color: '#ef4444', marginTop: 6, fontSize: 14 }}>Já existe um contato com esse número.</div>;
+                }
+                return null;
+              })()}
             </div>
             <div className="chat-new-modal-actions">
               <button
@@ -1909,10 +1982,15 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
               <button
                 className="chat-new-modal-button confirm"
                 onClick={async () => {
+                  const cleanNumber = newContactNumber.replace(/\D/g, '').slice(0, 15);
+                  const exists = contacts.some(c => c.number.replace(/\D/g, '').slice(0, 15) === cleanNumber);
+                  if (exists) {
+                    setNewContactError('Já existe um contato com esse número.');
+                    return;
+                  }
                   if (!newContactName.trim() || !newContactNumber.trim() || !selectedSectorId) return;
                   setIsCreatingContact(true);
                   try {
-                    const cleanNumber = newContactNumber.replace(/\D/g, '').slice(0, 15);
                     const created = await createContact({ name: newContactName, phoneNumber: cleanNumber, email: '', sectorId: Number(selectedSectorId) });
                     if (created && created.id) {
                       setContacts(prev => [...prev, { ...created, is_viewed: true }]);
@@ -1920,12 +1998,13 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
                       setShowNewContactModal(false);
                       setNewContactName('');
                       setNewContactNumber('');
+                      setNewContactError('');
                     }
                   } finally {
                     setIsCreatingContact(false);
                   }
                 }}
-                disabled={isCreatingContact || !newContactName.trim() || !newContactNumber.trim()}
+                disabled={isCreatingContact || !newContactName.trim() || !newContactNumber.trim() || contacts.some(c => c.number.replace(/\D/g, '').slice(0, 15) === newContactNumber.replace(/\D/g, '').slice(0, 15))}
               >
                 {isCreatingContact ? 'Criando...' : 'Iniciar conversa'}
               </button>
@@ -2062,6 +2141,116 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           </div>
         </div>
       )}
+      <AnimatePresence>
+        {isEditingName && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              background: 'rgba(0,0,0,0.32)',
+              zIndex: 2000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onClick={handleCancelEditName}
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              transition={{ duration: 0.22 }}
+              style={{
+                background: '#1a1a1a',
+                borderRadius: 16,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.28)',
+                padding: '36px 32px 28px 32px',
+                minWidth: 340,
+                maxWidth: '92vw',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                position: 'relative',
+                border: '1.5px solid #23272f'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ fontWeight: 700, fontSize: 21, color: '#e2e8f0', marginBottom: 20, letterSpacing: 0.2 }}>Editar nome do contato</div>
+              <input
+                type="text"
+                value={editedName}
+                onChange={e => setEditedName(e.target.value)}
+                maxLength={40}
+                style={{
+                  fontSize: 16,
+                  padding: '12px 16px',
+                  borderRadius: 10,
+                  border: '1.5px solid #23272f',
+                  background: '#23272f',
+                  color: '#e2e8f0',
+                  minWidth: 200,
+                  maxWidth: 280,
+                  marginBottom: 22,
+                  outline: 'none',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
+                  transition: 'border 0.2s, box-shadow 0.2s'
+                }}
+                autoFocus
+              />
+              <div style={{ display: 'flex', gap: 14 }}>
+                <button
+                  onClick={handleSaveName}
+                  style={{
+                    background: '#3b82f6',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '10px 28px',
+                    fontWeight: 600,
+                    fontSize: 15,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(59,130,246,0.10)',
+                    transition: 'background 0.18s, box-shadow 0.18s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = '#2563eb'}
+                  onMouseOut={e => e.currentTarget.style.background = '#3b82f6'}
+                >Salvar</button>
+                <button
+                  onClick={handleCancelEditName}
+                  style={{
+                    background: 'transparent',
+                    color: '#e2e8f0',
+                    border: '1.5px solid #23272f',
+                    borderRadius: 10,
+                    padding: '10px 28px',
+                    fontWeight: 500,
+                    fontSize: 15,
+                    cursor: 'pointer',
+                    transition: 'background 0.18s, color 0.18s, border 0.18s'
+                  }}
+                  onMouseOver={e => {
+                    e.currentTarget.style.background = '#23272f';
+                    e.currentTarget.style.color = '#60a5fa';
+                    e.currentTarget.style.border = '1.5px solid #3b82f6';
+                  }}
+                  onMouseOut={e => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = '#e2e8f0';
+                    e.currentTarget.style.border = '1.5px solid #23272f';
+                  }}
+                >Cancelar</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

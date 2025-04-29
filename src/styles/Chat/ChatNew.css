@@ -585,6 +585,18 @@
   box-shadow: 0 2px 8px rgba(59,130,246,0.10);
 }
 
+.chat-new-modal-button.confirm[disabled] {
+  background: rgba(59,130,246,0.35);
+  color: #b0b8c9;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.chat-new-modal-button.confirm[disabled]:hover {
+  background: rgba(59,130,246,0.35);
+  color: #b0b8c9;
+}
+
 .chat-new-modal-button.cancel {
   background-color: transparent;
   color: #6b7280;

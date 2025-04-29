@@ -10,6 +10,8 @@ interface ApiResponse<T> {
 
 // Interface para o contato
 export interface Contact {
+  isViewed: boolean;
+  is_viewed: any;
   id: number;
   name: string;
   tagId: number | null;

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import dayjs, { Dayjs } from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
 import Picker from '@emoji-mart/react';
 import {
   createMessageScheduling,
@@ -12,8 +13,10 @@ import { getTags, Tag } from '../services/LabelService';
 import { getContacts, Contact } from '../services/ContactService';
 import SessionService from '../services/SessionService';
 import './MessageSchedule.css';
-import Toast from '../components/Toast';
+import Toast, { ToastContainer } from '../components/Toast';
 import { useNavigate } from 'react-router-dom';
+
+dayjs.extend(customParseFormat);
 
 // Definindo explicitamente a interface CreateMessageSchedulingDTO para corrigir o erro de tipo
 interface CreateMessageSchedulingDTO {
@@ -366,6 +369,7 @@ const TimeSelector: React.FC<{
 
 export const MessageSchedule: React.FC<MessageScheduleProps & {
   initialData?: {
+    id?: number
     messageText: string;
     selectedDate: dayjs.Dayjs | null;
     selectedTime: dayjs.Dayjs | null;
@@ -709,48 +713,34 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
   // Salvar agendamento
   const handleSave = async () => {
     try {
-      // Validar campos
-    if (!selectedDate || !selectedTime) {
+      if (!selectedDate || !selectedTime) {
         addLocalToast('Selecione data e hora para o agendamento', 'error');
-      return;
-    }
-
-      // Verificar se há texto ou anexos
+        return;
+      }
       if (!messageText.trim() && attachments.length === 0) {
         addLocalToast('Adicione uma mensagem ou anexo', 'error');
-      return;
-    }
-
-      // Verificar se há contatos disponíveis
+        return;
+      }
       if (contacts.length === 0) {
         addLocalToast('Não há contatos disponíveis neste setor', 'error');
-      return;
-    }
-
-      // Verificar se há um contato selecionado
+        return;
+      }
       if (!selectedContactId) {
         addLocalToast('Selecione um contato', 'error');
-      return;
-    }
-
+        return;
+      }
       setIsSaving(true);
-      
-      // Combinar data e hora
       const combinedDate = selectedDate
-      .hour(selectedTime.hour())
-      .minute(selectedTime.minute())
+        .hour(selectedTime.hour())
+        .minute(selectedTime.minute())
         .second(0);
-      
       const token = SessionService.getToken();
       const sectorId = SessionService.getSectorId();
-      
       if (!token || !sectorId) {
         addLocalToast('Erro de autenticação', 'error');
         setIsSaving(false);
         return;
       }
-      
-      // Preparar dto
       const dto: CreateMessageSchedulingDTO = {
         name: `Agendamento para ${contacts.find(c => c.id === selectedContactId)?.name || 'Contato'}`,
         messageText,
@@ -766,17 +756,17 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
           mimeType: att.mimeType
         }))
       };
-      
-      // Enviar para API
-      await createMessageScheduling(dto);
-      
-      // Limpar campos
+      if (initialData?.id) {
+        await updateMessageScheduling(initialData.id, dto);
+        addToast('Agendamento atualizado com sucesso', 'success');
+      } else {
+        await createMessageScheduling(dto);
+        addToast('Mensagem agendada com sucesso', 'success');
+      }
       setMessageText('');
       setSelectedDate(null);
       setSelectedTime(null);
       setAttachments([]);
-      
-      addToast('Mensagem agendada com sucesso', 'success');
       onSave();
       onClose();
     } catch (error) {
@@ -1072,23 +1062,16 @@ export const MessageSchedule: React.FC<MessageScheduleProps & {
           </div>
         )}
         
-        {/* Toasts */}
-        <div className="toast-container">
+        <ToastContainer>
           {toasts.map(toast => (
-            <div 
+            <Toast
               key={toast.id}
-              className={`toast toast-${toast.type}`}
-            >
-              {toast.message}
-              <button 
-                className="toast-close"
-                onClick={() => removeToast(toast.id)}
-              >
-                ×
-              </button>
-            </div>
+              message={toast.message}
+              type={toast.type}
+              onClose={() => removeToast(toast.id)}
+            />
           ))}
-        </div>
+        </ToastContainer>
       </div>
     );
   };
@@ -1375,13 +1358,17 @@ const MessageScheduleScreen: React.FC = () => {
           console.log(`Encontradas ${messagesResponse.length} mensagens agendadas`);
           
         const formattedMessages = messagesResponse.map(msg => {
-            // Encontrar o contato correspondente, se disponível
             const messageContact = contactsResponse.data?.find(c => c.id === (msg.contactId || msg.contact_id));
           
+          // Log para depuração
+          console.log('Agendamento recebido:', msg);
+          const dateObj = dayjs(msg.sendDate, 'DD/MM/YYYY HH:mm:ss');
+          console.log('Parsing sendDate:', msg.sendDate, '->', dateObj.format(), 'isValid:', dateObj.isValid());
+
           return {
             id: msg.id,
               title: msg.name || "Sem título",
-            date: new Date(msg.sendDate).getTime(),
+            date: dateObj.isValid() ? dateObj.valueOf() : null,
               description: msg.messageText || "",
             labels: msg.tagIds ? msg.tagIds.split(',') : [],
               contactId: msg.contactId || msg.contact_id || null,
@@ -1482,11 +1469,12 @@ const MessageScheduleScreen: React.FC = () => {
         const data = await getMessageScheduling(message.id!);
         console.log("Dados recebidos do agendamento:", data);
         
-        const dateObj = dayjs(data.sendDate);
+        const dateObj = dayjs(data.sendDate, 'DD/MM/YYYY HH:mm:ss');
+        console.log('Abrindo drawer - sendDate:', data.sendDate, '->', dateObj.format(), 'isValid:', dateObj.isValid());
         setNewMessage({
           id: data.id,
           title: data.name,
-          date: dateObj.valueOf(),
+          date: dateObj.isValid() ? dateObj.valueOf() : null,
           description: data.messageText,
           labels: data.tagIds ? data.tagIds.split(',') : [],
           contactId: data.contactId ?? data.contact_id ?? null,
@@ -1511,6 +1499,7 @@ const MessageScheduleScreen: React.FC = () => {
         
         // Configurar os dados iniciais para o drawer
         setDrawerInitialData({
+          id: data.id,
           messageText: data.messageText,
           selectedDate: dateObj,
           selectedTime: dateObj,
@@ -1718,7 +1707,7 @@ const MessageScheduleScreen: React.FC = () => {
 
       {renderDrawer()}
 
-      <div className="toast-container">
+      <ToastContainer>
         {toasts.map(toast => (
           <Toast
             key={toast.id}
@@ -1727,7 +1716,7 @@ const MessageScheduleScreen: React.FC = () => {
             onClose={() => removeToast(toast.id)}
           />
         ))}
-      </div>
+      </ToastContainer>
     </div>
   );
 };

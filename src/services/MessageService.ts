@@ -43,7 +43,7 @@ export interface SendMessageDto {
   text: string;
   contactId: number;
   sectorId: number;
-  userId?: number;
+  userId: number;
   isAnonymous?: boolean;
 }
 

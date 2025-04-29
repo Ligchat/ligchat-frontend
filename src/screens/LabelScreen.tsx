@@ -517,7 +517,7 @@ const LabelScreen = () => {
                 isDeleting={isDeletingTag}
             />
 
-            <div className="ls-toast-container">
+            <div>
                 {toasts.map(toast => (
                     <Toast
                         key={toast.id}

@@ -4,6 +4,7 @@ import { FiEdit2, FiTrash2, FiPlus, FiX, FiFolder, FiCheckCircle, FiLoader } fro
 import { createSector, updateSector, deleteSector, getSectors, getWhatsAppStatus, getWhatsAppQRCode } from '../services/SectorService';
 import SessionService from '../services/SessionService';
 import Toast from '../components/Toast';
+import { ToastContainer } from '../components/Toast';
 import './SectorsPage.css';
 
 interface Sector {
@@ -684,7 +685,7 @@ const SectorsPage: React.FC = () => {
         </div>
       )}
 
-      <div className="toast-container">
+      <ToastContainer>
         {toasts.map(toast => (
           <Toast
             key={toast.id}
@@ -693,7 +694,7 @@ const SectorsPage: React.FC = () => {
             onClose={() => removeToast(toast.id)}
           />
         ))}
-      </div>
+      </ToastContainer>
     </div>
   );
 };

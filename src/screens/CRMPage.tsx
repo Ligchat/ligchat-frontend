@@ -49,6 +49,7 @@ import { getTags, Tag as ApiTag } from '../services/LabelService';
 import Toast from '../components/Toast';
 import { getAllUsers, User } from '../services/UserService';
 import { getContacts, updateContact, UpdateContactRequestDTO } from '../services/ContactService';
+import { ToastContainer } from '../components/Toast';
 
 interface Column {
   id: string;
@@ -548,34 +549,33 @@ const CRMPage: React.FC = () => {
         const cardToMove = sourceColumn.cards.find(card => card.id === cardId);
         if (!cardToMove) return;
 
-        // Calcula a nova posição do card
         let newPosition;
+        let insertIndex;
         if (sourceColumnId === targetColumnId) {
-          // Se for na mesma coluna, usa o índice do card alvo
           const targetCard = targetColumn.cards.find(card => card.id === targetPosition);
           const targetIndex = targetColumn.cards.indexOf(targetCard!);
           newPosition = targetIndex + 1;
+          insertIndex = targetIndex;
         } else {
-          // Se for em coluna diferente, usa a posição passada ou o final da coluna
-          newPosition = parseInt(targetPosition) || targetColumn.cards.length + 1;
+          const targetCard = targetColumn.cards.find(card => card.id === targetPosition);
+          if (targetCard) {
+            const targetIndex = targetColumn.cards.indexOf(targetCard);
+            newPosition = targetIndex + 1;
+            insertIndex = targetIndex;
+          } else {
+            newPosition = 1;
+            insertIndex = 0;
+          }
         }
 
-        // Atualiza imediatamente a UI
         const newColumns = columns.map(col => ({...col, cards: [...col.cards]}));
-        
-        // Remove o card da coluna de origem
         const sourceColIndex = newColumns.findIndex(col => col.id === sourceColumnId);
         newColumns[sourceColIndex].cards = newColumns[sourceColIndex].cards.filter(card => card.id !== cardId);
-        
-        // Adiciona o card na coluna de destino na posição correta
         const destColIndex = newColumns.findIndex(col => col.id === targetColumnId);
-        newColumns[destColIndex].cards.splice(newPosition - 1, 0, cardToMove);
-        
+        newColumns[destColIndex].cards.splice(insertIndex, 0, cardToMove);
         setColumns(newColumns);
 
-        // Atualiza no backend
         await moveCard(cardId, parseInt(targetColumnId), newPosition);
-        addToast('Card movido com sucesso', 'success');
       } catch (error) {
         console.error('Erro ao mover card:', error);
         setColumns(columns);
@@ -991,7 +991,7 @@ const CRMPage: React.FC = () => {
           )}
         </div>
         <div className="card-title">
-          {card.title}
+          <span>{card.title}</span>
           {getAssigneeInitials() && (
             <div className="card-assignee">
               <span className="assignee-initials">{getAssigneeInitials()}</span>
@@ -1088,7 +1088,7 @@ const CRMPage: React.FC = () => {
             )}
           </div>
           <div className="card-title">
-            {card.title}
+            <span>{card.title}</span>
             {getAssigneeInitials() && (
               <div className="card-assignee">
                 <span className="assignee-initials">{getAssigneeInitials()}</span>
@@ -1462,7 +1462,7 @@ const CRMPage: React.FC = () => {
           )}
         </div>
         
-        <div className="toast-container">
+        <ToastContainer>
           {toasts.map(toast => (
             <Toast
               key={toast.id}
@@ -1471,7 +1471,7 @@ const CRMPage: React.FC = () => {
               onClose={() => removeToast(toast.id)}
             />
           ))}
-        </div>
+        </ToastContainer>
       </div>
     </div>
   );

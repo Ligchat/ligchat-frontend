@@ -4,6 +4,7 @@ import { getSector, getSectors, Sector } from '../services/SectorService';
 import SessionService from '../services/SessionService';
 import { useNavigate } from 'react-router-dom';
 import Toast from '../components/Toast';
+import { ToastContainer } from '../components/Toast';
 import { FiEdit2, FiTrash2, FiPlus, FiX, FiCheck, FiUser, FiMail, FiToggleRight, FiToggleLeft, FiChevronDown } from 'react-icons/fi';
 import './AccessPage.css';
 
@@ -716,7 +717,7 @@ const AccessPage: React.FC = () => {
         </div>
       )}
 
-      <div className="ap-toast-container">
+      <ToastContainer>
         {toasts.map(toast => (
           <Toast
             key={toast.id}
@@ -725,7 +726,7 @@ const AccessPage: React.FC = () => {
             onClose={() => removeToast(toast.id)}
           />
         ))}
-      </div>
+      </ToastContainer>
     </div>
   );
 };

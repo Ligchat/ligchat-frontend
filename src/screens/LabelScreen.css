@@ -1019,14 +1019,6 @@
   border-color: #00c2ff;
 }
 
-.ls-toast-container {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 9999;
-  pointer-events: none;
-}
-
 .spin {
   animation: spin 1s linear infinite;
   display: inline-block;

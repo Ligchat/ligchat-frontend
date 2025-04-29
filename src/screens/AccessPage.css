@@ -849,16 +849,6 @@
     }
 }
 
-.ap-toast-container {
-    position: fixed;
-    top: 2rem;
-    right: 2rem;
-    z-index: 2000;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    align-items: flex-end;
-}
 
 .ap-spinner-btn {
     width: 18px;
@@ -872,12 +862,6 @@
     vertical-align: middle;
 }
 
-@media (max-width: 600px) {
-    .ap-toast-container {
-        top: 1rem;
-        right: 1rem;
-    }
-}
 
 .ap-content-loading {
     display: flex;

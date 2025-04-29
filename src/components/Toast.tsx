@@ -49,18 +49,18 @@ const Toast: React.FC<ToastProps> = ({
     };
 
     return (
-        <div className={`toast ${type}`}>
-            <div className="toast-content">
-                <div className="toast-icon">
+        <div className={`lig-toast lig-toast-${type}`}> 
+            <div className="lig-toast-content">
+                <div className="lig-toast-icon">
                     {getIcon()}
                 </div>
-                <div className="toast-message">{message}</div>
-                <button className="toast-close" onClick={onClose}>
+                <div className="lig-toast-message">{message}</div>
+                <button className="lig-toast-close" onClick={onClose}>
                     <FiX />
                 </button>
             </div>
             <div 
-                className={`toast-progress ${isClosing ? 'closing' : ''}`}
+                className={`lig-toast-progress${isClosing ? ' closing' : ''}`}
                 style={{ transitionDuration: `${duration}ms` }}
             />
         </div>
@@ -72,7 +72,7 @@ export const ToastContainer: React.FC<{
     style?: React.CSSProperties;
 }> = ({ children, style }) => {
     return (
-        <div className="toast-container" style={style}>
+        <div className="lig-toast-container" style={style}>
             {children}
         </div>
     );

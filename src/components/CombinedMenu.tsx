@@ -34,14 +34,7 @@ interface ViewedStatus {
     [contactId: number]: boolean;
 }
 
-// Define interface for ChatNew component props
-interface ChatNewProps {
-    key?: string;
-    hasNewMessages?: UnreadMessagesState;
-    setHasNewMessages?: (newState: UnreadMessagesState) => void;
-    contacts?: any[];
-    setContacts?: React.Dispatch<React.SetStateAction<any[]>>;
-}
+
 
 const PROFILE_UPDATED_EVENT = 'profileUpdated';
 

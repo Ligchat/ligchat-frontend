@@ -18,6 +18,8 @@ export interface SendTextMessageDTO {
   sector_id: number;
   recipient: string;
   message: string;
+  userId?: number;
+  isAnonymous?: boolean;
 }
 
 export interface SendImageDTO {
@@ -26,7 +28,9 @@ export interface SendImageDTO {
   mediaType: string;
   recipient: string;
   sectorId: number;
-  caption: string;
+  caption?: string;
+  userId?: number;
+  isAnonymous?: boolean;
 }
 
 export interface SendDocumentDTO {
@@ -35,7 +39,9 @@ export interface SendDocumentDTO {
   mediaType: string;
   recipient: string;
   sectorId: number;
-  caption: string;
+  caption?: string;
+  userId?: number;
+  isAnonymous?: boolean;
 }
 
 export interface SendMediaMessageDTO {
@@ -44,7 +50,9 @@ export interface SendMediaMessageDTO {
   mediaType: string;
   recipient: string;
   sectorId: number;
-  caption: string;
+  caption?: string;
+  userId?: number;
+  isAnonymous?: boolean;
 }
 
 export const sendTextMessage = async (data: SendTextMessageDTO): Promise<UnofficialMessageResponse> => {
