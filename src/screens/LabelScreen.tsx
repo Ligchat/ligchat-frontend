@@ -6,7 +6,7 @@ import { Tag, createTag, getTags, updateTag, deleteTag } from '../services/Label
 import { getSectors, Sector } from '../services/SectorService';
 import SessionService from '../services/SessionService';
 import './LabelScreen.css';
-import Toast from '../components/Toast';
+import Toast, { ToastContainer } from '../components/Toast';
 
 // Extended color palette with 54 colors
 const PRESET_COLORS = [
@@ -366,14 +366,14 @@ const LabelScreen = () => {
                 if (editing < tags.length) {
                     await updateTag(tags[editing].id, tagData);
                     addToast('Etiqueta atualizada com sucesso!', 'success');
-                } else {
-                    await createTag(tagData);
-                    addToast('Etiqueta criada com sucesso!', 'success');
                 }
-
-                await fetchTags();
-                handleCloseModal();
+            } else {
+                await createTag(tagData);
+                addToast('Etiqueta criada com sucesso!', 'success');
             }
+
+            await fetchTags();
+            handleCloseModal();
         } catch (error) {
             console.error('Erro ao salvar etiqueta:', error);
             setErrors({ title: 'Erro ao salvar a etiqueta. Tente novamente.' });
@@ -405,8 +405,7 @@ const LabelScreen = () => {
     };
 
     const handleAddNew = () => {
-        console.log('handleAddNew chamado');
-        setEditing(tags.length);
+        setEditing(null);
         setNewTitle('');
         setNewDescription('');
         setSelectedColor(PRESET_COLORS[0]);
@@ -436,6 +435,7 @@ const LabelScreen = () => {
                     {isLoading && SessionService.getSectorId() ? (
                         <div className="ls-loading">
                             <div className="ls-spinner" />
+                            <span className="ls-loading-text">Carregando etiquetas...</span>
                         </div>
                     ) : !SessionService.getSectorId() ? (
                         <div className="ls-no-sector">
@@ -517,7 +517,7 @@ const LabelScreen = () => {
                 isDeleting={isDeletingTag}
             />
 
-            <div>
+            <ToastContainer>
                 {toasts.map(toast => (
                     <Toast
                         key={toast.id}
@@ -526,7 +526,7 @@ const LabelScreen = () => {
                         onClose={() => removeToast(toast.id)}
                     />
                 ))}
-            </div>
+            </ToastContainer>
         </>
     );
 };
