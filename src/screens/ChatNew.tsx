@@ -180,6 +180,7 @@ interface OriginalContactData {
   lastMessageTime?: string;
   unreadCount?: number;
   is_viewed: boolean;
+  order?: number;
 }
 
 interface Message extends MessageResponse {
@@ -285,6 +286,8 @@ const RenderContacts = React.memo(({
   tags: Tag[],
   hasNewMessages: { [contactId: number]: boolean }
 }) => {
+  // Remover log que causa muitas saídas no console
+  // console.log('👀 [ChatNew] Contatos renderizados:', contacts.map(c => ({id: c.id, order: c.order, name: c.name})));
   if (contacts.length === 0) {
     return (
       <div className="contacts-empty-state">
@@ -298,7 +301,6 @@ const RenderContacts = React.memo(({
       </div>
     );
   }
-  
   return (
     <div className="contacts-list">
       {contacts.map((contact) => (
@@ -369,29 +371,41 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [newContactError, setNewContactError] = useState('');
+  const prevExternalHasNewMessages = React.useRef(externalHasNewMessages);
+  // 1. Controle refinado de carregamento e paginação
+  const loadingRef = useRef(false);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const prevSectorId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (externalHasNewMessages) setLocalHasNewMessages(externalHasNewMessages);
+    if (
+      externalHasNewMessages &&
+      JSON.stringify(externalHasNewMessages) !== JSON.stringify(prevExternalHasNewMessages.current)
+    ) {
+      setLocalHasNewMessages(externalHasNewMessages);
+      prevExternalHasNewMessages.current = externalHasNewMessages;
+    }
   }, [externalHasNewMessages]);
 
   const updateHasNewMessages = useCallback((updater: (prev: { [contactId: number]: boolean }) => { [contactId: number]: boolean }) => {
     setLocalHasNewMessages(prev => {
       const updated = updater(prev);
-      if (setHasNewMessages) setHasNewMessages(updated);
+      // Notificar o pai de forma segura, sem criar loop
+      if (setHasNewMessages) {
+        setTimeout(() => setHasNewMessages(updated), 0);
+      }
       return updated;
     });
   }, [setHasNewMessages]);
 
   const loadMessages = useCallback(async (contactId: number, pageParam = 0, append = false) => {
-    console.log('🔄 loadMessages - Iniciando carregamento de mensagens', { contactId, pageParam, append });
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     if (append) setIsLoadingMore(true);
-    else setIsMessagesLoading(true);
+    else if (pageParam === 0) setIsMessagesLoading(true);
     try {
       const offset = pageParam * MESSAGES_PAGE_SIZE;
-      console.log('📝 loadMessages - Chamando API getMessagesByContactId', { contactId, limit: MESSAGES_PAGE_SIZE, offset });
       const response = await getMessagesByContactId(contactId, MESSAGES_PAGE_SIZE, offset);
-      console.log('✅ loadMessages - Resposta da API', { response, length: Array.isArray(response) ? response.length : 0 });
-      
       const newMessages = Array.isArray(response) ? response : [];
       newMessages.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
       setHasMore(newMessages.length === MESSAGES_PAGE_SIZE);
@@ -400,21 +414,27 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       } else {
         setMessages(newMessages);
       }
+      setInitialLoad(false);
     } catch (error) {
       console.error('❌ loadMessages - Erro ao carregar mensagens:', error);
     } finally {
       if (append) setIsLoadingMore(false);
-      else setIsMessagesLoading(false);
+      else if (pageParam === 0) setIsMessagesLoading(false);
+      loadingRef.current = false;
     }
-  }, []);
+  }, [setMessages, setHasMore]);
 
+  // 2. Efeito para carregar mensagens só quando o id do contato muda
+  const prevContactId = useRef<number | null>(null);
   useEffect(() => {
-    if (selectedContact) {
-      console.log('🔄 useEffect [selectedContact] - Carregando mensagens para novo contato', { contactId: selectedContact.id });
+    if (selectedContact && selectedContact.id !== prevContactId.current) {
+      prevContactId.current = selectedContact.id;
       setPage(0);
+      setInitialLoad(true);
       loadMessages(selectedContact.id, 0, false);
     }
-  }, [selectedContact, loadMessages]);
+    // eslint-disable-next-line
+  }, [selectedContact?.id]);
 
   // Verificar se há um setor selecionado na sessão
   useEffect(() => {
@@ -491,8 +511,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       ));
       setPage(0);
       setSelectedContact({ ...contact });
-      // Marcar como visualizado na API
-      await markContactAsViewed(Number(selectedSectorId), contact.id);
     } catch (error) {
       console.error('❌ handleContactSelect - Erro ao selecionar contato:', error);
     }
@@ -562,6 +580,14 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     // Atualizar mensagens apenas adicionando a nova
     setMessages(prev => [...prev, newMessage]);
     setMessageInput('');
+    
+    // Garantir que o contato atual não seja marcado como não lido quando enviamos mensagem
+    if (selectedContact) {
+      updateHasNewMessages(prev => ({
+        ...prev,
+        [selectedContact.id]: false
+      }));
+    }
 
     try {
       console.log('🔄 handleSendMessage - Enviando mensagem para a API', {
@@ -592,9 +618,11 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       // Atualizar mensagem com resposta da API
       setMessages(prev => prev.map(msg => 
         msg.id === tempId && msg.contactID === contactId
-          ? { ...response, status: 'sent', contactID: contactId }
+          ? { ...response, status: 'sent', contactID: contactId, isSent: true }
           : msg
       ));
+
+      await markContactAsViewed(Number(selectedSectorId), contactId);
 
     } catch (error) {
       console.error('❌ handleSendMessage - Erro ao enviar mensagem:', error);
@@ -690,6 +718,8 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           : contact
       ));
 
+      await markContactAsViewed(Number(selectedSectorId), selectedContact.id);
+
     } catch (error) {
       console.error('❌ handleFileSelected - Erro ao enviar arquivo:', error);
       setMessages(prev => prev.map(msg => 
@@ -780,6 +810,8 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           : contact
       ));
 
+      await markContactAsViewed(Number(selectedSectorId), selectedContact.id);
+
     } catch (error) {
       console.error('❌ handleSendAudio - Erro ao enviar áudio:', error);
       setMessages(prev => prev.map(msg => 
@@ -796,13 +828,13 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       console.log('🔄 initializeData - Iniciando carregamento de dados', { selectedSectorId });
       if (!selectedSectorId) {
         console.log('❌ initializeData - Sem setor selecionado, limpando contatos');
-        setContacts([]);
+        if (setContacts) setContacts([]);
         return;
       }
       setIsContactsLoading(true);
       try {
-        console.log('🔄 initializeData - Buscando usuários, tags e contatos');
-        const [users, tagsResponse, contactsResponse] = await Promise.all([
+        console.log('🔄 initializeData - Buscando usuários e tags');
+        const [users, tagsResponse] = await Promise.all([
           getAllUsers().catch(error => {
             console.error('❌ initializeData - Erro ao buscar usuários:', error);
             return [];
@@ -810,10 +842,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           getTags(Number(selectedSectorId)).catch(error => {
             console.error('❌ initializeData - Erro ao buscar tags:', error);
             return { data: [] };
-          }),
-          getContacts(Number(selectedSectorId)).catch(error => {
-            console.error('❌ initializeData - Erro ao buscar contatos:', error);
-            return null;
           })
         ]);
 
@@ -829,63 +857,20 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           setTags([]);
         }
 
-        console.log('✅ initializeData - Contatos obtidos:', contactsResponse);
-        if (contactsResponse?.data && Array.isArray(contactsResponse.data)) {
-          const currentContactsMap = new Map(contacts.map(contact => [contact.id, contact]));
-          
-          // Obtém o ID do usuário atual
-          const token = SessionService.getToken();
-          const decodedToken = token ? SessionService.decodeToken(token) : null;
-          const userId = decodedToken ? decodedToken.userId : null;
-          console.log('🔄 initializeData - Usuário atual:', { userId });
-          
-          // Converter userId para número para garantir uma comparação correta
-          const currentUserIdNum = userId ? Number(userId) : null;
-          console.log('🔄 initializeData - Usuário atual (número):', { currentUserIdNum });
-          
-          const updatedContacts = contactsResponse.data.map(contact => {
-            const is_viewed = contact.is_viewed ?? contact.isViewed ?? true;
-            const assignedToName = contact.assignedTo === currentUserIdNum
-              ? "Delegado para mim"
-              : (contact as any).assignedToName || null;
-            return {
-              ...contact,
-              lastMessage: currentContactsMap.get(contact.id)?.lastMessage || '',
-              lastMessageTime: currentContactsMap.get(contact.id)?.lastMessageTime || '',
-              unreadCount: currentContactsMap.get(contact.id)?.unreadCount || 0,
-              is_viewed,
-              assignedToName
-            };
-          });
-          
-          console.log('✅ initializeData - Contatos atualizados:', updatedContacts);
-          setContacts(updatedContacts);
-          
-          // Se já tiver um contato selecionado, atualizar seu assignedToName também
-          if (selectedContact) {
-            console.log('🔄 initializeData - Atualizando contato selecionado');
-            const updatedSelectedContact = updatedContacts.find(c => c.id === selectedContact.id);
-            if (updatedSelectedContact) {
-              setSelectedContact(updatedSelectedContact);
-            }
-          }
-          
-          // Atualizar o mapa de não visualizados
-          const unreadMap = updatedContacts.reduce((acc, contact) => {
-            acc[contact.id] = contact.is_viewed === false;
-            return acc;
-          }, {} as { [contactId: number]: boolean });
-
-          if (setHasNewMessages) setHasNewMessages(unreadMap);
-          setLocalHasNewMessages(unreadMap);
-          
-        } else {
-          console.log('⚠️ initializeData - Formato de resposta inválido para contatos');
-          setContacts([]);
-        }
+        // Não busca mais contatos aqui, já recebemos via props do CombinedMenu
+        // Obtém o ID do usuário atual
+        const token = SessionService.getToken();
+        const decodedToken = token ? SessionService.decodeToken(token) : null;
+        const userId = decodedToken ? decodedToken.userId : null;
+        console.log('🔄 initializeData - Usuário atual:', { userId });
+        
+        // Converter userId para número para garantir uma comparação correta
+        const currentUserIdNum = userId ? Number(userId) : null;
+        console.log('🔄 initializeData - Usuário atual (número):', { currentUserIdNum });
+        setCurrentUserId(currentUserIdNum || undefined);
       } catch (error) {
         console.error('❌ initializeData - Erro ao carregar dados iniciais:', error);
-        setContacts([]);
+        if (setContacts) setContacts([]);
         setTags([]);
       } finally {
         setIsContactsLoading(false);
@@ -893,7 +878,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     };
 
     initializeData();
-  }, [selectedSectorId, setContacts, setHasNewMessages]);
+  }, [selectedSectorId, setContacts]);
 
   const renderMessageStatus = (message: Message) => {
     if (message.status === 'sending') {
@@ -937,20 +922,14 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     }
   }, [messages]);
 
-  const handleLoadMore = () => {
-    console.log('🔄 handleLoadMore - Carregando mais mensagens', { 
-      selectedContactId: selectedContact?.id, 
-      hasMore, 
-      isMessagesLoading, 
-      isLoadingMore,
-      currentPage: page 
-    });
-    if (selectedContact && hasMore && !isMessagesLoading && !isLoadingMore) {
+  // 3. Corrija handleLoadMore para não resetar loading desnecessariamente
+  const handleLoadMore = useCallback(() => {
+    if (selectedContact && hasMore && !isMessagesLoading && !isLoadingMore && !loadingRef.current) {
       const nextPage = page + 1;
       setPage(nextPage);
       loadMessages(selectedContact.id, nextPage, true);
     }
-  };
+  }, [selectedContact, hasMore, isMessagesLoading, isLoadingMore, page, loadMessages]);
 
   const renderMessage = (message: Message) => {
     const renderMediaContent = () => {
@@ -1204,100 +1183,89 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     };
   }, []);
 
+  // Substituir o useEffect de conexão do WebSocket para que o ChatNew sempre registre seu handler de mensagens, mesmo se CombinedMenu estiver ativo
   useEffect(() => {
+    if (!selectedSectorId || !selectedContact) return;
+
     const token = SessionService.getToken?.() || '';
-    console.log('🔄 useEffect [WebSocket] - Configurando WebSocket', { hasToken: !!token });
-    if (!token || !selectedSectorId) return;
+    if (!token) return;
 
+    // Handler para processar mensagens recebidas
     const handleWebSocketMessage = (msg: any) => {
-      if (msg.type === 'unread_status') {
-        const unread = msg.payload.unreadStatus || {};
-        const normalized = Object.fromEntries(
-          Object.entries(unread).map(([id, value]) => [id, !value])
-        );
-        updateHasNewMessages(() => ({ ...normalized }));
-      } else if (msg.type === 'contact') {
-        setContacts(prev => {
-          const exists = prev.some(c => c.id === msg.payload.id);
-          if (exists) {
-            return prev.map(c => c.id === msg.payload.id ? { ...c, ...msg.payload } : c);
-          } else {
-            return [...prev, msg.payload];
-          }
-        });
-      } else if (msg.type === 'message') {
-        // Para mensagens, garantir que mediaType está normalizado
-        if (msg.payload && msg.payload.mediaType) {
-          // Verificar se é áudio para garantir que não receba tipo errado
-          if (msg.payload.mediaType.toLowerCase() === 'audio' || 
-              msg.payload.mediaType.toLowerCase() === 'voice' ||
-              (msg.payload.mimeType && msg.payload.mimeType.startsWith('audio/'))) {
-            msg.payload.mediaType = 'audio';
-          }
-        }
-        
-        if (!selectedContact || msg.payload.contactID !== selectedContact.id) {
-          updateHasNewMessages(prev => ({
-            ...prev,
-            [msg.payload.contactID]: true
-          }));
-        }
-        if (selectedContact && msg.payload.contactID === selectedContact.id) {
-          setMessages(prev => {
-            if (prev.some(m => m.id === msg.payload.id)) return prev;
+      if (msg.type !== 'message') return;
+      if (msg.payload && msg.payload.contactID === selectedContact.id) {
+        setMessages(prev => {
+          // 1. Se já existe pelo id, não adiciona
+          if (prev.some(m => m.id === msg.payload.id)) return prev;
 
-            const idx = prev.findIndex(m =>
-              m.status === 'sending' &&
-              m.content === msg.payload.content &&
-              m.contactID === msg.payload.contactID &&
-              Math.abs(new Date(m.sentAt).getTime() - new Date(msg.payload.sentAt).getTime()) < 15000
-            );
-            if (idx !== -1) {
-              const updated = [...prev];
-              updated[idx] = { ...msg.payload, status: 'sent' };
-              return updated;
-            }
-            return [...prev, msg.payload];
-          });
-        }
+          // 2. Se existe uma mensagem local 'sending' com mesmo conteúdo e contato, substitui
+          const idx = prev.findIndex(m =>
+            m.status === 'sending' &&
+            m.content === msg.payload.content &&
+            m.contactID === msg.payload.contactID &&
+            Math.abs(new Date(m.sentAt).getTime() - new Date(msg.payload.sentAt).getTime()) < 15000
+          );
+          if (idx !== -1) {
+            const updated = [...prev];
+            updated[idx] = { ...msg.payload, status: 'sent' };
+            return updated;
+          }
+
+          // 3. Caso contrário, adiciona normalmente
+          return [...prev, msg.payload];
+        });
       }
     };
 
-    ChatWebSocketService.connect(token, handleWebSocketMessage, Number(selectedSectorId));
-    return () => {
-      ChatWebSocketService.disconnect();
-    };
-  }, [selectedContact, selectedSectorId, updateHasNewMessages, setContacts]);
+    // Registrar handler no ChatWebSocketService
+    const ws = require('../services/ChatWebSocketService').default;
+    ws.addMessageHandler?.(handleWebSocketMessage);
 
-  useEffect(() => {
-    if (selectedContact) {
-      updateHasNewMessages(prev => ({
-        ...prev,
-        [selectedContact.id]: false
-      }));
-      // Aqui você pode notificar o backend que o contato foi visualizado, se necessário
-    }
-  }, [selectedContact, updateHasNewMessages]);
+    return () => {
+      ws.removeMessageHandler?.(handleWebSocketMessage);
+    };
+  }, [selectedSectorId, selectedContact]);
 
   const filteredContacts = useMemo(() => {
-    return contacts.filter(contact => {
-      // Filtro por nome/número
-      const searchMatch = searchTerm.toLowerCase().trim() === '' ||
-        contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contact.number.toLowerCase().includes(searchTerm.toLowerCase());
+    const filtered = contacts
+      .filter(contact => {
+        // Filtro por nome/número
+        const searchMatch = searchTerm.toLowerCase().trim() === '' ||
+          contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          contact.number.toLowerCase().includes(searchTerm.toLowerCase());
 
-      // Filtro por responsável
-      const userMatch = !selectedFilterUser || contact.assignedTo === selectedFilterUser;
+        // Filtro por responsável
+        const userMatch = !selectedFilterUser || contact.assignedTo === selectedFilterUser;
 
-      // Filtro por tag
-      const tagMatch = !selectedFilterTag || contact.tagId === selectedFilterTag;
+        // Filtro por tag
+        const tagMatch = !selectedFilterTag || contact.tagId === selectedFilterTag;
 
-      // Filtro por status de visualização
-      const statusMatch = selectedStatus === 'all' || 
-        (selectedStatus === 'unread' && !contact.is_viewed) ||
-        (selectedStatus === 'read' && contact.is_viewed);
+        // Filtro por status de visualização
+        const statusMatch = selectedStatus === 'all' || 
+          (selectedStatus === 'unread' && !contact.is_viewed) ||
+          (selectedStatus === 'read' && contact.is_viewed);
 
-      return searchMatch && userMatch && tagMatch && statusMatch;
+        return searchMatch && userMatch && tagMatch && statusMatch;
+      });
+
+    // Ordenar por 'order' primeiro, garantindo que seja sempre respeitado
+    return filtered.sort((a, b) => {
+      // Se ambos têm ordem definida, usar ordem
+      if (a.order !== undefined && b.order !== undefined) {
+        return a.order - b.order;
+      }
+      
+      // Se apenas um tem ordem, ele vem primeiro
+      if (a.order !== undefined) return -1;
+      if (b.order !== undefined) return 1;
+      
+      // Se nenhum tem ordem, ordenar por data da última mensagem (mais recente primeiro)
+      if (a.lastMessageTime && b.lastMessageTime) {
+        return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
+      }
+      
+      // Por último, ordenar por id (mais recente primeiro)
+      return b.id - a.id;
     });
   }, [contacts, searchTerm, selectedFilterUser, selectedFilterTag, selectedStatus]);
 

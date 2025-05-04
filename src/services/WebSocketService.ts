@@ -1,8 +1,10 @@
 import { MessageType } from './MessageService';
+import ChatWebSocketService from './ChatWebSocketService';
 
 export class WebSocketService {
   private ws: WebSocket | null = null;
   private messageHandlers: ((message: MessageType) => void)[] = [];
+  private contactsListHandlers: ((contacts: any[]) => void)[] = [];
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectTimeout: NodeJS.Timeout | null = null;
@@ -13,110 +15,91 @@ export class WebSocketService {
   private isReconnecting = false;
   private lastConnectionAttempt: number = 0;
   private minReconnectDelay = 1000;
+  // Flag para indicar que estamos usando o ChatWebSocketService internamente
+  private usingSingletonService = true;
 
-  constructor() {}
+  constructor() {
+    console.log('⚠️ [WebSocketService] Construindo WebSocketService (usando adaptador para ChatWebSocketService)');
+  }
 
   connect(sectorId: string) {
-    // Prevenir múltiplas tentativas de conexão simultâneas
-    const now = Date.now();
-    if (this.isReconnecting || (now - this.lastConnectionAttempt < this.minReconnectDelay)) {
-      console.log('🚫 [WebSocketService] Tentativa de conexão ignorada - reconexão em andamento ou muito cedo');
-      return;
-    }
-
-    this.lastConnectionAttempt = now;
-
-    if (this.ws) {
-      console.log('🔄 [WebSocketService] Desconectando WebSocket existente antes de nova conexão');
-      this.disconnect();
-    }
-
-    const url = `wss://unofficial.ligchat.com/api/v1/ws/${sectorId}`;
-
-    console.log('🚀 [WebSocketService] Iniciando conexão:', {
-      sectorId,
-      url,
-      reconnectAttempts: this.reconnectAttempts
-    });
-
+    // Implementação adaptada para usar o ChatWebSocketService singleton
+    console.log('🔄 [WebSocketService-Adapter] Conectando via adaptador usando ChatWebSocketService singleton');
+    this.currentSectorId = sectorId;
+    
     try {
-      this.ws = new WebSocket(url);
-      this.isIntentionalClose = false;
-      this.currentSectorId = sectorId;
-      this.setupWebSocketHandlers();
-      this.setupConnectionCheck();
+      // Usar o serviço singleton para a conexão real
+      ChatWebSocketService.connect(
+        localStorage.getItem('token') || '', 
+        this.handleSharedWebSocketMessage.bind(this),
+        Number(sectorId)
+      );
     } catch (error) {
-      console.error('❌ [WebSocketService] Erro ao criar conexão:', error);
-      this.handleReconnect();
+      console.error('❌ [WebSocketService-Adapter] Erro ao criar conexão:', error);
     }
   }
 
-  private setupConnectionCheck() {
-    if (this.connectionCheckInterval) {
-      clearInterval(this.connectionCheckInterval);
-    }
-
-    // Envia ping a cada 30 segundos
-    this.connectionCheckInterval = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        try {
-          console.log('💓 [WebSocketService] Enviando ping');
-          this.ws.send(JSON.stringify({ type: 'ping' }));
-          
-          // Se não receber pong em 10 segundos, considera conexão perdida
-          setTimeout(() => {
-            if (this.lastPongTime && Date.now() - this.lastPongTime > 10000) {
-              console.log('⚠️ [WebSocketService] Timeout no ping/pong, reconectando...');
-              this.reconnect();
-            }
-          }, 10000);
-        } catch (error) {
-          console.error('❌ [WebSocketService] Erro ao enviar ping:', error);
-          this.reconnect();
-        }
+  // Handler intermediário que recebe mensagens do ChatWebSocketService e repassa para os handlers locais
+  private handleSharedWebSocketMessage(message: any) {
+    try {
+      // Para mensagens do tipo 'message', normalizar e enviar para handlers de mensagem
+      if (message.type === 'message') {
+        const normalizedMessage = this.normalizeMessage(message);
+        this.messageHandlers.forEach((handler, index) => {
+          try {
+            handler(normalizedMessage);
+          } catch (error) {
+            console.error(`❌ [WebSocketService-Adapter] Erro no handler ${index + 1}:`, error);
+          }
+        });
+      } 
+      // Para mensagens do tipo 'contacts_list', enviar apenas para handlers de contacts_list
+      else if (message.type === 'contacts_list' && message.payload?.contacts) {
+        this.contactsListHandlers.forEach((handler, index) => {
+          try {
+            handler(message.payload.contacts);
+          } catch (error) {
+            console.error(`❌ [WebSocketService-Adapter] Erro no handler de contacts_list ${index + 1}:`, error);
+          }
+        });
       }
-    }, 30000);
-  }
-
-  private reconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+    } catch (error) {
+      console.error('❌ [WebSocketService-Adapter] Erro ao processar mensagem:', error);
     }
-    this.handleReconnect();
   }
 
+  // Manter o método de normalização para compatibilidade
   private normalizeMessage(message: any): MessageType {
-    console.log('🔄 [WebSocketService] Normalizando mensagem:', message);
+    console.log('🔄 [WebSocketService-Adapter] Normalizando mensagem');
     
-    const messageData = message.data || message;
+    const messageData = message.data || message.payload || message;
     
-    let mediaType = messageData.type || 'text';
+    let mediaType = messageData.mediaType || messageData.type || 'text';
     let mediaUrl = null;
     let localUrl = null;
     let fileName = null;
     let mimeType = null;
 
-    if (messageData.type === 'image' || messageData.type === 'video') {
-      mediaUrl = messageData.url || messageData.mediaUrl;
+    if (mediaType === 'image' || mediaType === 'video') {
+      mediaUrl = messageData.mediaUrl || messageData.url;
       localUrl = messageData.localUrl;
-      mimeType = messageData.mime_type || messageData.mimeType || `${messageData.type}/jpeg`;
-      fileName = messageData.file_name || messageData.fileName || `${messageData.type}.${mimeType.split('/')[1]}`;
-    } else if (messageData.type === 'document') {
-      mediaUrl = messageData.url || messageData.mediaUrl;
+      mimeType = messageData.mimeType || messageData.mime_type || `${mediaType}/jpeg`;
+      fileName = messageData.fileName || messageData.file_name || `${mediaType}.${mimeType.split('/')[1]}`;
+    } else if (mediaType === 'document') {
+      mediaUrl = messageData.mediaUrl || messageData.url;
       localUrl = messageData.localUrl;
-      mimeType = messageData.mime_type || messageData.mimeType;
-      fileName = messageData.file_name || messageData.fileName || 'document';
-    } else if (messageData.type === 'audio' || messageData.type === 'voice') {
-      mediaUrl = messageData.url || messageData.mediaUrl;
+      mimeType = messageData.mimeType || messageData.mime_type;
+      fileName = messageData.fileName || messageData.file_name || 'document';
+    } else if (mediaType === 'audio' || mediaType === 'voice') {
+      mediaUrl = messageData.mediaUrl || messageData.url;
       localUrl = messageData.localUrl;
-      mimeType = messageData.mime_type || messageData.mimeType || 'audio/mpeg';
-      fileName = messageData.file_name || messageData.fileName || 'audio.mp3';
+      mimeType = messageData.mimeType || messageData.mime_type || 'audio/mpeg';
+      fileName = messageData.fileName || messageData.file_name || 'audio.mp3';
       mediaType = 'audio';
     }
 
     const normalized = {
-      id: messageData.message_id || messageData.id || Date.now(),
+      id: messageData.id || messageData.message_id || Date.now(),
       content: messageData.content || messageData.caption || '',
       isSent: false,
       mediaType,
@@ -124,10 +107,10 @@ export class WebSocketService {
       localUrl,
       fileName,
       mimeType,
-      sectorId: message.sector_id || messageData.sector_id,
-      contactID: messageData.contact_id,
+      sectorId: messageData.sectorId || messageData.sector_id || this.currentSectorId,
+      contactID: messageData.contactID || messageData.contact_id,
       isRead: false,
-      sentAt: messageData.timestamp ? new Date(messageData.timestamp * 1000).toISOString() : new Date().toISOString(),
+      sentAt: messageData.sentAt || (messageData.timestamp ? new Date(messageData.timestamp * 1000).toISOString() : new Date().toISOString()),
       type: message.type,
       attachment: mediaUrl ? {
         url: mediaUrl,
@@ -137,169 +120,47 @@ export class WebSocketService {
       } : undefined
     };
 
-    console.log('✨ [WebSocketService] Mensagem normalizada:', normalized);
     return normalized;
   }
 
-  private setupWebSocketHandlers() {
-    if (!this.ws) return;
-
-    this.ws.onopen = () => {
-      console.log('🌟 [WebSocketService] Conexão estabelecida com sucesso');
-      this.reconnectAttempts = 0;
-      this.isReconnecting = false;
-      this.lastPongTime = Date.now();
-    };
-
-    this.ws.onmessage = (event) => {
-      try {
-        console.log('📥 [WebSocketService] Mensagem recebida (raw):', event.data);
-        
-        let parsedMessage;
-        try {
-          parsedMessage = JSON.parse(event.data);
-          
-          // Tratamento especial para mensagens de ping/pong
-          if (parsedMessage.type === 'pong') {
-            console.log('💗 [WebSocketService] Pong recebido');
-            this.lastPongTime = Date.now();
-            return;
-          }
-          
-          if (typeof parsedMessage === 'string' && parsedMessage.startsWith('{')) {
-            parsedMessage = JSON.parse(parsedMessage);
-          }
-          console.log('🔄 [WebSocketService] Mensagem após parse:', parsedMessage);
-        } catch (e) {
-          console.error('❌ [WebSocketService] Erro ao fazer parse da mensagem:', e);
-          return;
-        }
-        
-        const normalizedMessage = this.normalizeMessage(parsedMessage);
-        console.log('✨ [WebSocketService] Mensagem normalizada:', normalizedMessage);
-        
-        console.log('📢 [WebSocketService] Notificando handlers:', {
-          handlersCount: this.messageHandlers.length,
-          messageId: normalizedMessage.id,
-          contactId: normalizedMessage.contactID
-        });
-
-        this.messageHandlers.forEach((handler, index) => {
-          try {
-            console.log(`🎯 [WebSocketService] Executando handler ${index + 1}/${this.messageHandlers.length}`);
-            handler(normalizedMessage);
-          } catch (error) {
-            console.error(`❌ [WebSocketService] Erro no handler ${index + 1}:`, error);
-          }
-        });
-      } catch (error) {
-        console.error('❌ [WebSocketService] Erro ao processar mensagem:', error);
-      }
-    };
-
-    this.ws.onerror = (event) => {
-      console.error('❌ [WebSocketService] Erro na conexão:', event);
-      // Não iniciar reconexão aqui, deixar o onclose lidar com isso
-    };
-
-    this.ws.onclose = (event) => {
-      console.log(`🔒 [WebSocketService] Conexão fechada. Código: ${event.code}, Razão: ${event.reason || 'Não especificada'}`);
-      
-      // Não tentar reconectar se o fechamento foi intencional
-      if (this.isIntentionalClose) {
-        console.log('✋ [WebSocketService] Fechamento intencional - não tentando reconectar');
-        return;
-      }
-
-      // Tratar diferentes códigos de fechamento
-      switch (event.code) {
-        case 1000: // Fechamento normal
-          console.log('�� [WebSocketService] Fechamento normal da conexão');
-          break;
-        case 1006: // Fechamento anormal
-          console.log('⚠️ [WebSocketService] Fechamento anormal - iniciando reconexão');
-          this.handleReconnect();
-          break;
-        default:
-          if (!this.isReconnecting) {
-            console.log('🔄 [WebSocketService] Código de fechamento não esperado - tentando reconectar');
-            this.handleReconnect();
-          }
-      }
-    };
-  }
-
-  private handleReconnect() {
-    if (this.isIntentionalClose || !this.currentSectorId || this.isReconnecting) {
-      console.log('🚫 [WebSocketService] Reconexão ignorada:', {
-        isIntentionalClose: this.isIntentionalClose,
-        hasSectorId: !!this.currentSectorId,
-        isReconnecting: this.isReconnecting
-      });
-      return;
-    }
-
-    this.isReconnecting = true;
-
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-      
-      if (this.reconnectTimeout) {
-        clearTimeout(this.reconnectTimeout);
-      }
-
-      console.log(`⏳ [WebSocketService] Agendando reconexão em ${delay}ms (tentativa ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
-
-      this.reconnectTimeout = setTimeout(() => {
-        this.reconnectAttempts++;
-        console.log(`🔄 [WebSocketService] Tentativa de reconexão ${this.reconnectAttempts} de ${this.maxReconnectAttempts}`);
-        this.connect(this.currentSectorId!);
-      }, delay);
-    } else {
-      console.error('❌ [WebSocketService] Número máximo de tentativas de reconexão atingido');
-      this.isReconnecting = false;
-    }
-  }
-
+  // Métodos de suporte mantidos apenas por compatibilidade
   addMessageHandler(handler: (message: MessageType) => void) {
-    console.log('➕ [WebSocketService] Adicionando novo handler. Total:', this.messageHandlers.length + 1);
+    console.log('➕ [WebSocketService-Adapter] Adicionando handler de mensagem');
     this.messageHandlers.push(handler);
   }
 
   removeMessageHandler(handler: (message: MessageType) => void) {
-    const previousCount = this.messageHandlers.length;
+    console.log('➖ [WebSocketService-Adapter] Removendo handler de mensagem');
     this.messageHandlers = this.messageHandlers.filter(h => h !== handler);
-    console.log('➖ [WebSocketService] Removendo handler. Antes:', previousCount, 'Depois:', this.messageHandlers.length);
+  }
+
+  addContactsListHandler(handler: (contacts: any[]) => void) {
+    console.log('➕ [WebSocketService-Adapter] Adicionando handler de contacts_list');
+    this.contactsListHandlers.push(handler);
+    
+    // Se já estiver usando o serviço global, também registrar lá
+    if (this.usingSingletonService && ChatWebSocketService.isConnected) {
+      ChatWebSocketService.addContactsListHandler(handler);
+    }
+  }
+
+  removeContactsListHandler(handler: (contacts: any[]) => void) {
+    console.log('➖ [WebSocketService-Adapter] Removendo handler de contacts_list');
+    this.contactsListHandlers = this.contactsListHandlers.filter(h => h !== handler);
+    
+    // Se estiver usando o serviço global, também remover de lá
+    if (this.usingSingletonService) {
+      ChatWebSocketService.removeContactsListHandler(handler);
+    }
   }
 
   disconnect() {
-    console.log('🔌 [WebSocketService] Iniciando desconexão');
-    this.isIntentionalClose = true;
+    console.log('🔌 [WebSocketService-Adapter] Desconectando (sem efeito real - gerenciado pelo singleton)');
+    this.messageHandlers = [];
+    this.contactsListHandlers = [];
     this.currentSectorId = null;
-    this.isReconnecting = false;
     
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-
-    if (this.connectionCheckInterval) {
-      clearInterval(this.connectionCheckInterval);
-      this.connectionCheckInterval = null;
-    }
-
-    if (this.ws) {
-      try {
-        console.log('👋 [WebSocketService] Fechando conexão WebSocket');
-        this.ws.close(1000, 'Desconexão intencional');
-      } catch (error) {
-        console.error('❌ [WebSocketService] Erro ao fechar conexão:', error);
-      } finally {
-        this.ws = null;
-      }
-    }
-
-    this.reconnectAttempts = 0;
-    console.log('✅ [WebSocketService] Desconexão completa');
+    // Não desconecta o ChatWebSocketService, apenas limpa os handlers locais
+    // O ChatWebSocketService será gerenciado pelo CombinedMenu
   }
 } 

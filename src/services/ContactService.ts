@@ -28,6 +28,7 @@ export interface Contact {
   createdAt: string;
   updatedAt: string;
   isOfficial: boolean;
+  order?: number; // Campo para ordenação na listagem
 }
 
 export interface CreateContactRequestDTO {

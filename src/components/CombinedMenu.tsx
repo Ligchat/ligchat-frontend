@@ -34,9 +34,17 @@ interface ViewedStatus {
     [contactId: number]: boolean;
 }
 
-
+// Objeto para armazenar contatos temporariamente antes de adicionar à lista
+type PendingContactsBuffer = {
+    [contactId: number]: {
+        contact: any;
+        timestamp: number;
+        timeoutId: NodeJS.Timeout;
+    }
+};
 
 const PROFILE_UPDATED_EVENT = 'profileUpdated';
+const CONTACT_BUFFER_TIMEOUT = 1500; // 1.5 segundos de buffer para contatos
 
 const CombinedMenu: React.FC = () => {
     const [sectors, setSectors] = useState<Sector[]>([]);
@@ -58,6 +66,9 @@ const CombinedMenu: React.FC = () => {
     const navigationInProgressRef = useRef(false);
     const [unreadMessagesState, setUnreadMessagesState] = useState<UnreadMessagesState>({});
     const [contacts, setContacts] = useState<any[]>([]);
+    
+    // Buffer de contatos pendentes
+    const pendingContactsRef = useRef<PendingContactsBuffer>({});
 
     const updateComponentForCurrentRoute = useCallback((sectorId: string | null) => {
         const path = location.pathname;
@@ -306,20 +317,68 @@ const CombinedMenu: React.FC = () => {
         }
     }, [selectedSector, sectors, updateComponentForCurrentRoute]);
 
+    // Função para ordenar contatos com base no campo order
+    const sortContactsByOrder = useCallback((contactsArray: any[]) => {
+        console.log('[DEBUG] Início da ordenação - Contatos recebidos:', 
+            contactsArray.map(c => ({ id: c.id, name: c.name, order: c.order }))
+        );
+        
+        const sorted = [...contactsArray].sort((a, b) => {
+            // Ordenar pelo campo 'order' (menor primeiro)
+            // Se order for igual ou ausente, ordenar pela data de criação mais recente
+            if (a.order !== undefined && b.order !== undefined) {
+                return a.order - b.order;
+            } else if (a.order !== undefined) {
+                return -1;
+            } else if (b.order !== undefined) {
+                return 1;
+            } else {
+                // Se order não existir, ordenar por data de criação (mais recente primeiro)
+                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            }
+        });
+        
+        console.log('[DEBUG] Final da ordenação - Contatos ordenados:', 
+            sorted.map(c => ({ id: c.id, name: c.name, order: c.order }))
+        );
+        
+        return sorted;
+    }, []);
+
     // Função para buscar contatos do setor selecionado
     const fetchContacts = useCallback(async (sectorId: string) => {
         if (!sectorId) return;
+        console.log('[DEBUG] Iniciando busca de contatos para o setor:', sectorId);
         try {
             const response = await getContacts(Number(sectorId));
+            console.log('[DEBUG] Resposta da API de contatos:', response);
             if (response && response.data) {
-                setContacts(response.data);
+                console.log('[DEBUG] Contatos obtidos da API antes da ordenação:', 
+                    response.data.map(c => ({ id: c.id, name: c.name, order: c.order }))
+                );
+                // Ordenar contatos pelo campo order antes de atualizar o estado
+                const sortedContacts = sortContactsByOrder(response.data);
+                console.log('[DEBUG] Contatos após ordenação final:', 
+                    sortedContacts.map(c => ({ id: c.id, name: c.name, order: c.order }))
+                );
+                setContacts(sortedContacts);
+                // Inicializar o estado de não lido com base no campo isViewed
+                const unreadMap = sortedContacts.reduce((acc, contact) => {
+                  if (!contact.isViewed) {
+                    acc[contact.id] = true;
+                  }
+                  return acc;
+                }, {});
+                setUnreadMessagesState(unreadMap);
             } else {
+                console.log('[DEBUG] Nenhum contato retornado da API');
                 setContacts([]);
             }
         } catch (error) {
+            console.error('[DEBUG] Erro ao buscar contatos:', error);
             setContacts([]);
         }
-    }, []);
+    }, [sortContactsByOrder]);
 
     // Buscar contatos sempre que o setor mudar
     useEffect(() => {
@@ -328,42 +387,153 @@ const CombinedMenu: React.FC = () => {
         }
     }, [selectedSector, fetchContacts]);
 
+    // Função para adicionar um contato após o período de buffer
+    const addOrUpdateBufferedContact = useCallback((contactData: any) => {
+        const contactId = contactData.id;
+        
+        // Se já existe um timeout para este contato, limpe-o
+        if (pendingContactsRef.current[contactId]?.timeoutId) {
+            clearTimeout(pendingContactsRef.current[contactId].timeoutId);
+        }
+        
+        // Atualizar o contato no buffer
+        const timeoutId = setTimeout(() => {
+            // Quando o timeout acontecer, adicione/atualize o contato na lista
+            setContacts(prev => {
+                const safePrev = Array.isArray(prev) ? prev : [];
+                const exists = safePrev.some(c => c.id === contactId);
+                const finalContactData = pendingContactsRef.current[contactId].contact;
+                
+                console.log('[WS] Adicionando/atualizando contato após buffer:', finalContactData);
+                
+                // Remover do buffer
+                delete pendingContactsRef.current[contactId];
+                
+                let newContacts;
+                if (exists) {
+                    newContacts = safePrev.map(c => c.id === contactId ? { ...c, ...finalContactData } : c);
+                } else {
+                    newContacts = [...safePrev, finalContactData];
+                }
+                
+                // Ordenar a lista atualizada antes de retornar
+                return sortContactsByOrder(newContacts);
+            });
+        }, CONTACT_BUFFER_TIMEOUT);
+        
+        // Armazenar ou atualizar no buffer
+        pendingContactsRef.current[contactId] = {
+            contact: contactData,
+            timestamp: Date.now(),
+            timeoutId: timeoutId
+        };
+    }, [sortContactsByOrder]);
+
     // WebSocket para notificações globais de mensagens não lidas
     useEffect(() => {
         const token = SessionService.getToken?.() || '';
         if (!token || !selectedSector) return;
 
+        // Define uma flag global para indicar que CombinedMenu está gerenciando o websocket principal
+        (window as any).combinedMenuWebSocketActive = true;
+
         const handleWebSocketMessage = (msg: any) => {
-            if (msg.type === 'unread_status') {
+            const msgType = msg.type || 'unknown';
+            console.log('[CombinedMenu] WebSocket mensagem recebida:', msgType);
+            
+            if (msgType === 'unread_status') {
                 const unread = msg.payload.unreadStatus || {};
                 const normalized = Object.fromEntries(
                     Object.entries(unread).map(([id, value]) => [id, !value])
                 );
+                console.log('[CombinedMenu] Status não lidos atualizados:', normalized);
                 setUnreadMessagesState(prev => ({ ...prev, ...normalized }));
+                
+                // Não precisamos de fetchContacts aqui, apenas atualizamos status
+            } else if (msgType === 'message') {
+                const contactId = msg.payload.contactID;
+                
+                // Determinar se é uma mensagem enviada pelo usuário ou recebida
+                const isSentByUser = msg.payload.isSent === true;
+                
+                console.log('[CombinedMenu] Nova mensagem para contactId:', contactId, 
+                    isSentByUser ? '(enviada pelo usuário)' : '(recebida)');
+                
+                // Apenas marcar como não lido se for mensagem recebida, não enviada pelo usuário
+                if (!isSentByUser) {
+                    setUnreadMessagesState(prev => ({
+                        ...prev,
+                        [contactId]: true
+                    }));
+                }
+                
+                // Buscar contatos para atualização completa de dados
                 fetchContacts(selectedSector);
-            } else if (msg.type === 'message') {
-                setUnreadMessagesState(prev => ({
-                    ...prev,
-                    [msg.payload.contactID]: true
-                }));
-                fetchContacts(selectedSector);
-            } else if (msg.type === 'contact') {
-                setContacts(prev => {
-                    const exists = prev.some(c => c.id === msg.payload.id);
-                    if (exists) {
-                        return prev.map(c => c.id === msg.payload.id ? { ...c, ...msg.payload } : c);
-                    } else {
-                        return [...prev, msg.payload];
-                    }
+            } else if (msgType === 'contact') {
+                console.log('[CombinedMenu] Evento contact recebido:', {
+                    id: msg.payload.id,
+                    name: msg.payload.name,
+                    order: msg.payload.order
                 });
+                
+                // Formatar o nome padrão baseado no número se o nome não estiver presente
+                const contactData = { ...msg.payload };
+                if (!contactData.name || contactData.name.trim() === '') {
+                    // Formatar número como nome: +XX YY ZZZZ-ZZZZ -> "Contato +XX YY ZZZZ-ZZZZ"
+                    const formattedNumber = contactData.number || '';
+                    contactData.name = `Contato ${formattedNumber}`;
+                    console.log('[CombinedMenu] Nome formatado para contato:', contactData.name);
+                }
+                
+                // Verificar se temos todos os campos necessários
+                if (!contactData.id || !contactData.number) {
+                    console.warn('[CombinedMenu] Contato recebido sem dados obrigatórios:', contactData);
+                    return; // Não processar contato incompleto
+                }
+                
+                // Não processar eventos de contato individuais, aguardar contacts_list para atualização completa
+                // fetchContacts(selectedSector);
+            } else if (msgType === 'contacts_list') {
+                console.log('[CombinedMenu] Lista de contatos recebida:', { 
+                    count: msg.payload?.contacts?.length || 0 
+                });
+                
+                if (msg.payload?.contacts && Array.isArray(msg.payload.contacts)) {
+                    // Atualiza a lista de contatos com a nova lista ordenada
+                    const sortedContacts = sortContactsByOrder(msg.payload.contacts);
+                    console.log('[CombinedMenu] Atualizando todos os contatos com a nova lista ordenada');
+                    setContacts(sortedContacts);
+                    
+                    // Atualizar também o mapa de não lidos, agora sobrescrevendo o estado local
+                    const unreadMap = msg.payload.contacts.reduce((acc: any, contact: any) => {
+                        // Só atualizar status se o contato estiver marcado como não lido no backend
+                        if (!contact.isViewed) {
+                            acc[contact.id] = true;
+                        }
+                        return acc;
+                    }, {});
+                    
+                    // Preservar status atual, apenas adicionando novos não lidos
+                    setUnreadMessagesState(unreadMap);
+                }
             }
         };
 
+        console.log('[CombinedMenu] Conectando WebSocket principal para setor:', selectedSector);
         ChatWebSocketService.connect(token, handleWebSocketMessage, Number(selectedSector));
+        
         return () => {
+            // Limpar todos os timeouts ao desmontar
+            Object.values(pendingContactsRef.current).forEach(item => {
+                clearTimeout(item.timeoutId);
+            });
+            pendingContactsRef.current = {};
+            
             ChatWebSocketService.disconnect();
+            (window as any).combinedMenuWebSocketActive = false;
+            console.log('[CombinedMenu] WebSocket principal desconectado');
         };
-    }, [selectedSector, fetchContacts]);
+    }, [selectedSector, fetchContacts, sortContactsByOrder]);
 
     const handleSectorChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = e.target.value;
@@ -444,6 +614,10 @@ const CombinedMenu: React.FC = () => {
 
         if (key === '2') {
             setUnreadMessagesState({});
+            // Forçar recarregamento dos contatos ao clicar no menu de chat
+            if (selectedSector) {
+                fetchContacts(selectedSector);
+            }
         }
 
         const path = getPathFromKey(key);
@@ -635,9 +809,6 @@ const CombinedMenu: React.FC = () => {
                             <path fill="currentColor" d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
                         </svg>
                     </button>
-                    <div className="menu-logo-container">
-                        <img src={Logo} alt="Logo" className="menu-logo" />
-                    </div>
                 </div>
                 <div className="menu-header-right">
                     <div className="menu-user-profile" onClick={toggleUserDropdown} ref={userDropdownRef}>
