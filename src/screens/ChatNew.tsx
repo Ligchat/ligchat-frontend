@@ -1198,7 +1198,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           // 1. Se já existe pelo id, não adiciona
           if (prev.some(m => m.id === msg.payload.id)) return prev;
 
-          // 2. Se existe uma mensagem local 'sending' com mesmo conteúdo e contato, substitui
+          // 2. Se existe uma mensagem local 'sending' com mesmo conteúdo e contato, remove ela e adiciona a do backend
           const idx = prev.findIndex(m =>
             m.status === 'sending' &&
             m.content === msg.payload.content &&
@@ -1207,7 +1207,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           );
           if (idx !== -1) {
             const updated = [...prev];
-            updated[idx] = { ...msg.payload, status: 'sent' };
+            updated.splice(idx, 1, { ...msg.payload, status: 'sent' });
             return updated;
           }
 
