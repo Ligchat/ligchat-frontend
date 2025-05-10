@@ -195,19 +195,20 @@ interface Message extends MessageResponse {
 
 
 function formatMessageTime(sentAt: string, isLocalMessage?: boolean) {
-  if (isLocalMessage) {
-    return dayjs(sentAt).format('HH:mm');
-  }
+  // Sempre exibe no horário de Manaus
   const customFormat = 'DD/MM/YYYY HH:mm:ss';
+  if (isLocalMessage) {
+    return dayjs(sentAt).tz('America/Manaus').format('HH:mm');
+  }
   if (/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/.test(sentAt)) {
-    return dayjs.utc(sentAt, customFormat).local().format('HH:mm');
+    return dayjs.utc(sentAt, customFormat).tz('America/Manaus').format('HH:mm');
   } else if (/Z$/.test(sentAt)) {
-    return dayjs.utc(sentAt).local().format('HH:mm');
+    return dayjs.utc(sentAt).tz('America/Manaus').format('HH:mm');
   } else if (/([+-]\d{2}:\d{2})$/.test(sentAt)) {
-    // Já tem offset, só formata!
-    return dayjs(sentAt).format('HH:mm');
+    // Já tem offset, converte para Manaus
+    return dayjs(sentAt).tz('America/Manaus').format('HH:mm');
   } else {
-    return dayjs(sentAt).local().format('HH:mm');
+    return dayjs(sentAt).tz('America/Manaus').format('HH:mm');
   }
 }
 
