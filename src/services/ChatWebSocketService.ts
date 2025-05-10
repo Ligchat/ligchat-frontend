@@ -70,7 +70,7 @@ class ChatWebSocketService {
       this.onMessageCallback = onMessage;
       this.currentSectorId = sectorId || null;
       const sectorParam = sectorId ? `?sector_id=${sectorId}` : '';
-      this.socket = new WebSocket(`https://unofficial.ligchat.com/api/v1/api/v1/ws${sectorParam}`);
+      this.socket = new WebSocket(`https://unofficial.ligchat.com/api/v1/ws${sectorParam}`);
 
       this.socket.onopen = () => {
         this._isConnected = true;
