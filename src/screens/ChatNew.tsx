@@ -511,6 +511,8 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       ));
       setPage(0);
       setSelectedContact({ ...contact });
+      // Marcar como lido ao abrir o chat
+      await markContactAsViewed(Number(contact.sectorId), contact.id);
     } catch (error) {
       console.error('❌ handleContactSelect - Erro ao selecionar contato:', error);
     }
@@ -562,6 +564,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     const tempId = Date.now();
     const contactId = selectedContact.id;
 
+    const nowLocal = dayjs().format(); // ISO 8601 com timezone local
     const newMessage: Message = {
       id: tempId,
       content: messageInput,
@@ -571,7 +574,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       mimeType: null,
       sectorId: Number(selectedSectorId),
       contactID: contactId,
-      sentAt: new Date().toISOString(),
+      sentAt: nowLocal,
       isSent: true,
       isRead: false,
       status: 'sending'
@@ -610,7 +613,8 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         contactId: contactId,
         sectorId: Number(selectedSectorId),
         userId: currentUserId,
-        isAnonymous: isCurrentUserAdmin ? isAnonymous : false
+        isAnonymous: isCurrentUserAdmin ? isAnonymous : false,
+        sentAt: nowLocal
       });
 
       console.log('✅ handleSendMessage - Resposta da API:', response);
@@ -621,8 +625,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           ? { ...response, status: 'sent', contactID: contactId, isSent: true }
           : msg
       ));
-
-      await markContactAsViewed(Number(selectedSectorId), contactId);
 
     } catch (error) {
       console.error('❌ handleSendMessage - Erro ao enviar mensagem:', error);
@@ -666,11 +668,12 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     const tempId = Date.now();
     const isImage = file.type.startsWith('image/');
     
+    const nowLocalFile = dayjs().format();
     const newMessage: Message = {
       id: tempId,
       content: '',
       isSent: true,
-      sentAt: new Date().toISOString(),
+      sentAt: nowLocalFile,
       isRead: false,
       mediaType: isImage ? 'image' : 'document',
       mediaUrl: URL.createObjectURL(file),
@@ -697,7 +700,8 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         contactId: selectedContact.id,
         sectorId: Number(selectedSectorId),
         ...(currentUserId !== undefined ? { userId: currentUserId } : {}),
-        isAnonymous: isCurrentUserAdmin ? isAnonymous : false
+        isAnonymous: isCurrentUserAdmin ? isAnonymous : false,
+        sentAt: nowLocalFile
       });
 
       setMessages(prev => prev.map(msg => 
@@ -717,8 +721,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
             }
           : contact
       ));
-
-      await markContactAsViewed(Number(selectedSectorId), selectedContact.id);
 
     } catch (error) {
       console.error('❌ handleFileSelected - Erro ao enviar arquivo:', error);
@@ -756,17 +758,17 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     const tempId = Date.now();
     const audioUrl = URL.createObjectURL(audioBlob);
 
-    // Adicionar mensagem temporária
+    const nowLocalAudio = dayjs().format();
     const newMessage: Message = {
       id: tempId,
       content: '',
       mediaType: 'audio',
       mediaUrl: audioUrl,
-      fileName: `audio_${tempId}.wav`, // Mudado para .wav já que será convertido
+      fileName: `audio_${tempId}.wav`,
       mimeType: 'audio/wav',
       sectorId: Number(selectedSectorId),
       contactID: selectedContact.id,
-      sentAt: new Date().toISOString(),
+      sentAt: nowLocalAudio,
       isSent: true,
       isRead: false,
       status: 'sending'
@@ -784,7 +786,8 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         selectedContact.id,
         Number(selectedSectorId),
         ...(currentUserId !== undefined ? [currentUserId] : []),
-        isCurrentUserAdmin ? isAnonymous : false
+        isCurrentUserAdmin ? isAnonymous : false,
+        nowLocalAudio
       );
 
       // Atualiza a mensagem temporária com os dados do servidor
@@ -809,8 +812,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
             }
           : contact
       ));
-
-      await markContactAsViewed(Number(selectedSectorId), selectedContact.id);
 
     } catch (error) {
       console.error('❌ handleSendAudio - Erro ao enviar áudio:', error);
@@ -1194,26 +1195,64 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     const handleWebSocketMessage = (msg: any) => {
       if (msg.type !== 'message') return;
       if (msg.payload && msg.payload.contactID === selectedContact.id) {
+        console.log('[WebSocket] Mensagem recebida:', msg.payload);
+        
         setMessages(prev => {
-          // 1. Se já existe pelo id, não adiciona
-          if (prev.some(m => m.id === msg.payload.id)) return prev;
-
-          // 2. Se existe uma mensagem local 'sending' com mesmo conteúdo e contato, remove ela e adiciona a do backend
-          const idx = prev.findIndex(m =>
-            m.status === 'sending' &&
-            m.content === msg.payload.content &&
-            m.contactID === msg.payload.contactID &&
-            Math.abs(new Date(m.sentAt).getTime() - new Date(msg.payload.sentAt).getTime()) < 15000
-          );
-          if (idx !== -1) {
-            const updated = [...prev];
-            updated.splice(idx, 1, { ...msg.payload, status: 'sent' });
-            return updated;
+          // 1. Verificar se a mensagem com mesmo ID já existe
+          if (prev.some(m => m.id === msg.payload.id)) {
+            console.log('[WebSocket] Mensagem já existe com mesmo ID, ignorando');
+            return prev;
           }
 
-          // 3. Caso contrário, adiciona normalmente
+          // 2. Verificar se é uma mensagem enviada pelo usuário 
+          // Isto é fundamental: não adicionar mensagens que o próprio usuário enviou
+          if (msg.payload.isSent === true) {
+            // 2.1 Verificar se já existe uma mensagem local com status 'sending' ou 'sent'
+            // que corresponda ao conteúdo e seja aproximadamente do mesmo tempo
+            const idxSent = prev.findIndex(m =>
+              (m.status === 'sending' || m.status === 'sent') &&
+              m.content === msg.payload.content &&
+              m.contactID === msg.payload.contactID &&
+              Math.abs(new Date(m.sentAt).getTime() - new Date(msg.payload.sentAt).getTime()) < 30000
+            );
+            
+            if (idxSent !== -1) {
+              console.log('[WebSocket] Encontrada mensagem local correspondente, substituindo');
+              // Substitui a mensagem local pela confirmação do servidor
+              const updated = [...prev];
+              updated[idxSent] = { ...msg.payload, status: 'sent' };
+              return updated;
+            }
+            
+            // Se não encontrou correspondência mas é uma mensagem enviada pelo usuário,
+            // provavelmente já foi adicionada - melhor não adicionar para evitar duplicação
+            console.log('[WebSocket] Mensagem enviada pelo usuário sem correspondência local, ignorando');
+            return prev;
+          }
+          
+          // 3. Se chegou aqui, é uma mensagem recebida do contato (não enviada pelo usuário)
+          // Verificar duplicação por conteúdo/tempo como último recurso
+          const idxDup = prev.findIndex(m =>
+            m.content === msg.payload.content &&
+            m.contactID === msg.payload.contactID &&
+            !m.isSent &&
+            Math.abs(new Date(m.sentAt).getTime() - new Date(msg.payload.sentAt).getTime()) < 10000
+          );
+          
+          if (idxDup !== -1) {
+            console.log('[WebSocket] Possível duplicação de mensagem recebida, ignorando');
+            return prev;
+          }
+
+          // 4. Mensagem nova e válida, adicionar ao estado
+          console.log('[WebSocket] Adicionando nova mensagem');
           return [...prev, msg.payload];
         });
+
+        // Marcar como lido se a mensagem recebida for de outro usuário
+        if (msg.payload.isSent !== true) {
+          markContactAsViewed(Number(selectedContact.sectorId), selectedContact.id);
+        }
       }
     };
 
@@ -1221,8 +1260,19 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     const ws = require('../services/ChatWebSocketService').default;
     ws.addMessageHandler?.(handleWebSocketMessage);
 
+    // Adicionar listener para reconectar WebSocket após autenticação WhatsApp
+    const handleWhatsAppConnected = () => {
+      ws.disconnect();
+      const token = SessionService.getToken?.() || '';
+      if (token && selectedSectorId) {
+        ws.connect(token, handleWebSocketMessage, Number(selectedSectorId));
+      }
+    };
+    window.addEventListener('whatsappConnected', handleWhatsAppConnected);
+
     return () => {
       ws.removeMessageHandler?.(handleWebSocketMessage);
+      window.removeEventListener('whatsappConnected', handleWhatsAppConnected);
     };
   }, [selectedSectorId, selectedContact]);
 

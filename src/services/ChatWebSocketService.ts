@@ -1,5 +1,3 @@
-
-
 type WebSocketMessage = {
   type: string;
   payload?: {

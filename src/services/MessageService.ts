@@ -8,7 +8,7 @@ const UNOFFICIAL_API_URL = process.env.REACT_APP_UNOFFICIAL_API_URL || '/unoffic
 // Verificação de segurança para garantir que não estamos usando a porta 5002
 const getApiUrl = () => {
   if (!WHATSAPP_API_URL) {
-    return 'http://localhost:5001';
+    return 'https://whatsapp.ligchat.com';
   }
   
   if (WHATSAPP_API_URL.includes(':5002')) {
@@ -45,6 +45,7 @@ export interface SendMessageDto {
   sectorId: number;
   userId: number;
   isAnonymous?: boolean;
+  sentAt?: string;
 }
 
 // Constantes para tipos de áudio suportados
@@ -63,6 +64,7 @@ export interface SendFileDto {
   isHuman?: boolean;
   userId?: number;
   isAnonymous?: boolean;
+  sentAt?: string;
 }
 
 export interface MessageType {
@@ -122,20 +124,26 @@ export const sendMessage = async (message: SendMessageDto): Promise<MessageRespo
         recipient: message.recipientPhone,
         message: message.text,
         userId: message.userId,
-        isAnonymous: message.isAnonymous
+        isAnonymous: message.isAnonymous,
+        sentAt: message.sentAt || new Date().toISOString()
       });
+
+      // Verificar se a resposta é válida
+      if (!unofficialResponse || unofficialResponse.status === 'error') {
+        throw new Error(unofficialResponse?.message || 'Erro ao enviar mensagem');
+      }
 
       // Converter a resposta não oficial para o formato MessageResponse
       return {
         id: Date.now(), // ID temporário
-        content: unofficialResponse.data.message || message.text,
+        content: message.text, // Usar o texto original da mensagem
         mediaType: 'text',
         mediaUrl: null,
         fileName: null,
         mimeType: null,
         sectorId: message.sectorId,
         contactID: message.contactId,
-        sentAt: unofficialResponse.timestamp || new Date().toISOString(),
+        sentAt: unofficialResponse.timestamp || message.sentAt || new Date().toISOString(),
         isSent: unofficialResponse.status === 'success',
         isRead: false
       };
@@ -149,7 +157,8 @@ export const sendMessage = async (message: SendMessageDto): Promise<MessageRespo
       contactId: message.contactId,
       sectorId: message.sectorId,
       userId: message.userId,
-      isAnonymous: message.isAnonymous
+      isAnonymous: message.isAnonymous,
+      sentAt: message.sentAt || new Date().toISOString()
     };
 
     console.log(`Enviando mensagem para: ${API_URL}/whatsapp/send-message`);
@@ -203,7 +212,8 @@ export async function sendFile(fileData: SendFileDto): Promise<MessageResponse> 
           sectorId: fileData.sectorId,
           caption: fileData.caption || '',
           userId: fileData.userId,
-          isAnonymous: fileData.isAnonymous
+          isAnonymous: fileData.isAnonymous,
+          sentAt: fileData.sentAt || new Date().toISOString()
         });
       } else if (isDocument) {
         response = await UnofficialMessageService.sendDocument({
@@ -214,7 +224,8 @@ export async function sendFile(fileData: SendFileDto): Promise<MessageResponse> 
           sectorId: fileData.sectorId,
           caption: fileData.caption || '',
           userId: fileData.userId,
-          isAnonymous: fileData.isAnonymous
+          isAnonymous: fileData.isAnonymous,
+          sentAt: fileData.sentAt || new Date().toISOString()
         });
       } else {
         // Para áudio, sempre usar audio/mpeg como tipo
@@ -226,7 +237,8 @@ export async function sendFile(fileData: SendFileDto): Promise<MessageResponse> 
           sectorId: fileData.sectorId,
           caption: fileData.caption || '',
           userId: fileData.userId,
-          isAnonymous: fileData.isAnonymous
+          isAnonymous: fileData.isAnonymous,
+          sentAt: fileData.sentAt || new Date().toISOString()
         });
       }
 
@@ -243,7 +255,7 @@ export async function sendFile(fileData: SendFileDto): Promise<MessageResponse> 
         mimeType: isAudio ? 'audio/mpeg' : mediaType || null,
         sectorId: fileData.sectorId,
         contactID: fileData.contactId,
-        sentAt: response.timestamp || new Date().toISOString(),
+        sentAt: response.timestamp || fileData.sentAt || new Date().toISOString(),
         isSent: response.status === 'success',
         isRead: false
       };
@@ -270,6 +282,7 @@ export async function sendFile(fileData: SendFileDto): Promise<MessageResponse> 
     if (fileData.isAnonymous !== undefined) {
       formData.append('isAnonymous', String(fileData.isAnonymous));
     }
+    formData.append('sentAt', fileData.sentAt || new Date().toISOString());
 
     const response = await axios.post(
       `${getApiUrl()}/whatsapp/send-file`,
@@ -374,7 +387,8 @@ export const sendAudioMessage = async (
   contactId: number,
   sectorId: number,
   userId?: number,
-  isAnonymous?: boolean
+  isAnonymous?: boolean,
+  sentAt?: string
 ): Promise<MessageResponse> => {
   try {
     console.log('Áudio original:', {
@@ -403,7 +417,8 @@ export const sendAudioMessage = async (
         sectorId: sectorId,
         caption: '',
         userId: userId,
-        isAnonymous: isAnonymous
+        isAnonymous: isAnonymous,
+        sentAt: sentAt || new Date().toISOString()
       });
 
       if (unofficialResponse.status === 'error') {
@@ -420,7 +435,7 @@ export const sendAudioMessage = async (
         mimeType: 'audio/wav',
         sectorId,
         contactID: contactId,
-        sentAt: unofficialResponse.timestamp || new Date().toISOString(),
+        sentAt: unofficialResponse.timestamp || sentAt || new Date().toISOString(),
         isSent: unofficialResponse.status === 'success',
         isRead: false
       };
@@ -448,6 +463,7 @@ export const sendAudioMessage = async (
     if (isAnonymous !== undefined) {
       formData.append('isAnonymous', String(isAnonymous));
     }
+    formData.append('sentAt', sentAt || new Date().toISOString());
 
     const response = await axios.post<MessageResponse>(
       `${getApiUrl()}/whatsapp/send-file`,

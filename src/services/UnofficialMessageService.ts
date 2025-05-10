@@ -20,6 +20,7 @@ export interface SendTextMessageDTO {
   message: string;
   userId?: number;
   isAnonymous?: boolean;
+  sentAt?: string;
 }
 
 export interface SendImageDTO {
@@ -31,6 +32,7 @@ export interface SendImageDTO {
   caption?: string;
   userId?: number;
   isAnonymous?: boolean;
+  sentAt?: string;
 }
 
 export interface SendDocumentDTO {
@@ -42,6 +44,7 @@ export interface SendDocumentDTO {
   caption?: string;
   userId?: number;
   isAnonymous?: boolean;
+  sentAt?: string;
 }
 
 export interface SendMediaMessageDTO {
@@ -53,11 +56,16 @@ export interface SendMediaMessageDTO {
   caption?: string;
   userId?: number;
   isAnonymous?: boolean;
+  sentAt?: string;
 }
 
 export const sendTextMessage = async (data: SendTextMessageDTO): Promise<UnofficialMessageResponse> => {
   try {
-    const response = await axios.post<UnofficialMessageResponse>(`${UNOFFICIAL_API_URL}/send-message`, data, {
+    const payload = {
+      ...data,
+      sentAt: data.sentAt || new Date().toISOString()
+    };
+    const response = await axios.post<UnofficialMessageResponse>(`${UNOFFICIAL_API_URL}/send-message`, payload, {
       headers: {
         'Content-Type': 'application/json'
       }
@@ -77,7 +85,10 @@ export const sendImage = async (data: SendImageDTO): Promise<UnofficialMessageRe
       mediaType: data.mediaType,
       recipient: data.recipient,
       sectorId: data.sectorId,
-      caption: data.caption || ''
+      caption: data.caption || '',
+      userId: data.userId,
+      isAnonymous: data.isAnonymous,
+      sentAt: data.sentAt || new Date().toISOString()
     };
 
     const response = await axios.post<UnofficialMessageResponse>(`${UNOFFICIAL_API_URL}/send-image`, payload, {
@@ -103,7 +114,10 @@ export const sendAudio = async (data: SendMediaMessageDTO): Promise<UnofficialMe
       mediaType: 'audio/wav', // Forçar o tipo como WAV
       recipient: data.recipient,
       sectorId: data.sectorId,
-      caption: data.caption || ''
+      caption: data.caption || '',
+      userId: data.userId,
+      isAnonymous: data.isAnonymous,
+      sentAt: data.sentAt || new Date().toISOString()
     };
 
     console.log('Enviando áudio para API:', {
@@ -135,7 +149,10 @@ export const sendDocument = async (data: SendDocumentDTO): Promise<UnofficialMes
       mediaType: data.mediaType,
       recipient: data.recipient,
       sectorId: data.sectorId,
-      caption: data.caption || ''
+      caption: data.caption || '',
+      userId: data.userId,
+      isAnonymous: data.isAnonymous,
+      sentAt: data.sentAt || new Date().toISOString()
     };
 
     const response = await axios.post<UnofficialMessageResponse>(`${UNOFFICIAL_API_URL}/send-document`, payload, {

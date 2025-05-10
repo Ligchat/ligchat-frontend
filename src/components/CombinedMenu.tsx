@@ -535,6 +535,25 @@ const CombinedMenu: React.FC = () => {
         };
     }, [selectedSector, fetchContacts, sortContactsByOrder]);
 
+    useEffect(() => {
+        const handleWhatsAppConnected = () => {
+            // Desconectar e reconectar o WebSocket
+            ChatWebSocketService.disconnect();
+            const token = SessionService.getToken?.() || '';
+            if (token && selectedSector) {
+                ChatWebSocketService.connect(token, () => {}, Number(selectedSector));
+            }
+            // Recarregar contatos
+            if (selectedSector) {
+                fetchContacts(selectedSector);
+            }
+        };
+        window.addEventListener('whatsappConnected', handleWhatsAppConnected);
+        return () => {
+            window.removeEventListener('whatsappConnected', handleWhatsAppConnected);
+        };
+    }, [selectedSector, fetchContacts]);
+
     const handleSectorChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = e.target.value;
         
