@@ -196,27 +196,19 @@ interface Message extends MessageResponse {
 
 function formatMessageTime(sentAt: string, isLocalMessage?: boolean) {
   if (isLocalMessage) {
-    return dayjs(sentAt).tz('America/Manaus').format('HH:mm');
-  }
-  const sent = dayjs(sentAt).tz('America/Manaus');
-  const now = dayjs().tz('America/Manaus');
-  if (Math.abs(now.diff(sent, 'minute')) < 1) {
-    return sent.format('HH:mm');
+    return dayjs(sentAt).format('HH:mm');
   }
   const customFormat = 'DD/MM/YYYY HH:mm:ss';
-  let resultado = '';
   if (/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/.test(sentAt)) {
-    resultado = dayjs.utc(sentAt, customFormat).tz('America/Manaus').format('HH:mm');
-  } else if (sentAt.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*(-|\+)/)) {
-    const match = sentAt.match(/^(.+?)([+-]\d{2}:\d{2})$/);
-    const datePart = match ? match[1] : sentAt;
-    const cleanDate = datePart.replace(/(\.\d{3})\d+/, '$1');
-    const dateNoOffset = cleanDate + 'Z';
-    resultado = dayjs.utc(dateNoOffset).tz('America/Manaus').format('HH:mm');
+    return dayjs.utc(sentAt, customFormat).local().format('HH:mm');
+  } else if (/Z$/.test(sentAt)) {
+    return dayjs.utc(sentAt).local().format('HH:mm');
+  } else if (/([+-]\d{2}:\d{2})$/.test(sentAt)) {
+    // Já tem offset, só formata!
+    return dayjs(sentAt).format('HH:mm');
   } else {
-    resultado = dayjs(sentAt).tz('America/Manaus').format('HH:mm');
+    return dayjs(sentAt).local().format('HH:mm');
   }
-  return resultado;
 }
 
 // Adicionar função de formatação de telefone antes do componente ChatNew
@@ -441,7 +433,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           ...prev,
           ...newMessages.map(msg => ({
             ...msg,
-            sentAt: normalizeSentAtToManaus(msg.sentAt)
+            sentAt: normalizeSentAtToLocal(msg.sentAt)
           }))
         ].sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf()));
       } else {
@@ -449,7 +441,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           newMessages
             .map(msg => ({
               ...msg,
-              sentAt: normalizeSentAtToManaus(msg.sentAt)
+              sentAt: normalizeSentAtToLocal(msg.sentAt)
             }))
             .sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf())
         );
@@ -582,26 +574,23 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
   }, [selectedSectorId]);
 
   const handleSendMessage = async () => {
-
     if (!messageInput.trim() || !selectedContact || !selectedSectorId) {
       return;
     }
-
     const tempId = Date.now();
     const contactId = selectedContact.id;
-
     // Garante que o sentAt da nova mensagem é maior que o das mensagens existentes
-    let nowManaus = dayjs().tz('America/Manaus');
+    let nowLocal = dayjs();
     if (messages.length > 0) {
       const maxSentAt = messages.reduce((max, m) => {
         const t = dayjs(m.sentAt).valueOf();
         return t > max ? t : max;
       }, 0);
-      if (nowManaus.valueOf() <= maxSentAt) {
-        nowManaus = dayjs(maxSentAt + 1000).tz('America/Manaus'); // soma 1 segundo
+      if (nowLocal.valueOf() <= maxSentAt) {
+        nowLocal = dayjs(maxSentAt + 1000); // soma 1 segundo
       }
     }
-    const sentAtString = nowManaus.format(); // ISO 8601 com timezone do Amazonas
+    const sentAtString = nowLocal.format();
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const newMessage: Message = {
       id: tempId,
@@ -617,22 +606,16 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       isRead: false,
       status: 'sending'
     };
-
-
     setMessages(prev => [...prev, newMessage].sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf()));
     setTimeout(() => scrollToBottom(), 100);
     setMessageInput('');
-    
-    // Garantir que o contato atual não seja marcado como não lido quando enviamos mensagem
     if (selectedContact) {
       updateHasNewMessages(prev => ({
         ...prev,
         [selectedContact.id]: false
       }));
     }
-
     try {
-
       if (currentUserId === undefined) {
         throw new Error('Usuário não identificado');
       }
@@ -647,15 +630,11 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         sentAt: sentAtString,
         timezone
       });
-
-
-      // Atualizar mensagem com resposta da API
       setMessages(prev => prev.map(msg => 
         msg.id === tempId && msg.contactID === contactId
           ? { ...response, sentAt: msg.sentAt, status: 'sent', contactID: contactId, isSent: true }
           : msg
       ));
-
     } catch (error) {
       setMessages(prev => prev.map(msg => 
         msg.id === tempId && msg.contactID === contactId
@@ -693,17 +672,26 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedContact || !selectedSectorId) return;
-
     const tempId = Date.now();
     const isImage = file.type.startsWith('image/');
-    
-    const nowManausFile = dayjs().tz('America/Manaus').format();
+    // Garante que o sentAt da nova mensagem é maior que o das mensagens existentes
+    let nowLocalFile = dayjs();
+    if (messages.length > 0) {
+      const maxSentAt = messages.reduce((max, m) => {
+        const t = dayjs(m.sentAt).valueOf();
+        return t > max ? t : max;
+      }, 0);
+      if (nowLocalFile.valueOf() <= maxSentAt) {
+        nowLocalFile = dayjs(maxSentAt + 1000);
+      }
+    }
+    const sentAtString = nowLocalFile.format();
     const timezoneFile = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const newMessage: Message = {
       id: tempId,
       content: '',
       isSent: true,
-      sentAt: nowManausFile,
+      sentAt: sentAtString,
       isRead: false,
       mediaType: isImage ? 'image' : 'document',
       mediaUrl: URL.createObjectURL(file),
@@ -713,11 +701,8 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       contactID: selectedContact.id,
       status: 'sending'
     };
-
-    // Não filtre mensagens existentes, apenas adicione a nova
     setMessages(prev => [...prev, newMessage].sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf()));
     scrollToBottom();
-
     try {
       const base64 = await fileToBase64(file);
       const response = await sendFile({
@@ -731,16 +716,13 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         sectorId: Number(selectedSectorId),
         ...(currentUserId !== undefined ? { userId: currentUserId } : {}),
         isAnonymous: isCurrentUserAdmin ? isAnonymous : false,
-        sentAt: nowManausFile,
+        sentAt: sentAtString,
         timezone: timezoneFile
       });
-
       setMessages(prev => {
         return prev.map(msg => {
           if (msg.id === tempId && msg.contactID === selectedContact.id) {
-            // Sempre mantenha o sentAt local, ignore o sentAt do backend
             let sentAt = msg.sentAt;
-            // Forçar sentAt para ser maior que o maior sentAt atual
             if (prev.length > 0) {
               const maxSentAt = Math.max(...prev.map(m => dayjs(m.sentAt).valueOf()));
               if (dayjs(sentAt).valueOf() <= maxSentAt) {
@@ -753,7 +735,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         });
       });
       setTimeout(() => scrollToBottom(), 120);
-
       const lastMessagePreview = isImage ? '📷 Imagem enviada' : '📎 Anexo enviado';
       setContacts(prevContacts => prevContacts.map(contact => 
         contact.id === selectedContact.id
@@ -764,7 +745,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
             }
           : contact
       ));
-
     } catch (error) {
       setMessages(prev => prev.map(msg => 
         msg.id === tempId && msg.contactID === selectedContact.id
@@ -772,7 +752,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           : msg
       ));
     }
-
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -796,11 +775,20 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
 
   const handleSendAudio = async (audioBlob: Blob) => {
     if (!selectedContact || !selectedSectorId) return;
-
     const tempId = Date.now();
     const audioUrl = URL.createObjectURL(audioBlob);
-
-    const nowManausAudio = dayjs().tz('America/Manaus').format();
+    // Garante que o sentAt da nova mensagem é maior que o das mensagens existentes
+    let nowLocalAudio = dayjs();
+    if (messages.length > 0) {
+      const maxSentAt = messages.reduce((max, m) => {
+        const t = dayjs(m.sentAt).valueOf();
+        return t > max ? t : max;
+      }, 0);
+      if (nowLocalAudio.valueOf() <= maxSentAt) {
+        nowLocalAudio = dayjs(maxSentAt + 1000);
+      }
+    }
+    const sentAtString = nowLocalAudio.format();
     const timezoneAudio = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const newMessage: Message = {
       id: tempId,
@@ -811,18 +799,14 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       mimeType: 'audio/wav',
       sectorId: Number(selectedSectorId),
       contactID: selectedContact.id,
-      sentAt: nowManausAudio,
+      sentAt: sentAtString,
       isSent: true,
       isRead: false,
       status: 'sending'
     };
-
-    // Adiciona a mensagem temporária ao estado
     setMessages(prev => [...prev, newMessage].sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf()));
     scrollToBottom();
-
     try {
-      // Usar sendAudioMessage em vez de sendFile
       const response = await sendAudioMessage(
         audioBlob,
         selectedContact.number,
@@ -830,17 +814,13 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         Number(selectedSectorId),
         ...(currentUserId !== undefined ? [currentUserId] : []),
         isCurrentUserAdmin ? isAnonymous : false,
-        nowManausAudio,
+        sentAtString,
         timezoneAudio
       );
-
-      // Atualiza a mensagem temporária com os dados do servidor
       setMessages(prev => {
         return prev.map(msg => {
           if (msg.id === tempId) {
-            // Sempre mantenha o sentAt local, ignore o sentAt do backend
             let sentAt = msg.sentAt;
-            // Forçar sentAt para ser maior que o maior sentAt atual
             if (prev.length > 0) {
               const maxSentAt = Math.max(...prev.map(m => dayjs(m.sentAt).valueOf()));
               if (dayjs(sentAt).valueOf() <= maxSentAt) {
@@ -853,8 +833,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         });
       });
       setTimeout(() => scrollToBottom(), 120);
-
-      // Atualizar a última mensagem do contato na lista
       setContacts(prevContacts => prevContacts.map(contact => 
         contact.id === selectedContact.id
           ? {
@@ -864,7 +842,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
             }
           : contact
       ));
-
     } catch (error) {
       setMessages(prev => prev.map(msg => 
         msg.id === tempId 
@@ -1260,7 +1237,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           if (idxDup !== -1) {
             return prev;
           }
-          const normalized = { ...msg.payload, sentAt: normalizeSentAtToManaus(msg.payload.sentAt) };
+          const normalized = { ...msg.payload, sentAt: normalizeSentAtToLocal(msg.payload.sentAt) };
           // Forçar sentAt para ser sempre maior que o maior sentAt atual
           if (prev.length > 0) {
             const maxSentAt = Math.max(...prev.map(m => dayjs(m.sentAt).valueOf()));
@@ -1451,8 +1428,8 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     setEditedName('');
   };
 
-  // Função utilitária para normalizar sentAt para o horário do Amazonas
-  function normalizeSentAtToManaus(sentAt: string) {
+  // Função utilitária para normalizar sentAt para o horário local do usuário
+  function normalizeSentAtToLocal(sentAt: string) {
     const customFormat = 'DD/MM/YYYY HH:mm:ss';
     if (/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/.test(sentAt)) {
       return dayjs.utc(sentAt, customFormat).tz('America/Manaus').toISOString();
