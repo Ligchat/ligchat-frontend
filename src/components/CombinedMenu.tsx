@@ -105,9 +105,7 @@ const CombinedMenu: React.FC = () => {
 
     const fetchSectors = useCallback(async (token: string) => {
         try {
-            console.log('Fetching sectors...');
             const sectors = await getSectors(token);
-            console.log('Sectors fetched:', sectors);
             setSectors(sectors);
             
             // Verificar se o setor atualmente selecionado ainda existe
@@ -115,7 +113,6 @@ const CombinedMenu: React.FC = () => {
             if (currentSectorId) {
                 const sectorExists = sectors.some(s => s.id === currentSectorId);
                 if (!sectorExists) {
-                    console.log('Current sector not found in available sectors, probably deleted');
                     SessionService.removeSectorId();
                     setSelectedSector('');
                     
@@ -166,7 +163,6 @@ const CombinedMenu: React.FC = () => {
     // Adicionar listener para atualização de setores
     useEffect(() => {
         const handleSectorsUpdated = async () => {
-            console.log('Evento sectorsUpdated recebido, atualizando lista de setores');
             const token = SessionService.getToken();
             if (token) {
                 await fetchSectors(token);
@@ -319,9 +315,6 @@ const CombinedMenu: React.FC = () => {
 
     // Função para ordenar contatos com base no campo order
     const sortContactsByOrder = useCallback((contactsArray: any[]) => {
-        console.log('[DEBUG] Início da ordenação - Contatos recebidos:', 
-            contactsArray.map(c => ({ id: c.id, name: c.name, order: c.order }))
-        );
         
         const sorted = [...contactsArray].sort((a, b) => {
             // Ordenar pelo campo 'order' (menor primeiro)
@@ -338,9 +331,6 @@ const CombinedMenu: React.FC = () => {
             }
         });
         
-        console.log('[DEBUG] Final da ordenação - Contatos ordenados:', 
-            sorted.map(c => ({ id: c.id, name: c.name, order: c.order }))
-        );
         
         return sorted;
     }, []);
@@ -348,19 +338,12 @@ const CombinedMenu: React.FC = () => {
     // Função para buscar contatos do setor selecionado
     const fetchContacts = useCallback(async (sectorId: string) => {
         if (!sectorId) return;
-        console.log('[DEBUG] Iniciando busca de contatos para o setor:', sectorId);
         try {
             const response = await getContacts(Number(sectorId));
-            console.log('[DEBUG] Resposta da API de contatos:', response);
             if (response && response.data) {
-                console.log('[DEBUG] Contatos obtidos da API antes da ordenação:', 
-                    response.data.map(c => ({ id: c.id, name: c.name, order: c.order }))
-                );
+   
                 // Ordenar contatos pelo campo order antes de atualizar o estado
                 const sortedContacts = sortContactsByOrder(response.data);
-                console.log('[DEBUG] Contatos após ordenação final:', 
-                    sortedContacts.map(c => ({ id: c.id, name: c.name, order: c.order }))
-                );
                 setContacts(sortedContacts);
                 // Inicializar o estado de não lido com base no campo isViewed
                 const unreadMap = sortedContacts.reduce((acc, contact) => {
@@ -371,7 +354,6 @@ const CombinedMenu: React.FC = () => {
                 }, {});
                 setUnreadMessagesState(unreadMap);
             } else {
-                console.log('[DEBUG] Nenhum contato retornado da API');
                 setContacts([]);
             }
         } catch (error) {
@@ -403,10 +385,7 @@ const CombinedMenu: React.FC = () => {
                 const safePrev = Array.isArray(prev) ? prev : [];
                 const exists = safePrev.some(c => c.id === contactId);
                 const finalContactData = pendingContactsRef.current[contactId].contact;
-                
-                console.log('[WS] Adicionando/atualizando contato após buffer:', finalContactData);
-                
-                // Remover do buffer
+
                 delete pendingContactsRef.current[contactId];
                 
                 let newContacts;
@@ -439,14 +418,12 @@ const CombinedMenu: React.FC = () => {
 
         const handleWebSocketMessage = (msg: any) => {
             const msgType = msg.type || 'unknown';
-            console.log('[CombinedMenu] WebSocket mensagem recebida:', msgType);
             
             if (msgType === 'unread_status') {
                 const unread = msg.payload.unreadStatus || {};
                 const normalized = Object.fromEntries(
                     Object.entries(unread).map(([id, value]) => [id, !value])
                 );
-                console.log('[CombinedMenu] Status não lidos atualizados:', normalized);
                 setUnreadMessagesState(prev => ({ ...prev, ...normalized }));
                 
                 // Não precisamos de fetchContacts aqui, apenas atualizamos status
@@ -456,10 +433,7 @@ const CombinedMenu: React.FC = () => {
                 // Determinar se é uma mensagem enviada pelo usuário ou recebida
                 const isSentByUser = msg.payload.isSent === true;
                 
-                console.log('[CombinedMenu] Nova mensagem para contactId:', contactId, 
-                    isSentByUser ? '(enviada pelo usuário)' : '(recebida)');
-                
-                // Apenas marcar como não lido se for mensagem recebida, não enviada pelo usuário
+
                 if (!isSentByUser) {
                     setUnreadMessagesState(prev => ({
                         ...prev,
@@ -470,11 +444,6 @@ const CombinedMenu: React.FC = () => {
                 // Buscar contatos para atualização completa de dados
                 fetchContacts(selectedSector);
             } else if (msgType === 'contact') {
-                console.log('[CombinedMenu] Evento contact recebido:', {
-                    id: msg.payload.id,
-                    name: msg.payload.name,
-                    order: msg.payload.order
-                });
                 
                 // Formatar o nome padrão baseado no número se o nome não estiver presente
                 const contactData = { ...msg.payload };
@@ -482,26 +451,20 @@ const CombinedMenu: React.FC = () => {
                     // Formatar número como nome: +XX YY ZZZZ-ZZZZ -> "Contato +XX YY ZZZZ-ZZZZ"
                     const formattedNumber = contactData.number || '';
                     contactData.name = `Contato ${formattedNumber}`;
-                    console.log('[CombinedMenu] Nome formatado para contato:', contactData.name);
                 }
                 
                 // Verificar se temos todos os campos necessários
                 if (!contactData.id || !contactData.number) {
-                    console.warn('[CombinedMenu] Contato recebido sem dados obrigatórios:', contactData);
                     return; // Não processar contato incompleto
                 }
                 
                 // Não processar eventos de contato individuais, aguardar contacts_list para atualização completa
                 // fetchContacts(selectedSector);
             } else if (msgType === 'contacts_list') {
-                console.log('[CombinedMenu] Lista de contatos recebida:', { 
-                    count: msg.payload?.contacts?.length || 0 
-                });
-                
+
                 if (msg.payload?.contacts && Array.isArray(msg.payload.contacts)) {
                     // Atualiza a lista de contatos com a nova lista ordenada
                     const sortedContacts = sortContactsByOrder(msg.payload.contacts);
-                    console.log('[CombinedMenu] Atualizando todos os contatos com a nova lista ordenada');
                     setContacts(sortedContacts);
                     
                     // Atualizar também o mapa de não lidos, agora sobrescrevendo o estado local
@@ -519,7 +482,6 @@ const CombinedMenu: React.FC = () => {
             }
         };
 
-        console.log('[CombinedMenu] Conectando WebSocket principal para setor:', selectedSector);
         ChatWebSocketService.connect(token, handleWebSocketMessage, Number(selectedSector));
         
         return () => {
@@ -531,7 +493,6 @@ const CombinedMenu: React.FC = () => {
             
             ChatWebSocketService.disconnect();
             (window as any).combinedMenuWebSocketActive = false;
-            console.log('[CombinedMenu] WebSocket principal desconectado');
         };
     }, [selectedSector, fetchContacts, sortContactsByOrder]);
 

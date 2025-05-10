@@ -46,6 +46,7 @@ export interface SendMessageDto {
   userId: number;
   isAnonymous?: boolean;
   sentAt?: string;
+  timezone?: string;
 }
 
 // Constantes para tipos de áudio suportados
@@ -65,6 +66,7 @@ export interface SendFileDto {
   userId?: number;
   isAnonymous?: boolean;
   sentAt?: string;
+  timezone?: string;
 }
 
 export interface MessageType {
@@ -92,16 +94,20 @@ export const getMessagesByContactId = async (
   offset: number = 0
 ): Promise<MessageResponse[]> => {
   try {
+    console.log(`[MessageService] Buscando mensagens para o contato ${contactId}, limit=${limit}, offset=${offset}`);
     const response = await axios.get<MessageResponse[]>(
       `${API_URL}/contact/${contactId}/messages`,
       {
         params: { limit, offset }
       }
     );
-    return response.data.map(message => ({
-      ...message,
-      sentAt: new Date(message.sentAt).toISOString()
-    }));
+    
+    // Logar a resposta original para debug
+    console.log(`[MessageService] Resposta original do backend para contato ${contactId}:`, 
+      JSON.stringify(response.data.slice(0, 2), null, 2)); // Mostra apenas as primeiras 2 mensagens para não poluir
+    
+    // NÃO converter para UTC - manter o valor original
+    return response.data;
   } catch (error) {
     console.error("Erro ao buscar mensagens:", error);
     return [];
@@ -125,7 +131,8 @@ export const sendMessage = async (message: SendMessageDto): Promise<MessageRespo
         message: message.text,
         userId: message.userId,
         isAnonymous: message.isAnonymous,
-        sentAt: message.sentAt || new Date().toISOString()
+        sentAt: message.sentAt || new Date().toISOString(),
+        ...(message.timezone ? { timezone: message.timezone } : {})
       });
 
       // Verificar se a resposta é válida

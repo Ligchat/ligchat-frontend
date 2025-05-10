@@ -28,12 +28,8 @@ class ChatWebSocketService {
   constructor() {
     // Verificar se já existe uma instância global
     if ((window as any)[GLOBAL_WS_KEY]) {
-      console.log('🚨 [ChatWebSocketService] Usando instância WebSocket existente');
       return (window as any)[GLOBAL_WS_KEY];
     }
-    
-    // Registrar esta instância globalmente
-    console.log('🌟 [ChatWebSocketService] Criando nova instância WebSocket global');
     (window as any)[GLOBAL_WS_KEY] = this;
   }
   
@@ -50,17 +46,12 @@ class ChatWebSocketService {
   async connect(token: string, onMessage: OnMessageCallback, sectorId?: number): Promise<void> {
     // Se já estiver conectado ao mesmo setor, apenas adicione o callback
     if (this.isConnectedToSector(sectorId || 0)) {
-      console.log('🔄 [ChatWebSocketService] Já conectado ao setor, apenas adicionando callback', {
-        sectorId,
-        currentSectorId: this.currentSectorId
-      });
       this.onMessageCallback = onMessage;
       return;
     }
     
     // Se já estiver em processo de conexão, aguarde
     if (this.connectingPromise) {
-      console.log('⏳ [ChatWebSocketService] Conexão já em andamento, aguardando...');
       await this.connectingPromise;
       // Após conectado, apenas atualize o callback se for o mesmo setor
       if (this.currentSectorId === sectorId) {
@@ -71,53 +62,38 @@ class ChatWebSocketService {
     
     // Desconectar conexão existente se houver
     if (this.socket) {
-      console.log('🔌 [ChatWebSocketService] Desconectando WebSocket existente antes de nova conexão');
       this.disconnect();
     }
-    
-    console.log('🚀 [ChatWebSocketService] Iniciando conexão:', {
-      hasSectorId: !!sectorId,
-      hasToken: !!token,
-      handlersCount: this.contactsListHandlers.length
-    });
     
     // Criar promessa de conexão
     this.connectingPromise = new Promise((resolve) => {
       this.onMessageCallback = onMessage;
       this.currentSectorId = sectorId || null;
       const sectorParam = sectorId ? `?sector_id=${sectorId}` : '';
-      this.socket = new WebSocket(`wss://unofficial.ligchat.com/api/v1/ws${sectorParam}`);
+      this.socket = new WebSocket(`https://unofficial.ligchat.com/api/v1/api/v1/ws${sectorParam}`);
 
       this.socket.onopen = () => {
-        console.log('🌟 [ChatWebSocketService] Conexão estabelecida com sucesso');
         this._isConnected = true;
         resolve();
       };
       
       this.socket.onmessage = (event) => {
-        console.log('📥 [ChatWebSocketService] Mensagem recebida (raw)', 
-          event.data.substring(0, 150) + (event.data.length > 150 ? '...' : ''));
-        
+        // Log detalhado da mensagem recebida do WebSocket
+        console.log('[ChatWebSocketService] Mensagem recebida (raw)', event.data);
         try {
           const data = JSON.parse(event.data) as WebSocketMessage;
           
           // Special handling for contacts_list message type
           if (data.type === 'contacts_list') {
-            console.log('📋 [ChatWebSocketService] Lista de contatos recebida:', {
-              contactsCount: data.payload?.contacts?.length || 0,
-              handlersCount: this.contactsListHandlers.length
-            });
             
             // Process contacts list in both services
             if (data.payload?.contacts && Array.isArray(data.payload.contacts)) {
               // Call handlers registered specifically for this service
               this.contactsListHandlers.forEach((handler, index) => {
                 try {
-                  console.log(`🔄 [ChatWebSocketService] Chamando handler de contacts_list #${index+1}/${this.contactsListHandlers.length}`);
                   handler(data.payload!.contacts!);
-                  console.log(`✅ [ChatWebSocketService] Handler #${index+1} executado com sucesso`);
+                 
                 } catch (error) {
-                  console.error(`❌ [ChatWebSocketService] Erro no handler #${index+1}:`, error);
                 }
               });
             }
@@ -144,7 +120,6 @@ class ChatWebSocketService {
       };
       
       this.socket.onclose = (event) => {
-        console.log(`🔒 [ChatWebSocketService] Conexão fechada. Código: ${event.code}, Razão: ${event.reason || 'Não especificada'}`);
         this._isConnected = false;
         this.connectingPromise = null;
       };
@@ -161,20 +136,12 @@ class ChatWebSocketService {
   }
 
   addContactsListHandler(handler: (contacts: any[]) => void) {
-    console.log('➕ [ChatWebSocketService] Adicionando handler de contacts_list', {
-      totalBefore: this.contactsListHandlers.length,
-      handlerRef: handler.toString().substring(0, 50) + '...'
-    });
+
     this.contactsListHandlers.push(handler);
-    console.log('✅ [ChatWebSocketService] Handler adicionado com sucesso. Total:', this.contactsListHandlers.length);
   }
 
   removeContactsListHandler(handler: (contacts: any[]) => void) {
-    console.log('🗑️ [ChatWebSocketService] Removendo handler de contacts_list', {
-      totalBefore: this.contactsListHandlers.length
-    });
     this.contactsListHandlers = this.contactsListHandlers.filter(h => h !== handler);
-    console.log('✅ [ChatWebSocketService] Handler removido com sucesso. Total:', this.contactsListHandlers.length);
   }
 
   addMessageHandler(handler: (msg: any) => void) {
@@ -186,7 +153,6 @@ class ChatWebSocketService {
   }
 
   disconnect() {
-    console.log('🔌 [ChatWebSocketService] Desconectando');
     this.contactsListHandlers = [];
     this._isConnected = false;
     this.currentSectorId = null;

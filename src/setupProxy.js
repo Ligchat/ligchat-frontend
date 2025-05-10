@@ -27,7 +27,7 @@ module.exports = function(app) {
     app.use(
         '/unofficial',
         createProxyMiddleware({
-            target: 'https://unofficial.ligchat.com',
+            target: 'https://unofficial.ligchat.com/api/v1',
             changeOrigin: true,
             pathRewrite: {
                 '^/unofficial': '/api/v1'

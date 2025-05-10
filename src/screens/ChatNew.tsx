@@ -3,6 +3,7 @@ import '../styles/Chat/ChatNew.css';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
 import SessionService from '../services/SessionService';
 import { getContacts, updateContact, createContact, deleteContactFromSector, markContactAsViewed } from '../services/ContactService';
 import { sendMessage, sendFile, MessageResponse, sendAudioMessage } from '../services/MessageService';
@@ -22,6 +23,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
+dayjs.extend(customParseFormat);
 
 const MESSAGES_PAGE_SIZE = 5;
 
@@ -84,13 +86,11 @@ const VideoThumbnail: React.FC<{ src: string }> = ({ src }) => {
               // Remover o listener após capturar o thumbnail
               video.removeEventListener('timeupdate', handleTimeUpdate);
             } catch (error) {
-              console.error('Erro ao gerar thumbnail:', error);
             }
           };
           
           video.addEventListener('timeupdate', handleTimeUpdate);
         } catch (error) {
-          console.error('Erro ao carregar vídeo para thumbnail:', error);
         }
       };
       
@@ -193,6 +193,38 @@ interface Message extends MessageResponse {
   };
 }
 
+
+function formatMessageTime(sentAt: string, isLocalMessage?: boolean) {
+  // Se for mensagem local (recém-enviada), não converte timezone
+  if (isLocalMessage) {
+    return dayjs(sentAt).format('HH:mm');
+  }
+
+  // Detectar se a mensagem foi criada "agora" (menos de 1 minuto de diferença)
+  const sent = dayjs(sentAt);
+  const now = dayjs();
+  if (Math.abs(now.diff(sent, 'minute')) < 1) {
+    return sent.format('HH:mm');
+  }
+
+  // --- Lógica original mantida abaixo ---
+  const customFormat = 'DD/MM/YYYY HH:mm:ss';
+  let resultado = '';
+
+  if (/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/.test(sentAt)) {
+    resultado = dayjs.utc(sentAt, customFormat).local().format('HH:mm');
+  } else if (sentAt.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*(-|\+)/)) {
+    const match = sentAt.match(/^(.+?)([+-]\d{2}:\d{2})$/);
+    const datePart = match ? match[1] : sentAt;
+    const cleanDate = datePart.replace(/(\.\d{3})\d+/, '$1');
+    const dateNoOffset = cleanDate + 'Z';
+    resultado = dayjs.utc(dateNoOffset).local().format('HH:mm');
+  } else {
+    resultado = dayjs(sentAt).local().format('HH:mm');
+  }
+  return resultado;
+}
+
 // Adicionar função de formatação de telefone antes do componente ChatNew
 const formatPhoneNumber = (phone: string): string => {
   const numbers = phone.replace(/\D/g, '');
@@ -263,7 +295,7 @@ const ContactItem = React.memo(({ contact, selectedContactId, onSelect, tags, ha
           <div className="contact-name">{contact.name}</div>
           {contact.lastMessageTime && (
             <span className="message-time">
-              {dayjs(contact.lastMessageTime).format('HH:mm')}
+              {formatMessageTime(contact.lastMessageTime)}
             </span>
           )}
         </div>
@@ -286,8 +318,6 @@ const RenderContacts = React.memo(({
   tags: Tag[],
   hasNewMessages: { [contactId: number]: boolean }
 }) => {
-  // Remover log que causa muitas saídas no console
-  // console.log('👀 [ChatNew] Contatos renderizados:', contacts.map(c => ({id: c.id, order: c.order, name: c.name})));
   if (contacts.length === 0) {
     return (
       <div className="contacts-empty-state">
@@ -407,16 +437,31 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       const offset = pageParam * MESSAGES_PAGE_SIZE;
       const response = await getMessagesByContactId(contactId, MESSAGES_PAGE_SIZE, offset);
       const newMessages = Array.isArray(response) ? response : [];
-      newMessages.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
+      
+      
+      // Deixar como está, sem normalização de datas
       setHasMore(newMessages.length === MESSAGES_PAGE_SIZE);
+      
       if (append) {
-        setMessages(prev => [...newMessages, ...prev]);
+        setMessages(prev => [
+          ...prev,
+          ...newMessages.map(msg => ({
+            ...msg,
+            sentAt: normalizeSentAtToLocal(msg.sentAt)
+          }))
+        ].sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf()));
       } else {
-        setMessages(newMessages);
+        setMessages(
+          newMessages
+            .map(msg => ({
+              ...msg,
+              sentAt: normalizeSentAtToLocal(msg.sentAt)
+            }))
+            .sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf())
+        );
       }
       setInitialLoad(false);
     } catch (error) {
-      console.error('❌ loadMessages - Erro ao carregar mensagens:', error);
     } finally {
       if (append) setIsLoadingMore(false);
       else if (pageParam === 0) setIsMessagesLoading(false);
@@ -440,7 +485,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
   useEffect(() => {
     const checkSector = () => {
       const sectorId = SessionService.getSectorId();
-      console.log('🔄 useEffect [checkSector] - Verificando setor na sessão', { sectorId, selectedSectorId });
       if (sectorId && String(sectorId) !== selectedSectorId) {
         setSelectedSectorId(String(sectorId));
       }
@@ -514,7 +558,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       // Marcar como lido ao abrir o chat
       await markContactAsViewed(Number(contact.sectorId), contact.id);
     } catch (error) {
-      console.error('❌ handleContactSelect - Erro ao selecionar contato:', error);
     }
     if (isMobile) {
       setShowSidebar(false);
@@ -531,17 +574,13 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
   useEffect(() => {
     const fetchSelectedSector = async () => {
       if (!selectedSectorId) {
-        console.log('❌ fetchSelectedSector - Sem selectedSectorId, não buscando setor');
         return;
       }
 
       try {
-        console.log('🔄 fetchSelectedSector - Buscando setor:', selectedSectorId);
         const sector = await getSector(Number(selectedSectorId));
-        console.log('✅ fetchSelectedSector - Setor retornado:', sector);
         setSelectedSector(sector);
       } catch (error) {
-        console.error('❌ fetchSelectedSector - Erro ao buscar setor:', error);
       }
     };
 
@@ -549,22 +588,27 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
   }, [selectedSectorId]);
 
   const handleSendMessage = async () => {
-    console.log('🔄 handleSendMessage - Iniciando envio de mensagem', {
-      messageInput,
-      selectedContact,
-      selectedSectorId,
-      selectedSector
-    });
 
     if (!messageInput.trim() || !selectedContact || !selectedSectorId) {
-      console.log('❌ handleSendMessage - Dados inválidos para envio');
       return;
     }
 
     const tempId = Date.now();
     const contactId = selectedContact.id;
 
-    const nowLocal = dayjs().format(); // ISO 8601 com timezone local
+    // Garante que o sentAt da nova mensagem é maior que o das mensagens existentes
+    let nowLocal = dayjs();
+    if (messages.length > 0) {
+      const maxSentAt = messages.reduce((max, m) => {
+        const t = dayjs(m.sentAt).valueOf();
+        return t > max ? t : max;
+      }, 0);
+      if (nowLocal.valueOf() <= maxSentAt) {
+        nowLocal = dayjs(maxSentAt + 1000); // soma 1 segundo
+      }
+    }
+    const sentAtString = nowLocal.format(); // ISO 8601 com timezone local
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const newMessage: Message = {
       id: tempId,
       content: messageInput,
@@ -574,14 +618,15 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       mimeType: null,
       sectorId: Number(selectedSectorId),
       contactID: contactId,
-      sentAt: nowLocal,
+      sentAt: sentAtString,
       isSent: true,
       isRead: false,
       status: 'sending'
     };
 
-    // Atualizar mensagens apenas adicionando a nova
-    setMessages(prev => [...prev, newMessage]);
+
+    setMessages(prev => [...prev, newMessage].sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf()));
+    setTimeout(() => scrollToBottom(), 100);
     setMessageInput('');
     
     // Garantir que o contato atual não seja marcado como não lido quando enviamos mensagem
@@ -593,15 +638,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     }
 
     try {
-      console.log('🔄 handleSendMessage - Enviando mensagem para a API', {
-        text: messageInput,
-        to: selectedContact.number,
-        recipientPhone: selectedContact.number,
-        contactId: contactId,
-        sectorId: Number(selectedSectorId),
-        ...(currentUserId !== undefined ? { userId: currentUserId } : {}),
-        isAnonymous: isCurrentUserAdmin ? isAnonymous : false
-      });
 
       if (currentUserId === undefined) {
         throw new Error('Usuário não identificado');
@@ -614,20 +650,19 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         sectorId: Number(selectedSectorId),
         userId: currentUserId,
         isAnonymous: isCurrentUserAdmin ? isAnonymous : false,
-        sentAt: nowLocal
+        sentAt: sentAtString,
+        timezone
       });
 
-      console.log('✅ handleSendMessage - Resposta da API:', response);
 
       // Atualizar mensagem com resposta da API
       setMessages(prev => prev.map(msg => 
         msg.id === tempId && msg.contactID === contactId
-          ? { ...response, status: 'sent', contactID: contactId, isSent: true }
+          ? { ...response, sentAt: msg.sentAt, status: 'sent', contactID: contactId, isSent: true }
           : msg
       ));
 
     } catch (error) {
-      console.error('❌ handleSendMessage - Erro ao enviar mensagem:', error);
       setMessages(prev => prev.map(msg => 
         msg.id === tempId && msg.contactID === contactId
           ? { ...msg, status: 'error' }
@@ -669,6 +704,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     const isImage = file.type.startsWith('image/');
     
     const nowLocalFile = dayjs().format();
+    const timezoneFile = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const newMessage: Message = {
       id: tempId,
       content: '',
@@ -685,7 +721,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     };
 
     // Não filtre mensagens existentes, apenas adicione a nova
-    setMessages(prev => [...prev, newMessage]);
+    setMessages(prev => [...prev, newMessage].sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf()));
     scrollToBottom();
 
     try {
@@ -701,15 +737,28 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         sectorId: Number(selectedSectorId),
         ...(currentUserId !== undefined ? { userId: currentUserId } : {}),
         isAnonymous: isCurrentUserAdmin ? isAnonymous : false,
-        sentAt: nowLocalFile
+        sentAt: nowLocalFile,
+        timezone: timezoneFile
       });
 
-      setMessages(prev => prev.map(msg => 
-        msg.id === tempId && msg.contactID === selectedContact.id
-          ? { ...msg, id: response.id, status: 'sent' }
-          : msg
-      ));
-      scrollToBottom();
+      setMessages(prev => {
+        return prev.map(msg => {
+          if (msg.id === tempId && msg.contactID === selectedContact.id) {
+            // Sempre mantenha o sentAt local, ignore o sentAt do backend
+            let sentAt = msg.sentAt;
+            // Forçar sentAt para ser maior que o maior sentAt atual
+            if (prev.length > 0) {
+              const maxSentAt = Math.max(...prev.map(m => dayjs(m.sentAt).valueOf()));
+              if (dayjs(sentAt).valueOf() <= maxSentAt) {
+                sentAt = dayjs(maxSentAt + 1000).toISOString();
+              }
+            }
+            return { ...msg, id: response.id, status: 'sent', sentAt };
+          }
+          return msg;
+        });
+      });
+      setTimeout(() => scrollToBottom(), 120);
 
       const lastMessagePreview = isImage ? '📷 Imagem enviada' : '📎 Anexo enviado';
       setContacts(prevContacts => prevContacts.map(contact => 
@@ -723,7 +772,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       ));
 
     } catch (error) {
-      console.error('❌ handleFileSelected - Erro ao enviar arquivo:', error);
       setMessages(prev => prev.map(msg => 
         msg.id === tempId && msg.contactID === selectedContact.id
           ? { ...msg, status: 'error' }
@@ -759,6 +807,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     const audioUrl = URL.createObjectURL(audioBlob);
 
     const nowLocalAudio = dayjs().format();
+    const timezoneAudio = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const newMessage: Message = {
       id: tempId,
       content: '',
@@ -775,7 +824,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     };
 
     // Adiciona a mensagem temporária ao estado
-    setMessages(prev => [...prev, newMessage]);
+    setMessages(prev => [...prev, newMessage].sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf()));
     scrollToBottom();
 
     try {
@@ -787,20 +836,29 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         Number(selectedSectorId),
         ...(currentUserId !== undefined ? [currentUserId] : []),
         isCurrentUserAdmin ? isAnonymous : false,
-        nowLocalAudio
+        nowLocalAudio,
+        timezoneAudio
       );
 
       // Atualiza a mensagem temporária com os dados do servidor
-      setMessages(prev => prev.map(msg => 
-        msg.id === tempId 
-          ? { 
-              ...response,
-              mediaUrl: audioUrl,
-              status: 'sent' 
+      setMessages(prev => {
+        return prev.map(msg => {
+          if (msg.id === tempId) {
+            // Sempre mantenha o sentAt local, ignore o sentAt do backend
+            let sentAt = msg.sentAt;
+            // Forçar sentAt para ser maior que o maior sentAt atual
+            if (prev.length > 0) {
+              const maxSentAt = Math.max(...prev.map(m => dayjs(m.sentAt).valueOf()));
+              if (dayjs(sentAt).valueOf() <= maxSentAt) {
+                sentAt = dayjs(maxSentAt + 1000).toISOString();
+              }
             }
-          : msg
-      ));
-      scrollToBottom();
+            return { ...msg, status: 'sent', sentAt };
+          }
+          return msg;
+        });
+      });
+      setTimeout(() => scrollToBottom(), 120);
 
       // Atualizar a última mensagem do contato na lista
       setContacts(prevContacts => prevContacts.map(contact => 
@@ -814,7 +872,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       ));
 
     } catch (error) {
-      console.error('❌ handleSendAudio - Erro ao enviar áudio:', error);
       setMessages(prev => prev.map(msg => 
         msg.id === tempId 
           ? { ...msg, status: 'error' }
@@ -826,35 +883,26 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
   // Atualizar o useEffect que monitora o selectedSectorId
   useEffect(() => {
     const initializeData = async () => {
-      console.log('🔄 initializeData - Iniciando carregamento de dados', { selectedSectorId });
       if (!selectedSectorId) {
-        console.log('❌ initializeData - Sem setor selecionado, limpando contatos');
         if (setContacts) setContacts([]);
         return;
       }
       setIsContactsLoading(true);
       try {
-        console.log('🔄 initializeData - Buscando usuários e tags');
         const [users, tagsResponse] = await Promise.all([
           getAllUsers().catch(error => {
-            console.error('❌ initializeData - Erro ao buscar usuários:', error);
             return [];
           }),
           getTags(Number(selectedSectorId)).catch(error => {
-            console.error('❌ initializeData - Erro ao buscar tags:', error);
             return { data: [] };
           })
         ]);
 
-        console.log('✅ initializeData - Usuários obtidos:', users);
         setUsers(users || []);
 
-        // Atualizar tags garantindo que temos a estrutura correta
-        console.log('✅ initializeData - Tags obtidas:', tagsResponse);
         if (tagsResponse?.data && Array.isArray(tagsResponse.data)) {
           setTags(tagsResponse.data);
         } else {
-          console.log('⚠️ initializeData - Formato de resposta inválido para tags');
           setTags([]);
         }
 
@@ -863,14 +911,11 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         const token = SessionService.getToken();
         const decodedToken = token ? SessionService.decodeToken(token) : null;
         const userId = decodedToken ? decodedToken.userId : null;
-        console.log('🔄 initializeData - Usuário atual:', { userId });
         
         // Converter userId para número para garantir uma comparação correta
         const currentUserIdNum = userId ? Number(userId) : null;
-        console.log('🔄 initializeData - Usuário atual (número):', { currentUserIdNum });
         setCurrentUserId(currentUserIdNum || undefined);
       } catch (error) {
-        console.error('❌ initializeData - Erro ao carregar dados iniciais:', error);
         if (setContacts) setContacts([]);
         setTags([]);
       } finally {
@@ -895,13 +940,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
 
   useEffect(() => {
     const isInChatPage = location.pathname === '/chat';
-    console.log('🔄 useEffect [location] - Verificando localização', { 
-      isInChatPage, 
-      pathname: location.pathname, 
-      selectedContactId: selectedContact?.id 
-    });
     if (selectedContact && isInChatPage) {
-      console.log('🔄 useEffect [location] - Carregando mensagens na página de chat');
       loadMessages(selectedContact.id, 0, false);
     }
     // Remover o setInterval de loadMessages
@@ -1013,8 +1052,8 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     };
 
     // Garantir que sentAt está em formato ISO para o dayjs
-    const sentAt = dayjs(message.sentAt).isValid() ? dayjs(message.sentAt).toISOString() : new Date().toISOString();
-
+    const sentAt = message.sentAt;
+    
     const shouldRenderAsSent = message.isSent;
 
     return (
@@ -1025,7 +1064,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         {renderMediaContent()}
         <div className="chat-new-message-info">
           <span className="chat-new-message-time">
-            {dayjs(sentAt).tz('America/Sao_Paulo').format('HH:mm')}
+            {formatMessageTime(sentAt)}
           </span>
           {shouldRenderAsSent && renderMessageStatus(message)}
         </div>
@@ -1087,7 +1126,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       ));
 
     } catch (error) {
-      console.error('❌ handleTransferContact - Erro ao transferir contato:', error);
     } finally {
       setIsTransferLoading(false);
       setShowTransferModal(false);
@@ -1124,7 +1162,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           : contact
       ));
     } catch (error) {
-      console.error('❌ handleChangeTag - Erro ao alterar tag:', error);
+
     } finally {
       setIsTagLoading(false);
       setShowTagModal(false);
@@ -1141,7 +1179,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         const hasAudioInput = devices.some(device => device.kind === 'audioinput');
         setIsMicrophoneAvailable(hasAudioInput);
       } catch (error) {
-        console.error('❌ Error checking microphone:', error);
         setIsMicrophoneAvailable(false);
       } finally {
         setIsCheckingMicrophone(false);
@@ -1195,20 +1232,15 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     const handleWebSocketMessage = (msg: any) => {
       if (msg.type !== 'message') return;
       if (msg.payload && msg.payload.contactID === selectedContact.id) {
-        console.log('[WebSocket] Mensagem recebida:', msg.payload);
         
         setMessages(prev => {
           // 1. Verificar se a mensagem com mesmo ID já existe
           if (prev.some(m => m.id === msg.payload.id)) {
-            console.log('[WebSocket] Mensagem já existe com mesmo ID, ignorando');
             return prev;
           }
 
           // 2. Verificar se é uma mensagem enviada pelo usuário 
-          // Isto é fundamental: não adicionar mensagens que o próprio usuário enviou
           if (msg.payload.isSent === true) {
-            // 2.1 Verificar se já existe uma mensagem local com status 'sending' ou 'sent'
-            // que corresponda ao conteúdo e seja aproximadamente do mesmo tempo
             const idxSent = prev.findIndex(m =>
               (m.status === 'sending' || m.status === 'sent') &&
               m.content === msg.payload.content &&
@@ -1217,36 +1249,35 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
             );
             
             if (idxSent !== -1) {
-              console.log('[WebSocket] Encontrada mensagem local correspondente, substituindo');
-              // Substitui a mensagem local pela confirmação do servidor
               const updated = [...prev];
-              updated[idxSent] = { ...msg.payload, status: 'sent' };
-              return updated;
+              updated[idxSent] = { ...msg.payload, sentAt: updated[idxSent].sentAt, status: 'sent' };
+              // Ordenar após substituir
+              return updated.sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf());
             }
-            
-            // Se não encontrou correspondência mas é uma mensagem enviada pelo usuário,
-            // provavelmente já foi adicionada - melhor não adicionar para evitar duplicação
-            console.log('[WebSocket] Mensagem enviada pelo usuário sem correspondência local, ignorando');
             return prev;
           }
-          
           // 3. Se chegou aqui, é uma mensagem recebida do contato (não enviada pelo usuário)
-          // Verificar duplicação por conteúdo/tempo como último recurso
           const idxDup = prev.findIndex(m =>
             m.content === msg.payload.content &&
             m.contactID === msg.payload.contactID &&
             !m.isSent &&
             Math.abs(new Date(m.sentAt).getTime() - new Date(msg.payload.sentAt).getTime()) < 10000
           );
-          
           if (idxDup !== -1) {
-            console.log('[WebSocket] Possível duplicação de mensagem recebida, ignorando');
             return prev;
           }
-
-          // 4. Mensagem nova e válida, adicionar ao estado
-          console.log('[WebSocket] Adicionando nova mensagem');
-          return [...prev, msg.payload];
+          const normalized = { ...msg.payload, sentAt: normalizeSentAtToLocal(msg.payload.sentAt) };
+          // Forçar sentAt para ser sempre maior que o maior sentAt atual
+          if (prev.length > 0) {
+            const maxSentAt = Math.max(...prev.map(m => dayjs(m.sentAt).valueOf()));
+            if (dayjs(normalized.sentAt).valueOf() <= maxSentAt) {
+              normalized.sentAt = dayjs(maxSentAt + 1000).toISOString();
+            }
+          }
+          // Ordenar após adicionar
+          const updatedMessages = [...prev, normalized].sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf());
+          setTimeout(() => scrollToBottom(), 120);
+          return updatedMessages;
         });
 
         // Marcar como lido se a mensagem recebida for de outro usuário
@@ -1365,7 +1396,6 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       ));
 
     } catch (error) {
-      console.error('❌ handleAssignToMe - Erro ao delegar contato:', error);
     }
   };
 
@@ -1426,6 +1456,30 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     setIsEditingName(false);
     setEditedName('');
   };
+
+  // Função utilitária para normalizar sentAt para o horário local do usuário
+  function normalizeSentAtToLocal(sentAt: string) {
+    const customFormat = 'DD/MM/YYYY HH:mm:ss';
+    if (/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/.test(sentAt)) {
+      return dayjs.utc(sentAt, customFormat).local().toISOString();
+    } else if (sentAt.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*(-|\+)/)) {
+      const match = sentAt.match(/^(.+?)([+-]\d{2}:\d{2})$/);
+      const datePart = match ? match[1] : sentAt;
+      const cleanDate = datePart.replace(/(\.\d{3})\d+/, '$1');
+      return dayjs.utc(cleanDate + 'Z').local().toISOString();
+    } else {
+      return dayjs(sentAt).local().toISOString();
+    }
+  }
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const last = messages[messages.length - 1];
+    const mediaType = (last.mediaType || '').toLowerCase();
+    if (['audio', 'voice', 'image', 'document', 'video'].includes(mediaType)) {
+      setTimeout(() => scrollToBottom(), 300);
+    }
+  }, [messages.length]);
 
   return (
     <div className="chat-new-container dark-mode">
@@ -1723,7 +1777,9 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
                   Nenhuma mensagem encontrada
                 </div>
               )}
-              {messages.map(renderMessage)}
+              {messages
+                .sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf())
+                .map(renderMessage)}
               <div ref={messagesEndRef} />
               {showScrollToBottom && scrollButtonLeft !== null && (
                 <button
