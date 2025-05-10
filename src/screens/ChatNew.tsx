@@ -195,32 +195,26 @@ interface Message extends MessageResponse {
 
 
 function formatMessageTime(sentAt: string, isLocalMessage?: boolean) {
-  // Se for mensagem local (recém-enviada), não converte timezone
   if (isLocalMessage) {
-    return dayjs(sentAt).format('HH:mm');
+    return dayjs(sentAt).tz('America/Manaus').format('HH:mm');
   }
-
-  // Detectar se a mensagem foi criada "agora" (menos de 1 minuto de diferença)
-  const sent = dayjs(sentAt);
-  const now = dayjs();
+  const sent = dayjs(sentAt).tz('America/Manaus');
+  const now = dayjs().tz('America/Manaus');
   if (Math.abs(now.diff(sent, 'minute')) < 1) {
     return sent.format('HH:mm');
   }
-
-  // --- Lógica original mantida abaixo ---
   const customFormat = 'DD/MM/YYYY HH:mm:ss';
   let resultado = '';
-
   if (/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/.test(sentAt)) {
-    resultado = dayjs.utc(sentAt, customFormat).local().format('HH:mm');
+    resultado = dayjs.utc(sentAt, customFormat).tz('America/Manaus').format('HH:mm');
   } else if (sentAt.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*(-|\+)/)) {
     const match = sentAt.match(/^(.+?)([+-]\d{2}:\d{2})$/);
     const datePart = match ? match[1] : sentAt;
     const cleanDate = datePart.replace(/(\.\d{3})\d+/, '$1');
     const dateNoOffset = cleanDate + 'Z';
-    resultado = dayjs.utc(dateNoOffset).local().format('HH:mm');
+    resultado = dayjs.utc(dateNoOffset).tz('America/Manaus').format('HH:mm');
   } else {
-    resultado = dayjs(sentAt).local().format('HH:mm');
+    resultado = dayjs(sentAt).tz('America/Manaus').format('HH:mm');
   }
   return resultado;
 }
@@ -447,7 +441,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           ...prev,
           ...newMessages.map(msg => ({
             ...msg,
-            sentAt: normalizeSentAtToLocal(msg.sentAt)
+            sentAt: normalizeSentAtToManaus(msg.sentAt)
           }))
         ].sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf()));
       } else {
@@ -455,7 +449,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           newMessages
             .map(msg => ({
               ...msg,
-              sentAt: normalizeSentAtToLocal(msg.sentAt)
+              sentAt: normalizeSentAtToManaus(msg.sentAt)
             }))
             .sort((a, b) => dayjs(a.sentAt).valueOf() - dayjs(b.sentAt).valueOf())
         );
@@ -597,17 +591,17 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     const contactId = selectedContact.id;
 
     // Garante que o sentAt da nova mensagem é maior que o das mensagens existentes
-    let nowLocal = dayjs();
+    let nowManaus = dayjs().tz('America/Manaus');
     if (messages.length > 0) {
       const maxSentAt = messages.reduce((max, m) => {
         const t = dayjs(m.sentAt).valueOf();
         return t > max ? t : max;
       }, 0);
-      if (nowLocal.valueOf() <= maxSentAt) {
-        nowLocal = dayjs(maxSentAt + 1000); // soma 1 segundo
+      if (nowManaus.valueOf() <= maxSentAt) {
+        nowManaus = dayjs(maxSentAt + 1000).tz('America/Manaus'); // soma 1 segundo
       }
     }
-    const sentAtString = nowLocal.format(); // ISO 8601 com timezone local
+    const sentAtString = nowManaus.format(); // ISO 8601 com timezone do Amazonas
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const newMessage: Message = {
       id: tempId,
@@ -703,13 +697,13 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     const tempId = Date.now();
     const isImage = file.type.startsWith('image/');
     
-    const nowLocalFile = dayjs().format();
+    const nowManausFile = dayjs().tz('America/Manaus').format();
     const timezoneFile = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const newMessage: Message = {
       id: tempId,
       content: '',
       isSent: true,
-      sentAt: nowLocalFile,
+      sentAt: nowManausFile,
       isRead: false,
       mediaType: isImage ? 'image' : 'document',
       mediaUrl: URL.createObjectURL(file),
@@ -737,7 +731,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         sectorId: Number(selectedSectorId),
         ...(currentUserId !== undefined ? { userId: currentUserId } : {}),
         isAnonymous: isCurrentUserAdmin ? isAnonymous : false,
-        sentAt: nowLocalFile,
+        sentAt: nowManausFile,
         timezone: timezoneFile
       });
 
@@ -806,7 +800,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     const tempId = Date.now();
     const audioUrl = URL.createObjectURL(audioBlob);
 
-    const nowLocalAudio = dayjs().format();
+    const nowManausAudio = dayjs().tz('America/Manaus').format();
     const timezoneAudio = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const newMessage: Message = {
       id: tempId,
@@ -817,7 +811,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
       mimeType: 'audio/wav',
       sectorId: Number(selectedSectorId),
       contactID: selectedContact.id,
-      sentAt: nowLocalAudio,
+      sentAt: nowManausAudio,
       isSent: true,
       isRead: false,
       status: 'sending'
@@ -836,7 +830,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
         Number(selectedSectorId),
         ...(currentUserId !== undefined ? [currentUserId] : []),
         isCurrentUserAdmin ? isAnonymous : false,
-        nowLocalAudio,
+        nowManausAudio,
         timezoneAudio
       );
 
@@ -1266,7 +1260,7 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
           if (idxDup !== -1) {
             return prev;
           }
-          const normalized = { ...msg.payload, sentAt: normalizeSentAtToLocal(msg.payload.sentAt) };
+          const normalized = { ...msg.payload, sentAt: normalizeSentAtToManaus(msg.payload.sentAt) };
           // Forçar sentAt para ser sempre maior que o maior sentAt atual
           if (prev.length > 0) {
             const maxSentAt = Math.max(...prev.map(m => dayjs(m.sentAt).valueOf()));
@@ -1457,18 +1451,18 @@ const ChatNew: React.FC<ChatNewProps> = ({ hasNewMessages: externalHasNewMessage
     setEditedName('');
   };
 
-  // Função utilitária para normalizar sentAt para o horário local do usuário
-  function normalizeSentAtToLocal(sentAt: string) {
+  // Função utilitária para normalizar sentAt para o horário do Amazonas
+  function normalizeSentAtToManaus(sentAt: string) {
     const customFormat = 'DD/MM/YYYY HH:mm:ss';
     if (/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/.test(sentAt)) {
-      return dayjs.utc(sentAt, customFormat).local().toISOString();
+      return dayjs.utc(sentAt, customFormat).tz('America/Manaus').toISOString();
     } else if (sentAt.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*(-|\+)/)) {
       const match = sentAt.match(/^(.+?)([+-]\d{2}:\d{2})$/);
       const datePart = match ? match[1] : sentAt;
       const cleanDate = datePart.replace(/(\.\d{3})\d+/, '$1');
-      return dayjs.utc(cleanDate + 'Z').local().toISOString();
+      return dayjs.utc(cleanDate + 'Z').tz('America/Manaus').toISOString();
     } else {
-      return dayjs(sentAt).local().toISOString();
+      return dayjs(sentAt).tz('America/Manaus').toISOString();
     }
   }
 
