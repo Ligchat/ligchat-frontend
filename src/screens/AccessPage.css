@@ -505,7 +505,10 @@
 .ap-button-secondary {
     background-color: transparent;
     color: #e0e0e0;
-    border: 1px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
 }
 
 .ap-button-secondary:hover {
@@ -516,6 +519,10 @@
     background-color: #ff4c4c;
     color: white;
     border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
 }
 
 .ap-button-danger:hover {
@@ -555,7 +562,9 @@
 
 .ap-confirm-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    justify-content: center;
 }
 
 /* Empty States */
@@ -846,6 +855,15 @@
     .ap-multiselect-dropdown {
         min-width: 100%;
         font-size: 0.95rem;
+    }
+    .ap-confirm-actions {
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+        align-items: stretch;
+    }
+    .ap-confirm-actions .ap-button {
+        width: 100%;
     }
 }
 
