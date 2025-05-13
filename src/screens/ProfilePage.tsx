@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ReactCrop, { type Crop, centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import SessionService from '../services/SessionService';
-import { updateUser, getUser } from '../services/UserService';
+import axios from 'axios';
 import './ProfilePage.css';
 
 interface ProfileUpdateEvent extends CustomEvent {
@@ -14,6 +14,8 @@ interface ProfileUpdateEvent extends CustomEvent {
 }
 
 const PROFILE_UPDATED_EVENT = 'profileUpdated';
+
+const API_URL = process.env.REACT_APP_API_URL;
 
 const ProfilePage: React.FC = () => {
   const [name, setName] = useState<string>('');
@@ -43,19 +45,18 @@ const ProfilePage: React.FC = () => {
       setIsLoading(true);
       try {
         const token = SessionService.getToken();
-        console.log('Token:', token);
-        const decodedToken = token ? SessionService.decodeToken(token) : null;
-        console.log('Decoded token:', decodedToken);
-        const userId = decodedToken ? decodedToken.userId : null;
-        console.log('UserId:', userId);
-
-        if (!userId) {
+        if (!token) {
           setIsLoading(false);
-
           return;
         }
 
-        const response: any = await getUser(userId);
+        const response = await axios.get(`${API_URL}/users/profile`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        });
+        
         const userData = response.data;
         console.log('userData:', userData);
         setName(userData.name);
@@ -206,24 +207,22 @@ const ProfilePage: React.FC = () => {
     setErrorMessage('');
     try {
       const token = SessionService.getToken();
-      const decodedToken = token ? SessionService.decodeToken(token) : null;
-      const userId = decodedToken ? decodedToken.userId : null;
-
-      if (!userId) {
+      if (!token) {
         setErrorMessage('Usuário não autenticado');
         setIsLoading(false);
         return;
       }
 
-      const response = await updateUser(userId, {
+      const response = await axios.put(`${API_URL}/users/profile`, {
         name,
         email,
-        avatarUrl: avatarBase64 || avatar || '',
         phoneWhatsapp: phoneNumber,
-        isAdmin: false,
-        status: true,
-        sectors: [],
-        invitedBy: 0
+        avatarUrl: avatarBase64 || avatar || ''
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
 
       if (response) {
@@ -478,4 +477,5 @@ const ProfilePage: React.FC = () => {
 };
 
 export default ProfilePage;
+
 
