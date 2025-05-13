@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import ReactCrop, { type Crop, centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import SessionService from '../services/SessionService';
-import axios from 'axios';
 import './ProfilePage.css';
 
 interface ProfileUpdateEvent extends CustomEvent {
@@ -24,7 +23,7 @@ const ProfilePage: React.FC = () => {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [successMessage, setSuccessMessage] = useState<boolean>(false);
+  const [successMessage, setSuccessMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isEmailValid, setIsEmailValid] = useState<boolean>(true);
   const [isPhoneValid, setIsPhoneValid] = useState<boolean>(true);
@@ -40,33 +39,86 @@ const ProfilePage: React.FC = () => {
   const [imgRef, setImgRef] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
-    console.log('useEffect running');
+    console.log('useEffect running - Inicializando carregamento de dados do perfil');
     const fetchUserData = async () => {
       setIsLoading(true);
       try {
         const token = SessionService.getToken();
         if (!token) {
+          console.error('Token não encontrado');
           setIsLoading(false);
           return;
         }
 
-        const response = await axios.get(`${API_URL}/users/profile`, {
+        console.log('Realizando requisição GET para obter dados do perfil');
+        const response = await fetch(`${API_URL}/users/profile`, {
+          method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json'
           }
         });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Erro na resposta:', response.status, errorText);
+          throw new Error(`Erro ${response.status}: ${response.statusText}`);
+        }
+
+        // Formato da resposta:
+        // {
+        //   "message": "Success",
+        //   "code": "200",
+        //   "data": {
+        //     "id": 4,
+        //     "name": "Gustavo Ribeiro",
+        //     "email": "gustavo.ribeiro01001@gmail.com",
+        //     "avatarUrl": null,
+        //     "phoneWhatsapp": "(15) 99184-4611"
+        //   }
+        // }
         
-        const userData = response.data;
-        console.log('userData:', userData);
-        setName(userData.name);
-        setEmail(userData.email);
-        setPhoneNumber(userData.phoneWhatsapp);
-        setAvatar(userData.avatarUrl ? `${userData.avatarUrl}?t=${new Date().getTime()}` : null);
+        const responseData = await response.json();
+        console.log('Resposta completa da API:', responseData);
+        
+        if (responseData && responseData.data) {
+          const userData = responseData.data;
+          console.log('Dados do usuário recebidos:', userData);
+          
+          // Atualiza os campos com os dados recebidos
+          if (userData.name) {
+            console.log('Definindo nome:', userData.name);
+            setName(userData.name);
+          }
+          
+          if (userData.email) {
+            console.log('Definindo email:', userData.email);
+            setEmail(userData.email);
+          }
+          
+          if (userData.phoneWhatsapp) {
+            console.log('Definindo telefone:', userData.phoneWhatsapp);
+            setPhoneNumber(userData.phoneWhatsapp);
+          }
+          
+          if (userData.avatarUrl) {
+            const avatarUrl = `${userData.avatarUrl}?t=${new Date().getTime()}`;
+            console.log('Definindo avatar:', avatarUrl);
+            setAvatar(avatarUrl);
+          } else {
+            console.log('Usuário não possui avatar');
+            setAvatar(null);
+          }
+          
+          console.log('Dados do usuário carregados com sucesso');
+        } else {
+          console.error('Estrutura de resposta inesperada:', responseData);
+        }
       } catch (error) {
         console.error('Erro ao buscar dados do usuário', error);
       } finally {
         setIsLoading(false);
+        console.log('Finalizado carregamento de dados do perfil');
       }
     };
 
@@ -213,37 +265,68 @@ const ProfilePage: React.FC = () => {
         return;
       }
 
-      const response = await axios.put(`${API_URL}/users/profile`, {
+      // Dados a serem enviados
+      const userData = {
         name,
         email,
         phoneWhatsapp: phoneNumber,
         avatarUrl: avatarBase64 || avatar || ''
-      }, {
+      };
+
+      console.log('Enviando dados:', userData);
+
+      // Usando fetch API ao invés de axios
+      const response = await fetch(`${API_URL}/users/profile`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify(userData)
       });
 
-      if (response) {
-        setSuccessMessage(true);
-        setTimeout(() => setSuccessMessage(false), 3000);
-        
-        // Dispatch event with updated data
-        const event = new CustomEvent(PROFILE_UPDATED_EVENT, {
-          detail: {
-            avatarUrl: avatarBase64 || avatar,
-            name: name,
-            timestamp: new Date().getTime()
-          }
-        });
-        window.dispatchEvent(event);
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Erro na resposta:', response.status, errorData);
+        throw new Error(`Erro ${response.status}: ${response.statusText}`);
       }
+
+      const responseData = await response.json();
+      console.log('Resposta do servidor:', responseData);
+      
+
+      // Atualiza os dados do usuário com a resposta da API
+      if (responseData && responseData.data) {
+        const updatedUserData = responseData.data;
+        
+        // Atualiza os dados locais
+        setName(updatedUserData.name || '');
+        setEmail(updatedUserData.email || '');
+        setPhoneNumber(updatedUserData.phoneWhatsapp || '');
+        
+        // Atualiza o avatar apenas se não estiver enviando um novo
+        if (!avatarBase64 && updatedUserData.avatarUrl) {
+          setAvatar(`${updatedUserData.avatarUrl}?t=${new Date().getTime()}`);
+        }
+      }
+
+      // Exibe mensagem de sucesso
+      setSuccessMessage(responseData.message || 'Perfil atualizado com sucesso!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+      // Dispatch event with updated data
+      const event = new CustomEvent(PROFILE_UPDATED_EVENT, {
+        detail: {
+          avatarUrl: avatarBase64 || avatar,
+          name: name,
+          timestamp: new Date().getTime()
+        }
+      });
+      window.dispatchEvent(event);
     } catch (error: any) {
       console.error('Erro ao atualizar o usuário:', error);
       setErrorMessage(
-        error.response?.data?.message || 
-        'Erro ao atualizar o perfil. Tente novamente.'
+        error.message || 'Erro ao atualizar o perfil. Tente novamente.'
       );
     } finally {
       setIsLoading(false);
@@ -406,7 +489,7 @@ const ProfilePage: React.FC = () => {
 
           {successMessage && (
             <div className="success-message">
-              Perfil atualizado com sucesso!
+              {successMessage}
             </div>
           )}
 
